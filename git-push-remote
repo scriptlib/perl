@@ -22,7 +22,7 @@ sub push_remote {
             print "[$idx/$count]pushing to [$_] $url ...\n";
             if(system(qw/git push/,$_,@_)!=0) {
                 print "[$idx/$count]pushing to [$_] failed\n";
-                return undef;
+                next;
             }
         }
     }
