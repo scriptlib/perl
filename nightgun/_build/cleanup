@@ -1,0 +1,12 @@
+do{ my $x = {
+       't/cache' => 1,
+       't/html' => 1,
+       't/config' => 1,
+       't/share' => 1,
+       './tmp' => 1,
+       'blib' => 1,
+       './tmon.out' => 1,
+       't/notebook' => 1,
+       './cover_db' => 1
+     };
+$x; }

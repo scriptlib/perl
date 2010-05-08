@@ -1,0 +1,40 @@
+#!/usr/bin/perl -w
+###APPNAME:     wine-ndo
+###APPAUTHOR:   duel
+###APPDATE:	2009-03-02 04:07:35
+###APPVER:	0.1
+###APPDESC:     wine without dlloverrides 	
+###APPUSAGE:	
+###APPEXAMPLE:	wine-ndo
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+my @dlls;
+if(open FI,"-|",'regedit -E - HKEY_CURRENT_USER\\\Software\\\Wine\\\DllOverrides 2>/dev/null') {
+    while(<FI>) {
+        if(/\"([^"]+)\"\s*=\s*/) {
+            push @dlls,$1;
+        }
+    }
+}
+
+my $set;
+if(@dlls) {
+    $set = join(",",@dlls) . "=b";
+}
+if($ENV{WINEDLLOVERRIDES}) {
+    $ENV{WINEDLLOVERRIDES}=$set . ";" . $ENV{WINEDLLOVERRIDES};
+}
+else {
+    $ENV{WINEDLLOVERRIDES}=$set . ";";
+}
+exec("cn_wine",@ARGV);

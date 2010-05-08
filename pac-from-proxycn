@@ -1,0 +1,69 @@
+#!/usr/bin/perl -w
+###APPNAME:     pac-from-proxycn
+###APPAUTHOR:   duel
+###APPDATE:	2009-01-24 02:39:54
+###APPVER:	0.1
+###APPDESC:     pac-from-proxycn	
+###APPUSAGE:    [output]	
+###APPEXAMPLE:	pac-from-proxycn
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+my $output = shift;
+$output ||= $ENV{HOME} . "/.mozilla/firefox/profiles/shared/proxy.pac";
+my $testurl = shift;
+$testurl ||= "http://www.touch99.com";
+
+my @proxy_source = qw(
+http://www.proxycn.com/html_proxy/30fastproxy-1.html
+http://www.proxycn.com/html_proxy/http-1.html
+http://www.proxycn.com/html_proxy/socks5-1.html
+http://www.proxycn.com/html_proxy/socks4-1.html
+);
+
+my @proxy;
+foreach my $url(@proxy_source) {
+open FI,"-|","httpcat '$url' | parse_proxycn -";
+while(<FI>) {
+    chomp;
+    push @proxy,$_;
+}
+close FI;
+}
+use Term::ReadKey;
+foreach(@proxy) {
+    unless($_ =~ /^socks/i) {
+        next unless(system("proxy-test",$testurl,$_) == 0);
+    }
+    open FO,">",$output or die("$!\n");
+    print FO "\n\nfunction FindProxyForURL(url, host){\nreturn \"$_\";\n}\n";
+    close FO;
+    print STDERR "PAC:\t$output\n";
+    print STDERR "Proxy:$_\n";
+    print STDERR "-"x80 . "\n\"q\" to quit,while other key to change proxy\n" . "-"x80 . "\n";
+    while (<STDIN>) {
+        chomp;
+        if($_ and $_ eq "q") {
+            exit 0;
+        }
+        goto setProxy;
+
+    }
+    ReadMode 4;
+    my $key;
+    while(not defined ($key = ReadKey(-1))) {
+        sleep 4;
+    }
+    ReadMode 0;
+    last if(lc($key) eq "q");
+    setProxy:
+}

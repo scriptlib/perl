@@ -1,0 +1,68 @@
+#!/usr/bin/perl -w
+###APPNAME:     recode_filename
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	2008-05-15 23:31:10
+###APPVER:	0.1
+###APPDESC:     recode filenames
+###APPUSAGE:	[-r] -f from_code -t to_code (directorys ... files)
+###APPEXAMPLE:	recode_filename -f utf8 -t iso8859-1 *
+###APPOPTION:	-r:Recursive|-f charset:Source charset|-t charset:Destination charset
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty format_help/;
+exit 0 if(help_even_empty($0,@ARGV));
+
+#!/usr/bin/perl
+use Cwd;
+use Getopt::Std;
+use MyPlace::Script::Message;
+my %OPT;
+die("$0: Invalid usage\n") unless(getopts('rf:t:',\%OPT));
+
+sub on_int {
+    die("$0: Interupted by user\n");
+}
+$SIG{INT}=\&on_int;
+
+my $recur=0;
+my $from="utf8";
+my $to="iso8859-1";
+$recur=1 if(exists $OPT{r});
+$from=$OPT{f} if($OPT{f});
+$to=$OPT{t} if($OPT{t});
+sub do_recode;
+sub do_r_recode;
+
+
+sub do_recode {
+    return unless(@_);
+    app_message "convmv --notest -f $from -t $to -- " . join(" ",@_) . "\n";
+    return (system("convmv","--notest","-f",$from,"-t",$to,"--",@_) == 0) 
+}
+
+sub do_r_recode {
+    foreach my $fname(@_) {
+        if(-d $fname) {
+            my $olddir=cwd();
+            chdir "$fname" or next;
+            do_r_recode(glob("*"));
+            chdir $olddir;
+        }
+    }
+    do_recode(@_);
+}
+
+if($recur) {
+    do_r_recode(@ARGV);
+}
+else {
+    do_recode(@ARGV);
+}
+
+
+

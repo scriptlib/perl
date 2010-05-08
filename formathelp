@@ -1,0 +1,91 @@
+#!/usr/bin/perl -w
+###APPNAME:     formathelp
+###APPAUTHOR:   root
+###APPDATE:	Fri Sep 21 12:11:45 2007
+###APPVER:	0.1
+###APPDESC:     format perl script help message	
+###APPUSAGE:	(Filename) [Args...]
+###APPEXAMPLE:	formathelp "/share/bin/plhelp" [Additonal Option String]
+###APPOPTION:   -h,--help:Display this help
+use strict;
+my $filename=shift;
+my $DEFAULTOPT=shift;
+$DEFAULTOPT="" unless($DEFAULTOPT);
+
+$filename=$0 unless($filename);
+foreach(@ARGV) {
+    $filename=$0 if($_ eq "-h");
+    $filename=$0 if($_ eq "--help");
+}
+
+open(TEXT,"<",$filename) or 
+    die("***ERROR*** File not readable : $filename\n");
+
+my %HELPVAR=("APPNAME"=>$filename);
+
+while(<TEXT>) {
+    last unless(/^#/ or 
+                /^my\s*\$APP/ or 
+                /^use/ or
+                /^APP/);
+    if( /^#*(\w+):\s*(.*)\s*$/ or 
+        /^my\s*\$(APP\w+)\s*=\s*"*(.*)"*\s*;\s*$/ or
+        /^#*(\w+)="(.*)"\s*/ or
+        /^#*(\w+)=(.*)\s*/) {
+        my $name=$1;
+        my $result=$2;
+        $result =~ s/\\t/\t/g;
+        $result =~ s/\\n/\n/g;
+        $HELPVAR{$name} = $result;
+    }
+}
+close(TEXT);
+
+
+print($HELPVAR{APPNAME}) if($HELPVAR{APPNAME});
+
+print(" V",$HELPVAR{APPVER}) if($HELPVAR{APPVER});
+print("\n");
+
+print("\t- ",$HELPVAR{APPDESC},"\n") if($HELPVAR{APPDESC});
+if ($HELPVAR{APPAUTHOR}) {
+    print("\t- by $HELPVAR{APPAUTHOR}"); 
+    print(", $HELPVAR{APPDATE}") if($HELPVAR{APPDATE});
+    print("\n");
+}
+
+print("Usage:\n\t",$filename," ",$HELPVAR{APPUSAGE},"\n") if($HELPVAR{APPUSAGE});
+if ($HELPVAR{APPOPTION}) {
+    $HELPVAR{APPOPTION} .= "|" . $DEFAULTOPT;
+}
+else {
+    $HELPVAR{APPOPTION}=$DEFAULTOPT;
+}
+
+print("Option:\n  ") if($HELPVAR{APPOPTION});
+my @HELPOPT;
+foreach(split(/\|/,$HELPVAR{APPOPTION})) {
+    if(m/^\s*(.+)\s*:\s*(.+)\s*$/) {
+        my $c=$1;
+        my $str=$2;
+        $c = "-" . $c if($c !~ /^-/);
+        push(@HELPOPT,{opt=>$c,text=>$str});
+    }
+}
+foreach (@HELPOPT) {
+    printf("\t%-10s\t%s\n",$_->{opt},$_->{text});
+}
+
+
+print("Example:\n\t",$HELPVAR{APPEXAMPLE},"\n")
+    if($HELPVAR{APPEXAMPLE});
+
+my $StdKey=join("|",qw/APPNAME APPVER APPDESC APPOPTION APPEXAMPLE APPUSAGE APPDATE APPAUTHOR/);
+foreach(keys(%HELPVAR)) {
+    unless(/$StdKey/) {
+        print("$_:\n\t$HELPVAR{$_}\n");
+    }
+}
+
+
+

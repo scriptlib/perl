@@ -1,0 +1,77 @@
+#!/usr/bin/perl -w
+###APPNAME:     urlrule_new
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sat Mar 22 22:56:33 2008
+###APPVER:	0.1
+###APPDESC:     create new url rule	
+###APPUSAGE:	URL [0-5]
+###APPEXAMPLE:	urlrule_new http://www.shuku.net/novels/gulong/bianlang/bianlang.html 2
+###APPOPTION:	
+use strict;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_even_empty/;
+
+exit 0 if(help_even_empty($0,@ARGV));
+
+use MyPlace::ColorPrint;
+use MyPlace::URLRule;
+
+my %rule = %{parse_rule(@ARGV)};
+my $url=$rule{url};
+my $level=$rule{level};
+my $source=$rule{source};
+
+if(-f $source) {
+    app_message("Rule for $url exists,opened for editing instead\n");
+    system("vim",$source);
+    exit 0;
+}
+
+my $date=localtime();
+open VIMED,"|-","vim -c 'file $source' - ";
+print VIMED <<"HEAD";
+#!/usr/bin/perl -w
+#$url
+#$date
+use strict;
+
+HEAD
+
+print VIMED <<'USAGE';
+#================================================================
+# apply_rule will be called with ($RuleBase,%Rule),the result returned have these meaning:
+# $result{base}          : Base url to build the full url
+# $result{work_dir}      : Working directory (will be created if not exists)
+# $result{data}          : Data array extracted from url,will be passed to $result{action}(see followed)
+# $result{action}        : Command which the $result{data} will be piped to,can be overrided
+# $result{pipeto}        : Same as action,Command which the $result{data} will be piped to,can be overrided
+# $result{hook}          : Hook action,function process_data will be called
+# $result{no_subdir}     : Do not create sub directories
+# $result{pass_data}     : Data array which will be passed to next level of urlrule
+# $result{pass_name}     : Names of each $result{pass_data}
+# $result{pass_arg}      : Additional arguments to be passed to next level of urlrule
+#================================================================
+
+USAGE
+
+print VIMED <<'FUNC';
+sub apply_rule {
+    my $rule_base= shift(@_);
+    my %rule = %{shift(@_)};
+    my %r;
+    $r{base}=$rule_base;
+    open FI,"-|","netcat \'$rule_base\'";
+    while(<FI>) {
+    }
+    close FI;
+    return %r;
+}
+FUNC
+
+close VIMED;
+
+if(-f "$source" and ! -x "$source") {
+    chmod 0775,$source; 
+}
+exit 0;
+

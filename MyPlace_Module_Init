@@ -1,0 +1,2 @@
+#!/usr/bin/perl -w
+print $ENV{XR_PERL_MODULE_DIR}?$ENV{XR_PERL_MODULE_DIR}:"/share/perl/modules";

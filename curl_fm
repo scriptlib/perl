@@ -1,0 +1,29 @@
+#!/usr/bin/perl -w
+use strict;
+###APPNAME:	curl_fm
+###APPAUTHOR:	duel
+###APPDATE:	Thu Sep 20 07:46:29 2007
+###APPVER:	0.1
+###APPDESC:	curl with reformated output
+###APPUSAGE:	See curl --help
+###APPEXAMPLE:	
+###APPOPTION:	
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+
+
+open(FH,"curl @ARGV 2>&1|");
+while(<FH>) {
+    if(m/([0-9.]+%)/) {
+        print "$1";
+    } 
+    else {
+        print "Haha___$_";
+    }
+}
+
+
+
+
+

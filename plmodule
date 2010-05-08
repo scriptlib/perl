@@ -1,0 +1,28 @@
+#!/usr/bin/perl -w
+use strict;
+###APPNAME:	plmodule
+###APPAUTHOR:	xiaoranzzz
+###APPDATE:	Fri Sep 14 06:30:59 2007
+###APPVER:	0.1
+###APPDESC:	cat perl module if found
+###APPUSAGE:	(name)
+###APPEXAMPLE:	plmodule module/App.pl
+###APPOPTION:	
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+my $pldir=`pldir`;
+foreach my $mname(@ARGV) {
+    my $fullname=$pldir . "/" . $mname;
+    if (-f $fullname) {
+        open FILE,"<",$fullname;
+        print while(<FILE>);
+        close FILE;
+    }
+    else {
+        print STDERR "File not exists:$fullname\n";
+    }
+}
+
+
+

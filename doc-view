@@ -1,0 +1,87 @@
+#!/usr/bin/perl -w
+###APPNAME:     doc-view
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Thu Feb 14 14:30:06 2008
+###APPVER:	0.1
+###APPDESC:	List and view documents of specified package
+###APPUSAGE:	(package name)
+###APPEXAMPLE:  doc-view aptitude	
+###APPOPTION:	
+use strict;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_even_empty/;
+exit 0 if(help_even_empty($0,@ARGV));
+
+my @topdir = ( "/usr/share/doc" , "/usr/local/share/doc" );
+my $dirname = $ARGV[0];
+my $docdir;
+my $zview = "zless";
+my $view = "less";
+
+print("Lookup document directory in \"",join("\", \"",@topdir),"\"\n");
+foreach(@topdir) {
+    if(-d "$_/$dirname") {
+        $docdir = "$_/$dirname";
+        print("Found $docdir \n");
+    }
+}
+die("No document directory for $dirname found\n") unless($docdir);
+
+chdir($docdir) or die("$!\n");
+
+my @docs;
+foreach(glob("*")) {
+    if(-f "$_") {
+        push(@docs,$_);
+    }
+}
+
+sub listDoc(@) {
+    my $idx=0;
+    print("Documents list:\n");
+    print("------------------------------------------\n");
+    foreach(@_) {
+        $idx++;
+        printf("%4s. %s\n",$idx,$_);
+    }
+    print("__________________________________________\n");
+    print("Your Choice(q to quit):")
+}
+
+listDoc(@docs);
+
+sub getInput() {
+    my $lines = <STDIN>;
+    chomp($lines);
+    if($lines eq "q" || $lines eq "Q") {
+        return 0;
+    }
+    else {
+        return $lines;
+    }
+}
+
+sub viewdoc($) {
+    my $file = $_[0];
+    if(! -f "$file" ){
+        print STDERR "File not exist:$file\n";
+    }
+    else {
+        if($file =~ m/\.gz$/i) {
+            system($zview,"$file");
+        }
+        else {
+            system($view,"$file");
+        }
+    }
+}
+
+while(my $choice = getInput()) {
+    if($choice>0 and $choice<=@docs) {
+        viewdoc($docdir . "/" . $docs[$choice-1]);
+    }
+    listDoc(@docs);
+}
+
+
+

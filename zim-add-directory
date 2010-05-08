@@ -1,0 +1,120 @@
+#!/usr/bin/perl -w
+###APPNAME:     zim-add-directory
+###APPAUTHOR:   duel
+###APPDATE:	2008-05-11 14:27:04
+###APPVER:	0.1
+###APPDESC:     add a directory entry to a zim txt file
+###APPUSAGE:	[--test] (directory) [level] 
+#[entry Name] [entry Description] [destination]
+###APPEXAMPLE:	zim-add-directory Test .test abc.txt 
+###APPOPTION:   --test:No writing will be made
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use Cwd;
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_even_empty($0,@ARGV));
+
+my $test=0;
+
+if($ARGV[0] eq "--test") {
+    $test=1;
+    shift;
+}
+my ($root_d,$level) = @ARGV;
+
+#my ($edir,$ename,$edesc,$dist) = @ARGV;
+#my $eloc;
+sub tee($) {
+    my $str=shift;
+    print STDERR "\t$str";
+    return $str;
+}
+#
+#unless($ename) {
+#    $ename = $edir;
+#    $ename =~ s/\/$//g;
+#    $ename =~ s/^.*\///g;
+#}
+#
+#unless($eloc) {
+#    $eloc = $ename;
+##    $eloc =~ s/[ ,\+　～×]/_/g;
+#    $eloc = ".$eloc";
+#}
+#
+#unless($dist) {
+#    $dist=$ENV{PWD};
+#    $dist =~ s/\/?$/.txt/;
+#}
+
+sub error_chdir($) {
+    my $dir=shift;
+    warn "Can't change to $dir!\n";
+}
+
+sub writeDirectory($) {
+    $level--;
+    my $edir=shift;
+    my $ename = $edir;
+    $ename =~ s/\/$//g;
+    $ename =~ s/^.*\///g;
+    my @files;
+    my @dirs;
+
+    my $olddir=cwd();
+    chdir($edir) or return(error_chdir($edir));
+    foreach my $file (glob("*")) {
+        next if($file eq ".");
+        next if($file eq "..");
+        if(-d $file && $level>=0) {
+            push @dirs,$file;
+        }
+        else {
+            next unless($file =~ /\.txt$/);
+            $file =~ s/\.txt$//;
+            next if(-d $file);
+            push @files,$file;
+        }
+    }
+    if(@files or @dirs) {
+        chdir($olddir) or return(error_chdir($olddir));
+        print STDERR "Writing $edir.txt...\n";
+        if($test) {
+            open FO,">","/dev/null";
+        }
+        else {
+            open FO,">","$edir.txt";
+        }
+        print FO tee("=" x 6 . " " . $ename . " " .  "=" x 6 . "\n");
+        print FO tee(scalar(localtime()) . "\n\n");
+        if(@files) {
+            print FO tee("File list:\n");
+            foreach my $file(@files) {
+                print FO tee("* [[.$file|$file]]\n");
+            }
+            print FO tee("\n");
+        }
+        if(@dirs) {
+            print FO tee("Directory list:\n");
+            foreach my $dir(@dirs) {
+                print FO tee("* [[.$dir|<$dir>]]\n");
+            }
+        }
+        close FO;
+        if(@dirs) {
+            chdir($edir) or return(error_chdir($edir));
+            foreach(@dirs) {
+               &writeDirectory($_);
+            }
+        }
+    }
+    chdir($olddir) or return(error_chdir($olddir));
+}
+
+&writeDirectory($root_d);
+

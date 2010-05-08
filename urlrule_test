@@ -1,0 +1,20 @@
+#!/usr/bin/perl -w
+###APPNAME:     urlrule_test
+###APPAUTHOR:   duel
+###APPDATE:	Mon Mar 24 06:25:31 2008
+###APPVER:	0.1
+###APPDESC:     test rule for URL,no action will be performed	
+###APPUSAGE:	urlrule_test URL [0-5]
+###APPEXAMPLE:	urlrule_test http://www.sina.com.cn 0
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+my $url=shift;
+my $level=shift;
+$level=0 unless($level);
+system("urlrule_action",$url,$level,"cat",@ARGV);
+
+
+

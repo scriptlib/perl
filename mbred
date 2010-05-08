@@ -1,0 +1,256 @@
+#!/usr/bin/perl -w
+###APPNAME:     mbred
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	2009-06-19 01:16:23
+###APPVER:	0.1
+###APPDESC:     Edit MSDOS boot sector record	
+###APPUSAGE:	mbred [options] [bootsect_filename]
+###APPEXAMPLE:	mbred -v bootsect.bin
+###APPOPTION:	-v:Display bootsect detail|-d:Hex dump|-o:Set OEM ID|-b|Set bytes per sector|-s:Set sectors count|-S:Set disk size|-l:Set Label
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+
+use Data::Dumper;
+my @field = qw/oem bs sc rs fat re s md sf st h hs ls pdn ch sig id vol sys/;
+my %mbr = (
+    $field[0]=>["OEMID","STR",0x03,8,"MSDOS5.0"],
+    $field[1]=>["Bytes Per Sector","INT",0x0B,2,512],
+    $field[2]=>["Sectors Per Cluster","INT",0x0D,1,1],
+    $field[3]=>["Reserved Sectors","INT",0x0E,2,1],
+    $field[4]=>["FATs","INT",0x10,1,2],
+    $field[5]=>["Root Entries","INT",0x11,2,224],
+    $field[6]=>["Small Sectors","INT",0x13,2,2880],
+    $field[7]=>["Media Descriptor","HEX",0x15,1,"F0"],
+    $field[8]=>["Sectors Per FAT","INT",0x16,2,9],
+    $field[9]=>["Sectors Per Track","INT",0x18,2,18],
+    $field[10]=>["Heads","INT",0x1A,2,2],
+    $field[11]=>["Hidden Sectors","INT",0x1C,4,0],
+    $field[12]=>["Large Sectors","INT",0x20,4,0],
+    $field[13]=>["Physical Drive Number","INT",0x24,1,0],
+    $field[14]=>["Current Head","INT",0x25,1,0],
+    $field[15]=>["Signature","INT",0x26,1,41],
+    $field[16]=>["ID","HEX",0x27,4,"0000"],
+    $field[17]=>["Volume Label","STR",0x2B,11,"Boot"],
+    $field[18]=>["System ID","STR",0x36,8,"FAT12"]
+);
+my $MAXREAD = 512;
+my $MINIREAD = 0x36+8;
+
+sub hexdump {
+    my @result;
+    my $length = scalar(@_);
+    push @result,"       0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n";;
+    for(my $i = 0;$i<$length;$i+=16) {
+        my $count = $i + 16 >= $length ? $length - 1 : $i + 15;
+        my @lines = @_[$i..$count];
+        push @result,sprintf("%03X0  ",$i/16); 
+        push @result,sprintf("%02X "x16,@lines);
+        push @result,map {/[\p{IsGraph} ]/ ? $_ : "." } map chr,@lines;
+        push @result,"\n";
+    }
+    push @result,"       0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n";;
+    return @result;
+}
+
+
+sub getvalue {
+    my $src = shift;
+    my $fn  = shift;
+    my $type= $mbr{$fn}->[1];
+    my $idx = $mbr{$fn}->[2];
+    my $len = $mbr{$fn}->[3];
+#    print STDERR Dumper($mbr{$fn}),"\n";
+    my @data= @{$src}[$idx..$idx+$len-1];
+    my $i=0;
+    my $result="";
+    if($type eq "HEX") {
+        for($i..($len-1)) {
+            $result = sprintf("%02X",$data[$_]) . $result; 
+        }
+    }
+    elsif($type eq "STR") {
+        $result = join("",map chr,@data);
+    }
+    else {
+        $result = 0;
+        for($i..($len-1)) {
+            $result = $result + $data[$_]*(256**$_);
+        }
+    }
+    return $result;
+}
+sub setvalue {
+    my $dst = shift;
+    my $fn  = shift;
+    my $value = shift;
+    my $type= $mbr{$fn}->[1];
+    my $idx = $mbr{$fn}->[2];
+    my $len = $mbr{$fn}->[3];
+#    print STDERR Dumper($mbr{$fn}),"\n";
+    my @data= @{$dst}[$idx..$idx+$len-1];
+    my $i=0;
+    my $result;
+    if($type eq "HEX") {
+        $value  = hex($value);
+        $type = "INT";
+    }
+    if($type eq "STR") {
+        @data = map ord,split("",substr($value . " "x$len,0,$len));
+    }
+    else {
+        @data = ();
+        for($i..($len-1)) {
+            my $low = $value % 256;
+            $value = $value / 256;
+            push @data,$low;
+        }
+    }
+    @{$dst}[$idx..$idx+$len-1]=@data;
+    return @data;
+}
+
+
+my %opts;
+while(@ARGV) {
+    my $p = shift(@ARGV);
+    if($p eq '-v' or $p eq '-d') {
+        $opts{$p}=1;
+        next;
+    }
+    elsif($p =~ /^-/) {
+        $opts{$p}=shift(@ARGV);
+    }
+    else {
+        $opts{file}=$p;
+    }
+}
+
+my $bytes = "";
+if($opts{file}) {
+    open FI,"<",$opts{file} or die("$!\n");
+    while(<FI>) {
+        $bytes .= $_;
+        last if(length($bytes)>$MAXREAD);
+    }
+}
+$bytes = substr($bytes . "\0" x $MINIREAD,0,$MAXREAD);
+my @bytes = map ord,split("",$bytes);
+
+foreach(@field) {
+    my $value = getvalue(\@bytes,$_);
+    my $type = $mbr{$_}->[1];
+    my $def = $mbr{$_}->[4];
+#    print STDERR ("$_ = $def\n");
+    next if($value eq $def);
+    if((!$value) or $value =~ /^[\0x0,\s]+$/) {
+#        print STDERR "Assing $_ to default:",$def,"\n";
+        setvalue(\@bytes,$_,$def);
+    }
+    else {
+        if($type eq "HEX") {
+            setvalue(\@bytes,$_,$def) if($value =~ /^0+$/);
+        }
+    }
+}
+
+
+setvalue(\@bytes,"oem",$opts{-o}) if($opts{-o});
+my $secs = getvalue(\@bytes,"s");
+my $bs = getvalue(\@bytes,"bs");
+if($opts{-S} && $opts{-S} > 0) {
+    $opts{-S} = $opts{-S} * 1024;
+    if($opts{-b} && $opts{-b}>0) {
+        $bs = int($opts{-b});
+        $secs = int($opts{-S} / $bs);
+    }
+    elsif($opts{-s} && $opts{-s}) {
+        $secs = int($opts{-b});
+        $bs = int($opts{-S}/$secs);
+    }
+    else {
+        $secs = int($opts{-S}/$bs);
+    }
+}
+elsif($opts{-b} && $opts{-b}>0) {
+    $bs = int($opts{-b});
+}
+elsif($opts{-s} && $opts{-s}>0) {
+    $secs = int($opts{-s});
+}
+
+setvalue(\@bytes,"bs",$bs);
+setvalue(\@bytes,"s",$secs);
+my $size = int($secs * $bs / 1024);
+my $tracks = 80;
+if($size <180) {
+    setvalue(\@bytes,"h",1);
+    setvalue(\@bytes,"md","FE");
+    setvalue(\@bytes,"st",8);
+    $tracks = 40;
+}
+elsif($size <320) {
+    setvalue(\@bytes,"h",1);
+    setvalue(\@bytes,"md","FC");
+    setvalue(\@bytes,"st",9);
+    $tracks = 40;
+}
+elsif($size <360) {
+    setvalue(\@bytes,"h",1);
+    setvalue(\@bytes,"md","FA");
+    setvalue(\@bytes,"st",8);
+    $tracks = 80;
+}
+elsif($size <640) {
+    setvalue(\@bytes,"h",2);
+    setvalue(\@bytes,"md","FD");
+    setvalue(\@bytes,"st",9);
+    $tracks = 40;
+}
+elsif($size <720) {
+    setvalue(\@bytes,"h",2);
+    setvalue(\@bytes,"md","FB");
+    setvalue(\@bytes,"st",8);
+}
+elsif($size <1440) {
+    setvalue(\@bytes,"h",2);
+    setvalue(\@bytes,"md","F9");
+    setvalue(\@bytes,"st",9);
+}
+elsif($size <2880) {
+    setvalue(\@bytes,"h",2);
+    setvalue(\@bytes,"md","F0");
+    setvalue(\@bytes,"st",18);
+}
+elsif($size ==2880) {
+    setvalue(\@bytes,"h",2);
+    setvalue(\@bytes,"md","F0");
+    setvalue(\@bytes,"st",36);
+    setvalue(\@bytes,"sc",2);
+}
+elsif($size <260000)  {
+    setvalue(\@bytes,"sc",1);
+}
+else {
+    setvalue(\@bytes,"sc",4);
+}
+
+if($opts{-v}) {
+    foreach(@field) {
+        printf STDERR "%28s : ",$mbr{$_}->[0];
+        print STDERR getvalue(\@bytes,$_),"\n";
+    }
+}
+if($opts{-d}) {
+    print STDERR hexdump(@bytes),"\n";
+}
+
+print map chr,@bytes;# unless($opts{-v} or $opts{-d});
+
+    

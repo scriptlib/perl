@@ -1,0 +1,36 @@
+#!/usr/bin/perl -w
+###APPNAME:     r-xinit
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	2008-10-18 19:17:18
+###APPVER:	0.1
+###APPDESC:     my xinit	
+###APPUSAGE:	[client] [options...] [-- [server]]
+###APPEXAMPLE:	r-xinit
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+my $display;
+print STDERR ("Looking for free DISPLAY number...");
+foreach my $d(0..100) {
+    next if(-f "/tmp/.X$d-lock");
+    $display=":$d";
+    last;
+}
+if($display) {
+    print STDERR ("\t[Get $display\n");
+    exec "xinit",@ARGV,"--",$display;
+}
+else {
+    print STDERR ("\t[None available]\n");
+    exit 1;
+}
+

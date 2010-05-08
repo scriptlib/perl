@@ -1,0 +1,156 @@
+#!/usr/bin/perl -w
+###APPNAME:     getopts
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sat Oct 20 07:53:54 2007
+###APPVER:	0.1
+###APPDESC:     bochs configure	
+###APPUSAGE:	[-hd{a,b,c,d} hdimage] [-cd{a,b} cdiso] [-fd{a,b} fdimage] [-boot {a,c,d}]
+###APPOPTION:	-rom filename:Specify bios rom image|-vgabios:Specify vga bios rom image|-mem number:Memory|-display {x,sdl,wx}:Display mode|-interface {textconfig,wx}:Config Interface|-edit:Edit template
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+#Parse options
+sub getOpt(@) {
+    my $flag=0;
+    my $last="";
+    my %result;
+    foreach(@_) {
+        if(m/^-/) {
+            if($flag) {
+                $result{$last}=1;
+            }
+            else {
+                $result{noname}=$last if($last);
+            }
+            $flag=1;
+            $last=$_;
+        }
+        else {
+            if($flag) {
+                $result{$last}=$_;
+            }
+            else {
+                $result{noname}=$_;
+            }
+            $flag=0;
+            $last="";
+        }
+    }
+    if($flag) {
+        $result{$last}=1;
+    }
+    return %result;
+}
+
+my %OPTS=getOpt(@ARGV);
+
+
+$OPTS{-hda}=$OPTS{noname} if($OPTS{noname} && !$OPTS{-hda});
+foreach(keys(%OPTS)) {
+    print STDERR ("$_\t:\t$OPTS{$_}\n");
+}
+
+my $dir_bochs="/usr/share/bochs";
+my $dir_vgabios="/usr/share/vgabios/";
+
+sub pickBest(@) {
+    foreach(@_) {
+        return $_ if(-f $_);
+    }
+}
+
+my @prop_template=(
+    "/share/appdata/bochs/config-template",
+    "~/.getopts/config-template",
+    "config-template",
+    );
+
+my @prop_rom=(
+   "$dir_bochs/BIOS-bochs-latest",
+   "/share/appdata/bochs/bios.rom",
+   $OPTS{-rom},
+   );
+
+my @prop_vgarom=(
+   "$dir_bochs/VGABIOS-lgpl-latest", 
+   "$dir_vgabios/vgabios.bin",
+   "$dir_vgabios/vgabios.cirrus.bin",
+   $OPTS{-vgabios},
+);
+
+my $template=pickBest(@prop_template);
+die("Template not found in :\n" . join("\n",@prop_template)) unless(-f $template);
+
+if ($OPTS{-edit}) {
+    system("vim",$template);
+}
+
+my $rom=pickBest(@prop_rom);
+die("Bios rom not found in :\n" . join("\n",@prop_rom)) unless(-f $rom);
+
+my $vgarom=pickBest(@prop_vgarom);
+die("VGA Bios rom not found in :\n" . join("\n",@prop_vgarom)) unless(-f $vgarom);
+
+
+my $interface = "textconfig";
+$interface=$OPTS{-interface} if($OPTS{-interface});
+
+my $display = "x";
+$display=$OPTS{-display} if($OPTS{-display});
+
+my $mem=128;
+$mem=$OPTS{-mem} if($OPTS{-mem});
+
+my $boot="floppy, cdrom , disk";
+if($OPTS{-boot}) {
+    my $c=$OPTS{-boot};
+    $boot="floppy, cdrom, disk" if($c eq "a");
+    $boot="disk, floppy, cdrom" if($c eq "c");
+    $boot="cdrom, floppy, disk" if($c eq "d");
+}
+
+my $cdroma="/dev/cdrom";
+$cdroma=$OPTS{-cda} if($OPTS{-cda});
+
+
+open(TEMPLATE,"<",$template) or die("$!\n");
+print <TEMPLATE>;
+close TEMPLATE;
+
+
+print "config_interface: $interface\n" if($interface);
+print "display_library: $display\n" if($display);
+print "megs: $mem\n" if($mem);
+print "romimage: file=\"$rom\"\n" if($rom);
+print "vgaromimage: file=\"$vgarom\"\n" if($vgarom);
+
+#Boot
+print "boot: $boot\n" if($boot);
+
+#Floppy
+print "floppya: 1_44=\"$OPTS{-fda}\", status=inserted\n" if($OPTS{-fda});
+print "floppya: 1_44=\"$OPTS{-fdb}\", status=inserted\n" if($OPTS{-fdb});
+
+#Hard Disk
+print "ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14\n" if($OPTS{-hda} or $OPTS{-hdb});
+print "ata1: enabled=1, ioaddr1=0x170, ioaddr2=0x370, irq=15\n" if($OPTS{-cda} or $OPTS{-cdb});
+print "ata2: enabled=1, ioaddr1=0x1e8, ioaddr2=0x3e0, irq=2\n" if($OPTS{-hdc} or $OPTS{-hdd});
+print "ata3: enabled=1, ioaddr1=0x168, ioaddr2=0x360, irq=3\n" if($OPTS{-hde} or $OPTS{-hdf});
+
+
+#Channel 0
+print ("ata0-master: type=disk, mode=flat, translation=auto, path=\"" . $OPTS{-hda} . "\", cylinders=0, heads=16, spt=63, biosdetect=auto, model=\"Generic 1234\"\n") if($OPTS{-hda});
+print "ata0-slave: type=disk, mode=flat, translation=auto, path=\"$OPTS{-hdb}\", cylinders=0, heads=16, spt=63, biosdetect=auto, model=\"Generic 1234\"\n" if($OPTS{-hdb});
+
+#Channel 2
+print "ata2-master: type=disk, mode=flat, translation=auto, path=\"$OPTS{-hdc}\", cylinders=0, heads=16, spt=63, biosdetect=auto, model=\"Generic 1234\"\n" if($OPTS{-hdc});
+print "ata2-slave: type=disk, mode=flat, translation=auto, path=\"$OPTS{-hdd}\", cylinders=0, heads=16, spt=63, biosdetect=auto, model=\"Generic 1234\"\n" if($OPTS{-hdd});
+
+#CD-ROM
+#print "ata1: enabled=1, ioaddr1=0x170, ioaddr2=0x370, irq=3\n";
+print "ata1-master: type=cdrom, path=\"$cdroma\", status=inserted, biosdetect=auto, model=\"Generic 1234\"\n";
+print "ata1-slave: type=cdrom, path=\"$OPTS{-cdb}\", status=inserted, biosdetect=auto, model=\"Generic 1234\"\n" if($OPTS{-cdb});
+

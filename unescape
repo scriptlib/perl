@@ -1,0 +1,14 @@
+#!/usr/bin/perl
+
+use URI::Escape;
+if ( @ARGV ==  "" ) { 
+    while(<>) {
+        print uri_unescape($_),"\n";
+    }
+}
+else {
+    print uri_unescape("@ARGV"),"\n";
+}
+
+
+

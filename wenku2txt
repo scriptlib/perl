@@ -1,0 +1,103 @@
+#!/usr/bin/perl
+###APPNAME:     wenku2txt
+###APPAUTHOR:   duel
+###APPDATE:	2008-04-27 07:37:08
+###APPVER:	0.1
+###APPDESC:     Convert HTML novel from wenku.com to plain text	
+###APPUSAGE:	[option] directory
+###APPEXAMPLE:	wenku2txt 
+###APPOPTION:	--multi:Convert to multiple files|--one:Convert to one file(default)
+use strict;
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_even_empty($0,@ARGV));
+
+my $multi=shift;
+my $srcd;
+if($multi eq "--multi") {
+    $multi=1;
+    $srcd=shift;
+}
+elsif($multi eq "--one") {
+    $multi=0;
+    $srcd=shift;
+}
+else {
+    $srcd=$multi;
+    $multi=0;
+}
+
+die("Invalid directory:$srcd\n") unless(-d $srcd and -r "$srcd/index.htm");
+
+require HTML::TreeBuilder;
+no warnings;
+
+my $title;
+my @pages;
+my $tree = HTML::TreeBuilder->new();
+$tree->parse_file("$srcd/index.htm");
+
+my @tags = $tree->find("title");
+$title=$tags[0]->as_text() if(@tags);
+unless($title) {
+    require MyPlace::Filename;
+    $title=MyPlace::Filename::get_basename(MyPlace::Filename::get_fullname($srcd));
+}
+
+foreach my $node ($tree->find("a")) {
+    my $href = $node->attr("href");
+    my $text = $node->as_text();
+    if($href =~ /\d+\.htm$/) {
+        push @pages,[$href,$text];
+    }
+}
+
+use MyPlace::HTML::Convertor;
+
+sub htm2txt($) {
+    my $file=shift;
+    my $result = text_from_file( $file,["mText"],[] );
+    if($result) {
+        return $result;
+    }
+    else {
+        print STDERR "Error when converting $file\n";
+        return [];
+    }
+}
+
+unless($multi) {
+    print STDERR "Generating $title.txt ...\n"; 
+    open FO,">","$title.txt";
+    print FO "\n$title\n\n\n";
+    foreach my $idx(0 .. $#pages) {
+        print FO $idx + 1,".",$pages[$idx]->[1],"\n";
+    }
+    print FO "\n\n";
+}
+
+my $numlen=length(@pages);
+foreach my $idx(0 .. $#pages) {
+    my $file = $pages[$idx]->[0];
+    my $name = $pages[$idx]->[1];
+    $idx++;
+    $idx = "0"x($numlen-length($idx)) . $idx;
+    if($multi) {
+        print STDERR "Generating \"$title - $idx - $name.txt\"\n";
+        open FO,">","$title - $idx - $name.txt";
+        print FO "\n$title\n\n\n$name\n\n",@{htm2txt("$srcd/$file")};
+        close FO;
+    }
+    else {
+        print FO "\n\n$name\n\n",@{htm2txt("$srcd/$file")}; 
+    }
+}
+
+close FO unless($multi);
+
+
+

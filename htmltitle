@@ -1,0 +1,8 @@
+#!/usr/bin/perl -W
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+    foreach(<>) {
+        if (/<\s*title\s*>(.*)<\s*\/title\s*>/i) {
+            print $1,"\n";
+            exit;
+        }
+    }

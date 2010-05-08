@@ -1,0 +1,19 @@
+#!/usr/bin/perl -w
+###APPNAME:     IncludeFile_New
+###APPAUTHOR:   duel
+###APPDATE:	Sun Mar 30 08:57:35 2008
+###APPVER:	0.1
+###APPDESC:     Create new perl script for IncludeFile usage	
+###APPUSAGE:	(name)
+###APPEXAMPLE:	IncludeFile_new HTML/Test
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+do `IncludeFile Help`;
+exit 0 if(Help::do_and_exit($0,@ARGV));
+
+my $name=shift;
+my $fn=`IncludeFile \"$name\"`;
+$fn=`pldir` . "/include/$name.pl" unless($fn);
+system("vim",$fn);
+

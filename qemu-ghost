@@ -1,0 +1,60 @@
+#!/usr/bin/perl -w
+###APPNAME:     qemu-ghost
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Thu Apr 17 03:54:33 2008
+###APPVER:	0.1
+###APPDESC:     qemu-ghost	
+###APPUSAGE:    (GhostImage) (DiskImages,...)
+###APPEXAMPLE:	qemu-ghost win2k win2k.gho
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_even_empty($0,@ARGV));
+
+my $ghostimg=shift;
+
+
+die("File not exists:$ghostimg\n") unless(-f $ghostimg);
+foreach my $diskimg (@ARGV) {
+    die("File not exists:$diskimg\n") unless(-f $diskimg);
+}
+
+my $ghostd="/tmp/qemu-ghost.xiaoranzzz";
+if(! -d $ghostd) {
+    mkdir $ghostd or die("$!\n");
+}
+
+if($ghostimg !~ /^\//) {
+    $ghostimg =~ s/\.\///;
+    $ghostimg = $ENV{PWD} . "/$ghostimg";
+}
+my $lname=$ghostd . "/ghost.gho";
+
+print STDERR "Link \"$ghostimg\" to \"$lname\"\n";
+system("ln","-sf",$ghostimg,$lname);
+
+my $hda="/myplace/emuos/ghostbox.raw";
+my $hdb="fat:$ghostd";
+
+#print STDERR join(" ",("myqemu","-hda",$hda,"-hdb",$hdb,"-hdc",$diskimg)),"\n";
+
+my @arg;
+push @arg,"-hdc",$ARGV[0] if($ARGV[0]);
+push @arg,"-hdd",$ARGV[1] if($ARGV[1]);
+
+exec "qemudos","-hda",$hda,"-hdb",$hdb,@arg;
+
+
+
+
+
+
+
+
+
+
+

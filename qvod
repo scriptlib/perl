@@ -1,0 +1,97 @@
+#!/usr/bin/perl
+use URI::Escape;
+
+sub qvodplayer {
+    return ('d:\qvodplayer\qvodplayer.exe','-qvodurl',@_);
+}
+
+my $url=shift;
+#system('msgbox',"Qvod $url");
+if($url) {
+    $url = uri_unescape($url);
+    $url =~ s/\\/\//g;
+    $url =~ s/#qvodplayer#$//;
+    $url =~ s/^qvod://;
+#    if($url =~ m/^qvod:\/\/(?:http|qvod)\//) {
+#        $url =~ s/^qvod:\/\/(http|qvod)\//$1:\/\//;
+#    }
+}
+my $QVODPLAYER='d:\qvodplayer\qvodplayer.exe';
+my $APP='C:\PROGRAM FILES\Internet Explorer\IExplore.exe';
+my $ARGS="";
+my $output = "$ENV{HOME}" . "/.qvodplayer/data/playlist.js";
+my $template = "/myplace/wine/bin/qvodplayer.html";
+sub qvodplayer_url {
+    my $url=shift;
+#    $url =~ s/#qvodplayer#$//;
+    my $urlname = $url;
+    for($urlname) {
+        s/\|+$//;
+        s/^.*[\|\/\\]//;
+    }
+    $url = uri_escape($url);
+    $urlname = uri_escape($urlname);
+    my $line = "urls.push(new Array(\"$url\",\"$urlname\"));\n";
+    if(-f $output) {
+        open FI,"<",$output;
+        my @text = grep {!($_ eq $line)} <FI>;
+        close FI;
+        open FO,">",$output;
+        print FO @text if(@text);
+    }
+    else {
+        open FO,">",$output;
+        print FO 'var urls = new Array();',"\n";
+    }
+    print FO $line;
+    close FO;
+    return "file:///z:" . $template;
+}
+
+if(!$url) {
+    $url="file:///z:/myplace/wine/bin/qvodplayer.html";
+}
+elsif(-f $url) {
+    $url=qx/fullname "$url"/;
+    chomp($url);
+    if($url =~ /\.torrent$/) {
+        $url = qx/winepath -w "$url"/;
+        chomp($url);
+        $APP="start";
+        $ENV{WINEDLLOVERRIDES}="comctl32=b";
+    }
+    else {
+        $url="file:///z:$url"; 
+    }
+}
+#elsif($url =~ m/\.torrent$/i) {
+#    $APP=$QVODPLAYER;
+#    $ARGS='-qvodplayer.torrent';
+#}
+elsif($url =~ m/^qvod:/i) {
+    $url = qvodplayer_url($url);
+}
+elsif($url =~ m/\.(?:rm|rmvb|avi|mpg|mpeg|mp4|wma|qt|torrent)$/i) {
+    $url =~ s/^qvod/http/;
+    $url = qvodplayer_url($url);
+}
+else {
+    $APP=$QVODPLAYER;
+    $ARGS='-qvodurl';
+}
+#chdir $ENV{HOME} . '/.qvodplayer/data/QvodPlayer';
+#&reg_qvod();
+$ENV{WINEPREFIX}=$ENV{HOME} . '/.qvodplayer';
+my $qv = `ps -A -o comm | grep -i 'qvodterminal'`;
+chomp($qv);
+print STDERR $qv,"\n";
+unless($qv) {
+    system("cn_wine 'd:\\QvodPlayer\\QvodTerminal.exe' -H 2>/dev/null 1>/dev/null &");
+    sleep(1);
+}
+chdir $ENV{HOME} . '/.qvodplayer/data/QvodPlayer';
+#system("msgbox","$APP --  $ARGS -- $url");
+print STDERR ("cn_wine '$APP' $ARGS '$url'\n");
+exec("cn_wine '$APP' $ARGS \"$url\"");
+#&unreg_qvod();
+

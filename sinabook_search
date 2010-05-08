@@ -1,0 +1,116 @@
+#!/usr/bin/perl -w
+###APPNAME:     sinabook_search
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 11 16:56:49 2008
+###APPVER:	0.1
+###APPDESC:	[cmd] default as sinabook_justtext
+###APPUSAGE:    <keyword> [cmd]	
+###APPEXAMPLE:	sinabook_search 我的名字
+###APPOPTION:	
+use strict;
+use URI::Escape;
+use HTML::TreeBuilder;
+use Data::Dumper;
+
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $keyword=shift;
+print "searching club.book.sina.com.cn for \"$keyword\" ...\n";
+
+my $cmd=shift;
+$cmd = "sinabook_justtext" unless($cmd);
+
+$keyword=`echo $keyword | iconv -f utf8 -t gb2312 -c`;
+chomp($keyword);
+$keyword = uri_escape($keyword);
+my $URL="http://club.book.sina.com.cn/booksearch/booksearch.php?key1=&k=&textfield=&bookuser=&c=112&col=%B6%C1%CA%E9&item=writingname&area=hotkey&kw=$keyword";
+
+open FI,"-|","netcat '$URL' | iconv -f gb2312 -t utf8" or die("Unable to fork netcat | iconv\n");
+my @tree;
+$tree[0] = HTML::TreeBuilder->new(); 
+my $pages=1;
+while(<FI>) {
+    $tree[0]->parse($_);
+    my @match = $_ =~ /(\/booksearch\/booksearch\.php\?page=)([0-9]+)(\&[^\"\' ]+)/;
+    if(@match) {
+        $pages = $match[1];
+    }
+}
+close FI;
+$tree[0]->eof;
+
+for(my $i=2;$i<=$pages;$i++) {
+    $tree[$i-1] = HTML::TreeBuilder->new();
+    open FI,"-|","netcat '$URL&page=$i' | iconv -f gb2312 -t utf8" or die("Unable to fork netcat | iconv\n");
+    $tree[$i-1]->parse($_) while(<FI>);
+    close FI;
+    $tree[$i-1]->eof;
+}
+
+sub gettext(@) {
+    my @text;
+    foreach my $child(@_) {
+        next if(ref $child);
+        push(@text,$child) if($child);
+    }
+    return @text;
+}
+
+sub selectBook(@) {
+    my @books = @_;
+    print "=" x 40,"\n\n";
+    for(my $i=0;$i<@books;$i++) {
+        printf "%-2d. %s (%s)\n",$i + 1,$books[$i]{title},$books[$i]{author};
+    }
+    print "=" x 40,"\n";
+    print "Your choice (0 to quit): ";
+    my $result;
+    until($result) {
+        $result = <STDIN>;
+        chomp($result);
+        if($result =~ /^\d$/) {
+           return $result-1 if($result >=0 && $result <=@books);
+           $result=0;
+        }
+        print "\rInvalid input,Select again: ";
+    }
+}
+
+my @books=();
+foreach my $tree(@tree) {
+foreach my $div($tree->look_down("_tag","div","class","des")) {
+    my %book;
+    foreach my $node($div->look_down("_tag",qr/^(a|p)$/i)) {
+        $node->normalize_content;
+        if((!$book{author}) and $node->tag() eq "p") {
+            my @text=gettext($node->content_list);
+            $book{author} = $text[0] if(@text);
+            $book{about} = $text[1];
+        };
+        unless($book{href}) {
+            next unless($node->tag() eq "a");
+            $book{href}=$node->attr("href");
+            my @text=gettext($node->content_list);
+            $book{title} = $text[0] if(@text);
+        };
+    }
+    push(@books,\%book);
+}
+$tree->delete();
+}
+
+if(!@books) {
+    print "Empty result!\n";
+    exit 0;
+}
+else {
+    my $idx = selectBook(@books);
+    exit 0 if($idx == -1);
+    print("Selected ",$books[$idx]{href},"\n");
+    system($cmd,$books[$idx]{href});
+}
+
+

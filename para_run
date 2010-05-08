@@ -1,0 +1,29 @@
+#!/usr/bin/perl -w
+###APPNAME:     para_run
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Wed Mar 26 15:10:05 2008
+###APPVER:	0.1
+###APPDESC:     run parallel processing
+###APPUSAGE:	(Number of Process)
+###APPEXAMPLE:	cat cmd.lst | para_run 3
+###APPOPTION:	
+use strict;
+use Term::ANSIColor;
+use POSIX ":sys_wait_h";
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_required/;
+use MyPlace::ParallelRun;
+
+exit 0 if(help_required($0,@ARGV));
+
+my $max=shift;
+my $verbose=shift;
+die("Number must greater than 0\n") unless($max>0);
+
+para_init $max,$verbose;
+while(<STDIN>) {
+    chomp;
+    para_queue($_);
+}
+para_cleanup;
+

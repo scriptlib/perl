@@ -1,0 +1,25 @@
+#!/usr/bin/perl -w
+###APPNAME:     sinabook_batchget
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Wed Mar 12 04:10:17 2008
+###APPVER:	0.1
+###APPDESC:     batch download books from book.sina.com.cn	
+###APPUSAGE:	URL [CMD]
+###APPEXAMPLE:	sinabook_batchget http://club.book.sina.com.cn/booksearch/booksearch.php?area=author&kw=%BC%D6%C6%BD%B0%BC sinabook_justtext
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+my $URL=shift;
+my $CMD=shift;
+$CMD="sinabook_justtext" unless($CMD);
+
+open FI,"-|","urlrule -P -H '$URL'";
+while(<FI>) {
+    chomp;
+    system($CMD,$_);
+}
+close FI;
+

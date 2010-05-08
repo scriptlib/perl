@@ -1,0 +1,70 @@
+#!/usr/bin/perl -w
+###APPNAME:     pskill
+###APPAUTHOR:   root
+###APPDATE:	Sat Sep 29 09:13:38 2007
+###APPVER:	0.1
+###APPDESC:     Send SIGNAL to process by name,default is KILL\n\tTake same options as killall
+###APPUSAGE:	[Options...] (NAME)
+###APPEXAMPLE:	pskill -s TERM gedit
+###APPOPTION:	
+use strict;
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+my @args;
+my @exps;
+
+while(@ARGV) {
+    my $arg = shift @ARGV;
+    if($arg =~ /^-/) {
+        push @args,$arg;
+        push @args,shift(@ARGV) if(@ARGV);
+    }
+    else {
+        push @exps,$arg;
+    }
+}
+
+my %procs;
+open FI,"-|","ps -Ao pid,command h";
+while(<FI>) {
+    chomp;
+    if(/^\s*(\d+)\s+(.*)\s*$/) {
+        next if($2 =~ /pskill/);
+        $procs{$1} = $2;
+    }
+}
+close FI;
+
+sub select_process {
+    my $exp = shift;
+    my $result = shift;;
+    foreach my $pid(keys %procs) {
+        if($pid =~ /^$exp$/i) {
+            $result->{$pid}=$procs{$pid};
+        }
+        elsif($procs{$pid} =~ /(?:\/|^)$exp(?:\s+|$)/i) {
+            $result->{$pid}=$procs{$pid};
+        }
+    }
+    return $result;
+}
+
+my %selected;
+foreach(@exps) {
+    select_process($_,\%selected);
+}
+@args = qw/-SIGTERM/ unless(@args);
+my @selected = keys %selected;
+print STDERR scalar(@selected), scalar(@selected) > 1 ? " processes" : " process"," selected\n";
+foreach(@selected) {
+    print STDERR "sending signal(",join(" ",@args),") to \"$selected{$_}($_)\" ...";
+    if(system("kill",@args,$_)==0) {
+        print STDERR "\t[OK]\n";
+    }
+    else {
+        print STDERR "\t[Failed]\n";
+    }
+}
+
+exit 0;

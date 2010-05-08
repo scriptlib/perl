@@ -1,0 +1,56 @@
+#!/usr/bin/perl -w
+###APPNAME:     diskimg-setup
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sun Oct  7 02:52:13 2007
+###APPVER:	0.1
+###APPDESC:     setup loopback device for disk image	
+###APPUSAGE:	(disk image file) (partition NUM)
+###APPEXAMPLE:	diskimg-setup disk.img 1
+###APPOPTION:   -d:Delete loopback device setup	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+
+my $do_delete=0;
+my $disk="";
+my $num=0;
+
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+    if($_ eq "-d") { 
+        $do_delete=1;
+    }
+    elsif (-f $_ && !$disk) {
+        $disk=$_;
+    }
+    elsif (/^[0-9]+$/)  {
+        $num=$_;
+    }
+}
+
+die("You must be root for running $0.\n") unless($>==0);
+die("File not exists\n") unless(-f $disk);
+$num=1 unless(defined($num));
+
+#print join("\t","Disk=$disk","Partition=$num","Delete=$do_delete"),"\n";
+#exit 0;
+
+my $name=$disk;
+$name =~ s/^.*\///g;
+$name .= $num if($num > 0);
+my $ln_loop="/share/system/loopback";
+
+if (!$do_delete) {
+    my $offset=`diskimg-offset "$disk" "$num"`;
+    chomp($offset);
+    die("Could not calculat offset for $disk partition $num\n") unless($offset>=0);
+    my $freeloop=`losetup -f`;
+    chomp($freeloop);
+    die("No free loopback device found\n") unless($freeloop);
+    if(system("losetup","-o",$offset,$freeloop,$disk)==0) {
+        system("losetup",$freeloop);
+#        system("ln", "-vsf",$freeloop,$ln_loop . "/" . $name);
+    }
+}
+
+
+

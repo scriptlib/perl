@@ -1,0 +1,54 @@
+#!/usr/bin/perl -w
+###APPNAME:     sinabook_parsesearch
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 11 16:56:49 2008
+###APPVER:	0.1
+###APPDESC:	[cmd] default as sinabook_justtext
+###APPUSAGE:    URL	
+###APPOPTION:	
+use strict;
+use URI::Escape;
+use HTML::TreeBuilder;
+use Data::Dumper;
+
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $URL=shift;
+
+open FI,"-|","netcat '$URL' | iconv -f gb2312 -t utf8" or die("Unable to fork netcat | iconv\n");
+my @tree;
+$tree[0] = HTML::TreeBuilder->new(); 
+my $pages=0;
+while(<FI>) {
+    $tree[0]->parse($_);
+    my @match = $_ =~ /(\/booksearch\/booksearch\.php\?page=)([0-9]+)(\&[^\"\' ]+)/;
+    if(@match) {
+        $pages = $match[1];
+    }
+}
+close FI;
+$tree[0]->eof;
+
+for(my $i=2;$i<=$pages;$i++) {
+    $tree[$i-1] = HTML::TreeBuilder->new();
+    open FI,"-|","netcat '$URL&page=$i' | iconv -f gb2312 -t utf8" or die("Unable to fork netcat | iconv\n");
+    $tree[$i-1]->parse($_) while(<FI>);
+    close FI;
+    $tree[$i-1]->eof;
+}
+
+open FO,"|-","sort -u";
+foreach my $tree(@tree) {
+foreach my $div($tree->look_down("_tag","div","class","des")) {
+    foreach my $node($div->look_down("_tag","a")) {
+        print FO $node->attr("href"),"\n";
+    }
+}
+$tree->delete();
+}
+close FO
+
+

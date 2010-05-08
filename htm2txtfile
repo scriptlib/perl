@@ -1,0 +1,91 @@
+#!/usr/bin/perl -w
+###APPNAME:     htm2txtfile
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 11 05:03:49 2008
+###APPVER:	0.1
+###APPDESC:     convert html file download from adult168.com to text	
+###APPUSAGE:	[htmlfile...] 
+###APPEXAMPLE:	htm2txtfile booksrc/1.shtml
+###APPOPTION:   	
+use strict;
+use HTML::TreeBuilder;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_required/;
+use MyPlace::HTML;
+use MyPlace::Convertor;
+
+exit 0 if(help_required($0,@ARGV));
+
+
+my @flist;
+
+if(@ARGV) {
+    push @flist,@ARGV;
+}
+else {
+    push @flist,"/dev/stdin";
+}
+
+sub getfilename($$) {
+    my $base=shift;
+    my $ext=shift;
+    my $inc = 0;
+    while(-f "$base$ext") {
+        $inc++;
+        $base = $base . $inc;
+    }
+    return "$base$ext";
+}
+
+my $index=0;
+my $count=@flist;
+foreach my $fn (@flist) {
+    my $title;
+    my @src;
+    my $dst;
+    
+    $index++;
+    open FI,"<",$fn or die("$!\n");
+    while(<FI>) {
+        push @src,$_;
+        $title = get_title($_) unless($title)
+    }
+    close FI;
+    
+    if(!$title) {
+        $title = $fn;
+        $title =~ s/^.*\///g;
+        $title =~ s/\.(html|htm)$//;
+    }
+    else {
+        $title =~ s/\s+.*$//;
+        $title =~ s/\[.*$//g;
+    }
+    $dst = getfilename($title,".txt");
+    print STDERR "[$index/$count]$fn -> $dst ...";
+    if(! open FO,">",$dst) {
+        print STDERR ("\n$!\n");
+        next;
+    }
+    print FO $title,"\n","\n";
+
+    my @dst=text_from_string(\@src,undef,undef,["zoom"],undef);
+    my $blanks=0;
+    foreach(@dst) {
+        chomp;
+        if(/^\s*$/) {
+            $blanks++;
+        }
+        else {
+            if($blanks) {
+                $_ .= "\n";
+                $blanks=0;
+            }
+            print FO $_;
+        }
+    }
+    close FO;
+    print STDERR "\n";
+}
+
+    

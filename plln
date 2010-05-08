@@ -1,0 +1,31 @@
+#!/usr/bin/perl
+###APPNAME:	plln
+###APPAUTHOR:	xiaoranzzz
+###APPDATE:	Fri Sep 14 06:56:55 2007
+###APPVER:	0.1
+###APPDESC:	Link perl script
+###APPUSAGE:	(name)
+###APPEXAMPLE:	plln plln
+###APPOPTION:	
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+my $PERL_SRC_DIR=$ENV{XR_PERL_SOURCE_DIR};
+my $PERL_BIN_DIR=$ENV{XR_PERL_BINARY_DIR};
+my $name=$ARGV[0];
+$name =~ s/\.pl$//;
+my $src=$PERL_SRC_DIR . "/" . $name . ".pl";
+my $bin=$PERL_BIN_DIR . "/" . $name;
+
+die("File not exist:$src\n") unless(-f "$src");
+
+if(system "ln",("-vs",$src,$bin)) {
+    print "Retry in force mode?(y/n)";
+    my $answer;
+    read STDIN,$answer,1;
+    if(lc($answer)=="y") {
+        system "ln","-vfs",$src,$bin;
+    }
+}
+
+
+

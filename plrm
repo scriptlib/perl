@@ -1,0 +1,39 @@
+#!/usr/bin/perl
+###APPNAME:	plrm
+###APPAUTHOR:	xiaoranzzz
+###APPDATE:	Fri Sep 14 06:56:55 2007
+###APPVER:	0.1
+###APPDESC:	Delete perl script
+###APPUSAGE:	(name)
+###APPEXAMPLE:	plrm plrm
+###APPOPTION:	
+use strict;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::ENV qw/$SRC_DIR $BIN_DIR/;
+use MyPlace::Script::Usage qw/help_even_empty/;
+
+exit 0 if help_even_empty($0,@ARGV);
+
+my $name=$ARGV[0];
+$name =~ s/\.pl$//;
+my $src=$SRC_DIR . "/" . $name . ".pl";
+my $bin=$BIN_DIR . "/" . $name;
+
+sub delete(\$) {
+    my $filename=shift;
+    (!$filename) && return;
+    print ("Deleting $filename ...");
+    if(unlink $filename) {
+        print ("  [Ok]\n");
+    }
+    else {
+        print "\n$!\n";
+    }
+}
+
+&delete($bin);
+&delete($src);
+
+
+
+

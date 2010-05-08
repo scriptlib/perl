@@ -1,0 +1,16 @@
+#!/usr/bin/perl -w
+use strict;
+###APPNAME:	searchdoc
+###APPAUTHOR:	xiaoranzzz
+###APPDATE:	Wed Sep 19 13:07:08 2007
+###APPVER:	0.1
+###APPDESC:	
+###APPUSAGE:	
+###APPEXAMPLE:	
+###APPOPTION:	
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+my @docdirs=qw(/usr/share/doc /usr/local/share/doc /share/doc);
+
+

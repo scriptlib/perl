@@ -1,0 +1,20 @@
+#!/usr/bin/perl -W
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+sub format {
+    my $n = shift;
+    print chr($n) . " = $n\t";
+}
+
+$COLUMS=10;
+
+foreach((1 .. 128)){
+    print chr($_) . "($_)";
+    if (($_%$COLUMS) == 0) {
+        print("\n");
+    }
+    else {
+        print("\t");
+    }
+}
+print("\n");

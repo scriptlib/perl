@@ -1,0 +1,62 @@
+#!/usr/bin/perl -w
+###APPNAME:     diskimg-format
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	2009-06-19 17:01:39
+###APPVER:	0.1
+###APPDESC:     format msdos floopy images use "mbred"	
+###APPUSAGE:	[options] filenames...
+###APPEXAMPLE:	diskimg-format -l msdos -b bootsect.bin filename
+###APPOPTION:   -l:Set label|-b:Set bootsect file|-q:Be quiet	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+#exit 0 if(help_required($0,@ARGV));
+exit 0 if(help_even_empty($0,@ARGV));
+
+my $label;
+my $bootsect;
+my @files;
+my $quiet;
+while(@ARGV) {
+    my $p=shift(@ARGV);
+    if($p eq '-l') {
+        $label=shift(@ARGV);
+    }
+    elsif($p eq '-b') {
+        $bootsect=shift(@ARGV);
+    }
+    elsif($p eq '-q') {
+        $quiet=1;
+    }
+    else {
+        push @files,$p;
+    }
+}
+die("Nothing to do!\n") unless(@files);
+my $mbred = "mbred";
+$mbred .= " -l $label" if($label);
+$mbred .= " $bootsect" if($bootsect);
+my $dd = "dd bs=512 count=1 conv=notrunc";
+foreach(@files) {
+    if(-f $_) {
+        my $size = -s $_;
+        $size = int($size / 1024);
+        my @codes;
+        print STDERR "Formating $_..." unless($quiet);
+        open FI,"-|",$mbred  . " -S $size" or die("$!\n");
+        open FO,"|-",$dd . " of=\"$_\" >/dev/null 2>&1";
+        print FO <FI>;
+        close FI;
+        close FO;
+        print STDERR "\t[OK]\n";
+    }
+    else {
+        print STDERR "File not exist:$_\n"
+    }
+}
+

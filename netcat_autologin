@@ -1,0 +1,126 @@
+#!/usr/bin/perl -w
+###APPNAME:     netcat_autologin
+###APPAUTHOR:   duel
+###APPDATE:	2009-01-06 17:32:15
+###APPVER:	0.1
+###APPDESC:     netcat a http url with autologin support
+###APPUSAGE:	(url)
+###APPEXAMPLE:	netcat_autologin www.google.com
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+my $no_cached;
+if ($ARGV[0] eq "--no-cache") {
+   $no_cached=1;
+   shift @ARGV;
+}
+my ($url,$user,$pass)=@ARGV;
+$url = "http://$url" unless($url =~ /^http:/i);
+
+unless($no_cached) {
+eval {use MyPlace::Cache;};
+my $cache = MyPlace::Cache->new("httpget");
+my @values = $cache->load($url);
+if(@values) {
+    print @values;
+    exit 0;
+}
+
+sub cache_save {
+    my $key=shift;
+    $cache->save($key,@_) unless($no_cached);
+    return @_;
+}
+
+}
+
+unless($user) {$user = "120,114,108,102,117,110,";$user =~ s/([^,]+),/chr($1)/ge;};
+unless($pass) {$pass = "97,98,115,102,114,101,101,100,111,109,";$pass =~ s/([^,]+),/chr($1)/ge;};
+
+die("Password is empty\n") unless($pass);
+
+use LWP::UserAgent;
+use HTTP::Cookies;
+use Data::Dumper;
+
+
+my  $ua = LWP::UserAgent->new;
+my $cookie = HTTP::Cookies->new(file => "$ENV{'HOME'}/.lwp_cookies.dat", autosave => 1);
+$ua->cookie_jar($cookie);
+$ua->agent("Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
+
+Connect:
+my $req = HTTP::Request->new(GET => $url);
+my $res = $ua->request($req);
+  if ($res->is_success) {
+        my ($login,%fields)=&parse_content($res->content);
+        if($login) {
+            $req = HTTP::Request->new(POST => $login);
+            $req->header(referer=>$url);
+            $req->content_type('application/x-www-form-urlencoded');
+            $fields{username}=$user;
+            $fields{password}=$pass;
+            my $post="" ; #= "username=$user&password=$pass";
+            foreach(keys %fields) {
+                $post = $post . "&$_=" . $fields{$_};
+            }
+            $post = substr($post,1);
+            print STDERR "POSTING:$post\n";
+            $req->content($post); 
+            $res = $ua->request($req);
+            if($res->is_success) {
+                goto Connect;
+            }
+            else {
+                print STDERR $res->status_line,"\n";
+                exit 1;
+            }
+        }
+        else {
+            print cache_save($url,$res->content);
+            exit 0;
+        }
+  }
+  else {
+      print STDERR $res->status_line, "\n";
+      exit 1;
+  }
+
+sub parse_content {
+    print @_,"\n";
+    my $content = join("",@_);
+    if($content =~ /input\s+[^<>]*\s*name=['"]username['"]/im) {
+        my ($login,%fields) ;
+        if($content =~ /\<form\s+[^<>]*\s*action=['"]([^'"]+)['"]/i) {
+            use URI;
+            $login = URI->new_abs($1,$url);
+            print STDERR "Trying to Login : $login","\n";
+            my @match = $content =~ /\<((?:input|select)\s+[^<>]+)/g;
+           # \s*name=['"]([^'"]*)['"]/g; '[^<>]*value=['"]([^'"]+)['"]/g;
+            if(@match) {
+                foreach(@match) {
+                    my ($name,$value)= /^select/ ? ("",0) :  ("","");
+                    if(/\s*name=['"]([^'"]*)['"]/) {
+                        $name = $1;
+                        if(/\s*value=['"]([^'"]+)['"]/) {
+                            $value=$1;
+                        };
+                        $fields{$name}=$value;
+                    }
+                }
+            }
+            $fields{loginfield}="username";
+            $fields{referer}=$url;
+            $fields{loginsubmit}="true";
+            return $login,%fields;
+        }
+    }
+    return undef;
+}

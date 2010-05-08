@@ -1,0 +1,15 @@
+#!/usr/bin/perl -w
+###APPNAME:     to_ord
+###APPAUTHOR:   duel
+###APPDATE:	2009-01-13 17:53:59
+###APPVER:	0.1
+###APPDESC:     to_ord	
+###APPUSAGE:	
+###APPEXAMPLE:	to_ord
+###APPOPTION:	
+use strict;
+my $old=join(" ",@ARGV);
+$old =~ s/(.)/ord($1) . ","/ge;
+print $old;
+exit 0;
+

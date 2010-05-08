@@ -1,0 +1,23 @@
+#!/usr/bin/perl -w
+###APPNAME:     urlrule_list
+###APPAUTHOR:   duel
+###APPDATE:	Thu Apr  3 07:46:26 2008
+###APPVER:	0.1
+###APPDESC:     list urlrules	
+###APPUSAGE:    [Level]	
+###APPEXAMPLE:	urlrule_list 1
+###APPOPTION:	
+use strict;
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required/;
+exit 0 if(help_required($0,@ARGV));
+
+use MyPlace::URLRule;
+my $level=shift;
+$level=0 unless($level);
+my $dir=get_rule_dir();
+system("ls","-l","$dir/$level");
+
+
+

@@ -1,0 +1,114 @@
+#!/usr/bin/perl -w
+#Autor      :   xiaoranzzz@myplace
+#Date       :   2008.08.07 06:31AM
+use strict;
+my $appname="listlinks.pl";
+my $appdesc="listlinks of URL, optionally run COMMANDS against it";
+my $appver="0.1";
+
+sub usage {
+    print "$appname v$appver\n\t- $appdesc\n","Usage:\n","\t";
+    print "$0 [options] URL commands";
+    print "\n";
+    print "Options:\n";
+    print "\t-d\tDebug mode\n";
+    print "\t-n\tNo recursive mode\n";
+    print "\t-h\tDisplay this text\n";
+    exit 0;    
+}
+
+my ($nr,$DEBUG,$url,@downloader);
+
+for my $arg (@ARGV) {
+    if($arg eq "-h" || $arg  eq "-H") {
+        &usage;
+        exit 0;
+    }
+    elsif($arg eq "-n") {
+        $nr=1;
+    }
+    elsif($arg eq "-d") {
+        $DEBUG=1;
+    }
+    elsif(!$url) {
+        $url=$arg;
+    }
+    else {
+        push @downloader,$arg;
+    }
+}
+&usage unless(@ARGV);
+my @lister;
+if($DEBUG) {
+    @lister=("wget","-v");
+}
+else {
+    @lister=("wget","-q");
+}
+
+use File::Temp qw/tempfile/;
+sub listftp {
+    my $ftp_url=shift;
+    return unless($ftp_url);
+    my %result;
+    my (undef,$fn) = tempfile();
+    print STDERR "Listing $ftp_url...\n";
+    if(system(@lister,"-O",$fn,$ftp_url) == 0) {
+#        print STDERR "\t[OK]\n";
+    }
+    else {
+        die("\n$!\n");
+    }
+    open FI,"<",$fn;
+    while(<FI>) {
+        if(m#<a href="([^"]+)"#i) {
+            my $url=$1;
+            my $type= ($url =~ /[\/\\]$/) ? "directory" : "file";
+            push @{$result{$type}},$url;
+        }
+    }
+    close FI;
+    return %result;
+}
+
+sub getfile($) {
+    my $url=shift;
+    return undef unless($url);
+    if(@downloader) {
+        if($DEBUG) {
+           print STDERR "#",join(" ",@downloader)," $url","\n";
+        }
+        return(system(@downloader,$url)==0);
+    }
+    else {
+        print("$url\n");
+        return 1;
+    }
+    return 1;
+}
+
+sub getfolder($) {
+    my $fdurl=shift;
+    my %result = listftp($fdurl);
+    my @dirs = @{$result{directory}} if($result{directory});
+    my @files = @{$result{file}} if($result{file});
+    foreach(@files) {
+        &getfile($_);
+    }
+    return 1 if($nr);
+    foreach(@dirs) {
+        &getfolder($_);
+    }
+}
+
+if($url) {
+    &getfolder($url);
+}
+else {
+    &usage;
+    exit 0;
+}
+
+
+
+

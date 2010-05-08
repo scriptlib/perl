@@ -1,0 +1,48 @@
+#!/usr/bin/perl -w
+###APPNAME:     book_parser_new
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sat Mar 22 22:56:33 2008
+###APPVER:	0.1
+###APPDESC:     create new book parser	
+###APPUSAGE:	URL|Name
+###APPEXAMPLE:	book_parser_new http://www.shuku.net/novels/gulong/bianlang/bianlang.html
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+do `plinclude AppMessage`;
+do `plinclude BookParser`;
+
+my $url=shift;
+my $parser=BookParser::get_parser($url);
+if(-f $parser) {
+    AppMessage::message("Parser for $url exists,opened for editing instead\n");
+    system("vim",$parser);
+    exit 0;
+}
+
+my $domain=BookParser::get_domain($url);
+
+my $fn= ( $domain =~ /\.pl$/ ? $domain : $domain . ".pl");
+$fn = BookParser::get_parser_dir() . "/$fn";
+
+open VIMED,"|-","vim -c 'file $fn' - ";
+print VIMED "#!/usr/bin/perl -w\n";
+print VIMED "#Book parser for $domain\n";
+print VIMED "#Example Url:$url\n";
+print VIMED "#Date Created:" . `date`;
+print VIMED "use strict;\n\n";
+print VIMED 'my $url=shift;',"\n";
+print VIMED 'my %book;',"\n";
+print VIMED 'while(<STDIN>){',"\n";
+print VIMED "}\n";
+close VIMED;
+
+if(-f "$fn" and ! -x "$fn") {
+    chmod 0775,$fn; 
+}
+exit 0;
+

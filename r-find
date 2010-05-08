@@ -1,0 +1,156 @@
+#!/usr/bin/perl -w
+###APPNAME:     r-find
+###APPAUTHOR:   duel
+###APPDATE:	2008-08-27 12:46:27
+###APPVER:	0.1
+###APPDESC:     extend find to support "-havename,-copy,-move,-from-file"
+###APPUSAGE:    r-find [Options]	
+###APPEXAMPLE:	r-find
+###APPOPTION:	-havename [text]:filename match *text*|-copy [Dir]:copy to dir|-move [Dir]:move to dir|-from-file (filename):read options from file
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+my $opt_exp = qr/^(-havename|-copy|-move|-from-file)$/;
+my $file_exp = qr/^-from-file$/;
+my $name_exp = qr/^-havename$/;
+my $action_exp = qr/^(-copy|-move)$/;
+my %actions = (
+    "--copy"=>["-exec","cp","-v","--","{}","NAME_ACTION_DEST",";"],
+    "--move"=>["-exec","mv","-v","--","{}","NAME_ACTION_DEST",";"]
+);
+
+my @names;
+    
+sub convert_opt($$) {
+    my $opt_key = shift;
+    my $opt = shift;
+    my @result;
+    #print STDERR "NAMES = ",join(" ",@names),"\n";
+    if($opt_key =~ $name_exp) {
+        push @result,"-name","*$opt*";
+    }
+    elsif($opt_key =~ $action_exp) {
+        my $name_dest = $opt;
+        if(!$opt) {
+            $name_dest = shift @names;
+        }
+        elsif($opt =~ m/^-/) {
+            $name_dest = shift @names;
+        }
+        $name_dest = shift @names unless($name_dest);
+        #print STDERR "Name_DEST = ",$name_dest,"\n";
+        die("No destionation found for $opt_key...\n") unless($name_dest);
+        mkdir $name_dest unless(-d $name_dest);
+        foreach my $action (@{$actions{$opt_key}}) {
+            my $para = $action;
+            $para =~ s/NAME_ACTION_DEST/$name_dest/g;
+            push @result,$para;
+        }
+        push @result,$opt if($opt and $opt =~ m/^-/);
+    }
+    else {
+        push @result,$opt_key,$opt;
+    }
+    #print STDERR ("key=$opt_key\tvalue=$opt\nresult=",join(" ",@result),"\n");
+    return @result;
+}
+
+sub collect_names(@) {
+    my $opt_key="";
+    my @result;
+    foreach my $opt (@_) {
+        if($opt_key) {
+            push @result,$opt;
+            $opt_key = 0;
+        }
+        else {
+            if($opt =~ $name_exp) {
+                $opt_key = 1;
+            }
+        }
+    }
+    return @result;
+}
+
+
+sub collect_opt(@) {
+    my $opt_key="";
+    my %result;
+    foreach my $opt (@_) {
+        if($opt_key) {
+            if($opt_key =~ $action_exp and $opt =~ $opt_exp) {
+                push @{$result{opt}},&convert_opt($opt_key,"");
+                $opt_key = $opt;
+            }
+            elsif($opt_key =~ $file_exp) {
+                push @{$result{files}},$opt;
+                $opt_key = "";
+            }
+            else {
+                push @{$result{opt}},&convert_opt($opt_key,$opt);
+                $opt_key="";
+            }
+        }
+        else {
+            if($opt =~ $opt_exp) {
+                $opt_key = $opt;
+            }
+            else {
+                push @{$result{opt}},$opt;
+            }
+        }
+    }
+    if($opt_key) {
+        push @{$result{opt}},&convert_opt($opt_key,"");
+    }
+    return \%result;
+}
+sub run_find(@) {
+    print STDERR join(" ","find",@_),"\n";
+    system("find",@_);
+}
+
+sub process(@) {
+    my @PARGS = @_;
+#    print STDERR "Process :",join(" ",@PARGS),"\n";
+    @names = ();
+    @names = &collect_names(@PARGS);
+    my $options = &collect_opt(@PARGS);
+    my @find_opt = $options->{opt} ? @{$options->{opt}} : ();
+#    print STDERR "Find Options:",join(" ",@find_opt),"\n";
+    my @files = $options->{files} ? @{$options->{files}} : ();
+    if(@files) {
+        foreach my $file(@files) {
+            if(!-f $file) {
+                print STDERR "File not exists:$file...\n";
+                next;
+            }
+            if(!open FI,"<",$file) {
+                print STDERR ("File not readable:$file...\n");
+                next;
+            }
+            print STDERR "From file : $file\n";
+            my @LINES = <FI>;
+            close FI;
+            foreach(@LINES){
+                chomp;
+                my @args = split(" ",$_);
+                &process(@find_opt,@args);
+            }
+        }
+    }
+    else {
+        &run_find(@find_opt);
+    }
+}
+
+process(@ARGV);
+

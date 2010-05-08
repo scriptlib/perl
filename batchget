@@ -1,0 +1,10 @@
+#!/bin/sh
+exec batchget-nopuf "$@"
+
+# puf=`which puf`
+
+# if [ -n "$puf" ] ; then
+    # exec batchget-puf "$@"
+# else
+    # exec batchget-nopuf "$@"
+# fi

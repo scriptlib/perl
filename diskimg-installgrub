@@ -1,0 +1,97 @@
+#!/usr/bin/perl -w
+###APPNAME:     diskimg-installgrub
+###APPAUTHOR:   root
+###APPDATE:	Tue Oct  9 08:02:21 2007
+###APPVER:	0.1
+###APPDESC:     setup grub on diskimg	
+###APPUSAGE:	disk.img (parttion number)
+###APPEXAMPLE:	disk.img 1
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+sub sudo_system {
+    if ($>==0) {
+        return (system(@_)==0);
+    }
+    else {
+        return (system("sudo",@_)==0);
+    }
+}
+
+sub sudo_qx($) {
+    if ($>==0) {
+        return `$_[0]`;
+    }
+    else {
+        return `sudo $_[0]`;
+    }
+}
+
+my $disk=shift;
+die("$disk not writable\n") unless( -w $disk);
+my $num=shift;
+$num=1 unless($num && $num>0);
+my $type=`diskimg-fstype $disk $num`;
+chomp($type);
+
+
+my $partmain=sudo_qx("losetup -f");
+chomp($partmain);
+
+die("losetup $partmain $disk:$!\n") unless(sudo_system("losetup",$partmain,$disk));
+print("Whole disk of $disk, setup on $partmain\n");
+
+
+my $partFst=sudo_qx("losetup -f");
+chomp($partFst);
+my $off=`diskimg-offset $disk $num`;
+chomp($off);
+
+die("losetup -o $off $partFst,$disk:$!\n") unless(sudo_system("losetup","-o",$off,$partFst,$disk));
+print("First partition of $disk, setup on $partFst\n");
+
+my $tmpname=`mktemp`;
+chomp($tmpname);
+
+unlink $tmpname if( -e $tmpname);
+mkdir $tmpname or die("Unable to create mount-point directory:$tmpname\n");
+die("mount -f $type $partFst $tmpname: $!\n") unless(sudo_system("mount","-t",$type,$partFst,$tmpname));
+print("Mount $partFst on $tmpname\n");
+
+print("Grub stage files copyed.\n") if(sudo_system("cp","-vfR","/boot/grub/",$tmpname . '/'));
+
+die("$!\n") unless(sudo_system("umount",$partFst));
+print("Unmount $partFst\n");
+
+rmdir $tmpname or die("$!\n");
+die("$!\n") if(system("ln","-sf",$partmain,$tmpname));
+die("$!\n") if(system("ln","-sf",$partFst,$tmpname . "1"));
+print("Create Symbol links for $partmain and $partFst\n");
+
+print("Execute Grub...\n");
+open(GRUB,"| sudo grub --batch") or die("$!\n");
+print GRUB ('device (hd0) ',$tmpname,"\n");
+print GRUB ("root (hd0,0)\n");
+print GRUB ("setup (hd0)\n");
+close GRUB;
+print("="x40,"\n");
+print("Clean...\n");
+unlink $tmpname . "1";
+unlink $tmpname;
+sudo_system("losetup","-vd",$partFst);
+sudo_system("losetup","-vd",$partmain);
+
+
+
+
+
+
+
+
+
+
+

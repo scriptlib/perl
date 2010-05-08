@@ -1,0 +1,172 @@
+#!/usr/bin/perl -w
+###APPNAME:     tasks
+###APPAUTHOR:   duel
+###APPDATE:	2008-05-14 06:07:09
+###APPVER:	0.1
+###APPDESC:     execute commands in a tasks style	
+###APPUSAGE:    [Options]	
+###APPEXAMPLE:	tasks -n download -t line -l download.log -p wget
+###APPOPTION:	-n name :Task name(default to "default")|-t type:"line" or "pipe"|-l file:Loggiing filename|-p string:Prefix string|-s string:Suffix string|-r file:Read tasks from file("-" == STDIN)|-w Write tasks only
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+
+use constant D_EXT=>".tasks";
+use constant OPT_SEP=>qr/:\|:/;
+use MyPlace::Script::Message;
+
+our %opts;
+my %optmap=(
+    "-n"=>"name",
+    "-t"=>"type",
+    "-l"=>"logfile",
+    "-p"=>"prefix",
+    "-s"=>"suffix",
+    "-r"=>"read",
+    "-w"=>"write"
+);
+my @tasks;
+my $index=-1;
+my $count=-1;
+my $log_message=\&log_to_stderr;
+
+sub log_to_stderr {
+    print STDERR "\033]0;",@_,"\007";
+    app_message(@_);
+}
+
+sub log_to_file {
+    app_message(@_);
+    print MYLOG @_;
+}
+
+sub optstr($) {
+    my $opt=shift;
+    return "\$opts{$opt}=\"" . $opts{$opt} ."\";" if(exists $opts{$opt});
+}
+sub tasks_int() {
+    print STDERR "\n";
+    &$log_message("Quiting ...\n");
+    $index -- ;
+    exit 1 if($index<0);
+    exit 1 unless($opts{config});
+    open FO,">",$opts{config} or exit 1;
+    &$log_message("Save remaining tasks ...\n");
+    print FO optstr("type"),"\n";
+    print FO optstr("prefix"),"\n";
+    print FO optstr("suffix"),"\n";
+    print FO optstr("logfile"),"\n";
+    print FO "\$opts{tasks}=[\n";
+    for($index .. $#tasks) {
+        print FO "\"$tasks[$_]\",\n";
+    }
+    print FO "\t];\n";
+    close FO;
+    &$log_message("Ok " . ($#tasks - $index) . " task[s] saved to \"$opts{config}\"\n");
+    exit 1;
+}
+$SIG{INT}=\&tasks_int;
+
+my $opt;
+foreach(@ARGV) {
+    if(exists $optmap{$_}) {
+        $opt=$optmap{$_};
+        $opts{$opt}=1;
+        next;
+    }
+    else {
+        $opts{$opt}=$_;
+    }
+}
+
+$opts{name}="default" unless($opts{name});
+$opts{config}=$opts{name} . D_EXT;
+do $opts{config} if(-f $opts{config});
+$opt="";
+foreach(@ARGV) {
+    if(exists $optmap{$_}) {
+        $opt=$optmap{$_};
+        $opts{$opt}=1;
+        next;
+    }
+    else {
+        $opts{$opt}=$_;
+    }
+}
+
+$opts{type}="line" unless($opts{type});
+$opts{logfile}="" unless($opts{logfile});
+$opts{prefix}="" unless($opts{prefix});
+$opts{suffix}="" unless($opts{suffix});
+
+if(! exists $opts{read} and ! -f $opts{config}) {
+    $opts{read}="-";
+}
+
+if($opts{logfile} and open MYLOG,">>",$opts{logfile}) {
+    $log_message=\&log_to_file;
+}
+
+if($opts{read}) {
+    &$log_message("Reading tasks from \"$opts{read}\"...\n");
+    if($opts{read} eq "-") {
+        while(<STDIN>) {
+            chomp;
+            app_message("Add to queue:$_\n");
+            push @tasks,$_;
+        }
+    }
+    else {
+        open FI,"<",$opts{read} or last;
+        while(<FI>) {
+            chomp;
+            app_messagg("Add to queue:$_\n");
+            push @tasks,$_;
+        }
+        close FI;
+    }
+}
+push @tasks,@{$opts{tasks}} if($opts{tasks});
+
+$index=0;
+$count=@tasks;
+if($opts{write}) {
+    $index=1;
+    &tasks_int();
+    exit 0;
+}
+
+&$log_message("Start doing tasks of \"$opts{name}\"...\n");
+my @prefix = $opts{prefix} ? split(OPT_SEP,$opts{prefix}) : ();
+my @suffix = $opts{suffix} ? split(OPT_SEP,$opts{suffix}) : ();
+foreach(@tasks) {
+    $index++;
+    my @cmd = @prefix;
+    push @cmd,split(OPT_SEP,$_);
+    push @cmd,@suffix;
+    &$log_message("[$index/$count]:" . join(" ",@cmd) . "\n");
+    system @cmd;
+}
+&$log_message("Stop doing tasks of \"$opts{name}\"...\n");
+if(-f $opts{config}) {
+    &$log_message("Deleting task file \"$opts{config}\"...\n");
+    unlink $opts{config} or die("$!\n");
+}
+&$log_message("OK\n");
+exit 0;
+
+
+
+
+
+
+
+
+
+

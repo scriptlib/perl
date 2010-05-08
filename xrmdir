@@ -1,0 +1,84 @@
+#!/usr/bin/perl -w
+###APPNAME:     xrmdir
+###APPAUTHOR:   geek
+###APPDATE:	Sat Sep 29 15:37:45 2007
+###APPVER:	0.1
+###APPDESC:     delete directories which even not empty	
+###APPUSAGE:	[options] (directories...)
+###APPEXAMPLE:	xrmdir -g tmp Temp
+###APPOPTION:   s:Silent Mode|g:Gui Mode	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("formathelp",$0)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $silent=0;
+my $gui=0;
+
+sub DeleteFolder {
+    system("rm","-fdr",@_);
+}
+
+sub Message {
+    return if($silent);
+    my $msg=join(" ",@_);
+    if($gui) {
+        system("zenity","--info","--text=$msg");
+    }
+    else {
+        print($msg);
+    }
+}
+
+sub Confirm {
+    return if($silent);
+    my $msg=join(" ",@_);
+    if($gui) {
+        if (system("zenity","-question","-text=$msg")) {
+            return 0;
+        }
+        else {
+            return 1;
+        }
+    }
+    else {
+        my $ans;
+        print($msg,"(y/n)");
+        read STDIN,$ans,1
+        if(lc($ans) eq "y") {
+            return 1;
+        }
+        else {
+            return 0;
+        }
+    }
+}
+
+
+    if [ -z "$OPT_Silent" ] ; then
+        DeleteFolder "$D" 2>/dev/null 1>/dev/null 
+    else
+        if [ ! -d "$D" ] ; then
+            Message "\"$D\" not exists."
+        else
+            if Confirm "Delete \"$D\"?" ; then
+                DeleteFolder "$D"
+            fi
+        fi
+    fi
+
+if Confirm "Delete " "$@" "\nContinue?" ; then
+    for D in "$@" ; do
+        [ "$D" == "-s" -o "$D" == "-g" ] && continue
+        if [ ! -d "$D" ] ; then
+            Message "\"$D\" not exists."
+        else
+            DeleteFolder "$D"
+        fi
+    done
+fi
+ 
+
+
+

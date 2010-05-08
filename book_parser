@@ -1,0 +1,24 @@
+#!/usr/bin/perl -w
+###APPNAME:     book_parser
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sat Mar 22 22:43:48 2008
+###APPVER:	0.1
+###APPDESC:     html book parser	
+###APPUSAGE:	domainName
+###APPEXAMPLE:	book_parser http://www.shuku.net/novels/gulong/bianlang/bianlang.html
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+do `plinclude AppMessage`;
+do `plinclude BookParser`;
+
+my $url=shift;
+my $parser=BookParser::get_parser($url);
+AppMessage::abort("Parser not found for $url\n") unless(-f $parser);
+AppMessage::message("Using $parser\n");
+system("netcat '$url' | $parser '$url'");
+

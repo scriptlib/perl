@@ -1,0 +1,92 @@
+#!/usr/bin/perl -w
+###APPNAME:     rtorrent-action
+###APPAUTHOR:   duel
+###APPDATE:	2008-10-19 02:43:05
+###APPVER:	0.1
+###APPDESC:     rtorrent-action	
+###APPUSAGE:	
+###APPEXAMPLE:	rtorrent-action
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+my $action=shift;
+my $file=shift;
+my $income="$ENV{HOME}/public/videos/income";
+die("No action specified.\n") unless($action);
+
+my @msger = ("zenity","--title","RTorrent-action($action)");
+sub message {
+    return not system(@msger,"--info","--text",join(" ",@_));
+}
+sub ask {
+    return not system(@msger,"--question","--text",join(" ",@_));
+}
+sub warn {
+    return not system(@msger,"--warning","--text",join(" ",@_));
+}
+sub abort {
+    system(@msger,"--error","--text",join(" ",@_));
+    exit 0;
+}
+sub select {
+    open FI,"-|",@msger,"--width=480","--height=240","--list","--column=Action",@_;
+    my $result=join("",<FI>);
+    chomp($result);
+    return $result;
+}
+my %SELECT = (
+    move=>"1.Move to income",
+    delete=>"2.Delete!"
+);
+if($action eq "erase") {
+    &abort("No file specified!") unless($file); 
+AskErase:
+    my $answer = &select("--text","\n$file\n\nSelect action:",values %SELECT);
+    $answer = "" unless($answer);
+    if($answer eq $SELECT{move}) {
+        if(&ask("Move file\n'$file'\n=>\n'$income'\n?")) {
+            system("mv","-fv","--",$file,$income);
+        }
+        else {
+            goto AskErase;
+        }
+    }
+    elsif($answer eq $SELECT{delete}) { 
+        if(&ask("Delete $file?\n")) {
+            &abort("file $file not exists!\n") unless(-e $file); 
+            system("rm","-fdr","--",$file);
+        }
+        else {
+            goto AskErase;
+        }
+    }
+}
+elsif($action eq "mc") {
+    system("xterm -e mc '$file' '$file'&");
+}
+elsif($action eq "insert") {
+}
+elsif($action eq "open") {
+}
+elsif($action eq "close") {
+}
+elsif($action eq "finished") {
+}
+elsif($action eq "start") {
+}
+elsif($action eq "stop") {
+}
+else {
+   &warn("Action \"$action\" not implemented\n");
+}
+
+exit 0;

@@ -1,0 +1,44 @@
+#!/usr/bin/perl -w
+###APPNAME:     cmdcat
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Fri Sep 21 22:33:33 2007
+###APPVER:	0.1
+###APPDESC:     cat command source text
+###APPUSAGE:	(cmdname)
+###APPEXAMPLE:	cmdcat cmdinfo
+###APPOPTION:	
+use strict;
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+my $support="application\/(x-awk|x-shellscript|text\/plain|x-perl)";
+my $editor="cat";
+my $cmdname=shift;
+my $location=`which "$cmdname"`;
+chomp($location);
+die("Command not found: $cmdname\n") unless($location);
+my $info=`file -biL "$location"`;
+chomp($info);
+$info =~ s/,.*$//g;
+
+my $format="%-15s%s\n";
+printf STDERR ($format,"Name:",$cmdname);
+printf STDERR ($format,"FileType:",$info);
+printf STDERR ($format,"Location:",$location);
+printf STDERR ($format,"LinkTo:",readlink($location)) if(-l $location);
+if ($info =~ m/^text\// or $info =~ m/$support/) {
+    system($editor,$location);
+}
+else {
+    print STDERR ("Not supported type\n");
+    my $answer="n";
+    read STDIN,$answer,1;
+    system($editor,$location) if (lc($answer) eq "y");
+}
+
+
+
+
+
+
+

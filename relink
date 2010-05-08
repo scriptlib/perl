@@ -1,0 +1,38 @@
+#!/usr/bin/perl -w
+my $usage = "$0 text replacement files...\n";
+my $text = shift;
+my $rep = shift;
+my @files = @ARGV;
+
+unless(@files and $text) {
+	print STDERR $usage;
+	exit 0;
+}
+
+my $exp=qr/$text/;
+foreach(@files) {
+	next unless(-l $_);
+	my $oldlink = readlink $_;
+	my $newlink = $oldlink;
+	$newlink =~ s/$exp/$rep/g;
+	if($oldlink eq $newlink) {
+		print STDERR "$_ ingored...\n";
+		next;
+	}
+	unless(unlink $_) {
+		print STDERR "$!\n";
+		next;
+	}
+        printf STDERR "%-10s%s...\n","Relinking",$_;
+	if(symlink($newlink,$_)) {
+            printf STDERR "%-10s%s\n%-10s%s\n",
+            "From:","\"$oldlink\"",
+            "To:","\"$newlink\"";
+        }
+        else {
+            print STDERR "$!\n";
+        }
+}
+
+
+

@@ -1,0 +1,15 @@
+#!/usr/bin/perl -w
+###APPNAME:     setuploop
+###APPAUTHOR:   root
+###APPDATE:	Sun Oct  7 00:41:25 2007
+###APPVER:	0.1
+###APPDESC:     setup loopback block device	
+###APPUSAGE:	[partition number]
+###APPEXAMPLE:	
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+

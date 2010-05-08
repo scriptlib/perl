@@ -1,0 +1,384 @@
+#!/usr/bin/perl -w
+###APPNAME:     xsite-download-topic
+###APPAUTHOR:   duel
+###APPDATE:	2009-02-09 10:07:34
+###APPVER:	0.1
+###APPDESC:     xsite-download-topic [options] url
+###APPUSAGE:	
+###APPEXAMPLE:	xsite-download-topic 'http://se.9aaxx.com/html/11006/' --dump
+###APPOPTION:   --dump:dump lists found | --page:download page instead of topic
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+use URI;
+use Term::ANSIColor;
+use Encode qw/decode/;
+use Cwd qw/getcwd/;
+use MyPlace::HTML;
+use MyPlace::HTML::Content;
+use MyPlace::ReEnterable;
+
+my $CWD = getcwd();
+my $HND = MyPlace::ReEnterable->new('main');
+my $DEBUG_MODE;
+my $PAGE_MODE;
+
+my @PAGES_EXP = (
+    [
+        qr/\/html\/\d+(:?\/|\/index.html|\/list_\d+_\d+\.html)$/, #url 
+        qr/(list_\d+_)(\d+)(\.html)$/,                          #page
+        'index.html',                                             #index
+        qr/\/\d+\/\d+\/\d+\.html$/                                #list  
+    ],
+    [
+        qr/^http:\/\/[^\/]+\/\w+-\d+\.htm$/,
+        qr/^(\/\w+-)(\d+)(\.htm)$/,
+        undef,
+        qr/^\/(:?html|htm)\/\d+\.htm$/
+    ],
+);
+
+use constant {
+    BODY_ID=>[
+        {class=>"NewsBody"},
+        {id=>"NewsContentLabel"},
+    ],
+    SOURCE_D=>"src/",
+    IMAGE_D=>"",
+    TEXT_D=>"",
+    TEXT_FILE_SIZE=>1024,
+    RESUME_FILE_NAME=>".xsite-download.resume",
+};
+
+
+sub get_page_exp {
+    my $url=shift;
+    foreach(@PAGES_EXP) {
+        if($url =~ $_->[0]) {
+            return {page=>$_->[1],index=>$_->[2],list=>$_->[3]};
+        }
+    }
+    return undef;
+}
+
+sub build_url {
+    my ($url,$base) = @_;
+    return $url unless($base);
+    return URI->new_abs($url,$base)->as_string();
+}
+
+sub clear_title {
+    my $title = shift;
+    return unless($title);
+    $title =~ s/[\[【\s]*\d+-\d+-\d+[\]】\s]*//g;
+    $title =~ s/5u.*//g;
+    $title =~ s/[\/\\\!\*\+]//g;
+    $title =~ s/-.*$//;
+    $title =~ s/^\s+//;
+    $title =~ s/\s+$//;
+    $title = "no_title" unless($title);
+    return $title;
+}
+
+sub curdir {
+    my $fullpath = shift;
+    my $dir = decode("utf8",getcwd());
+    if($fullpath) {
+        return $dir;
+    }
+    else {
+        $dir =~ s/.*\///;
+        $dir = "/" unless($dir);
+        return $dir;
+    }
+}
+
+sub print_n {
+    my $prompt = shift;
+    print STDERR "\r",curdir(),">" if($prompt);
+    print STDERR color("green"),@_,color("reset");
+}
+
+sub print_n2 {
+    my $prompt = shift;
+    print STDERR "\r",curdir(),">" if($prompt);
+    print STDERR color("yellow"),@_,color("reset");
+}
+
+sub print_n3 {
+    my $prompt = shift;
+    print STDERR "\r",curdir(),">" if($prompt);
+    print STDERR color("cyan"),@_,color("reset");
+}
+sub print_e {
+    my $prompt = shift;
+    print STDERR "\r",curdir(),">" if($prompt);
+    print STDERR color("red"),@_,color("reset");
+}
+
+sub print_w {
+    my $prompt = shift;
+    print STDERR "\r",curdir(),">" if($prompt);
+    print STDERR color("bold yellow"),@_,color("reset");
+
+}
+
+sub url_to_file {
+    my($url) = @_;
+    my $filename = $url;$filename =~ s/^.*\///;$filename ||= "index.html";
+    $filename = SOURCE_D . "$filename";
+    goto download_end if(-f $filename);
+#    print_n3 1,"downloading $url";
+    my $r = system("curl","-L","-#","--url",$url,"-o",$filename);
+    if($r != 0) {
+       unlink $filename if(-f $filename);
+    }
+    if($r == 2) {
+        return sig_killed();
+    }
+    download_end:
+    return $filename;
+}
+
+sub mkdir_check {
+    my $dir = shift;
+    return 1 unless($dir);
+    unless(-d $dir) {
+        unless(mkdir $dir) {
+            print_e 1,"$!\n";return 0;
+        }
+    }
+    return 1;
+}
+
+sub count_text {
+    my $text = shift;
+    return 0 unless($text);
+    my $count = 0;
+    foreach(@{$text}) {
+        my $line = $_;
+        $line =~ s/\s//g;
+        $count += length($line);
+    }
+    return $count;
+}
+
+sub persist_entry {
+    my $url=shift;
+    my $prefix = shift || "";
+    print_n3 1,"$prefix processing $url\n";
+    my $file = url_to_file($url);
+    unless (-f $file) {
+        print_e 1,"$prefix file not exists : $file\t[Skipped]\n";
+        return undef;
+    }
+    my $page = MyPlace::HTML::Content->new_from_file($file,@{&BODY_ID});
+    unless($page) {
+        print_e 1,"$prefix couldn't no parse $file...\n";
+        return undef;
+    }
+    my $title = $page->{title};
+    print_n3 1,"$prefix persisting $title ...\n";
+    print_n3 1,"$prefix checking images ...\t";
+    if($page->{images}) {
+            my @images = @{$page->{images}};
+            @images = map {URI->new($_)->as_string();} @images;
+            print_w 0,"got " . scalar(@images) . " image(s)\n";
+            my $imgd = IMAGE_D . "$title";
+            mkdir_check($imgd) or next;
+            open FO,"|-","batchget","-a","-w",$imgd,"-n",$title,"-i" or die("$!\n");
+            print FO $_,"\n" foreach(@images);
+            close FO;
+            my $r_code = $?;
+#            unless($r_code == 0) {
+#                print_e 1,"batchget return $r_code\n";
+#                die;
+#            }
+            if($r_code && ($r_code == 2 || $r_code == 256)) {
+#                print_e 1,"\"batchget\" killed\n";#, skip to next\n";
+                return sig_killed();
+            }
+        }
+    else {
+        print_e 0,"[No images found]\n";
+    }
+    print_n3 1,"$prefix checking text ...\t";
+    my $dst = TEXT_D . "$title.txt";
+    if(-f $dst) {
+        print_e 0,"[Skipped(File $dst exists)]\n";
+        return undef;
+    }
+    my $text_size = count_text($page->{text});
+    if($text_size >= TEXT_FILE_SIZE) {
+        print_w 0,"get $text_size chars,wrtting to $dst\n"; 
+        my $text = $page->{text};
+        open FO,">:utf8",$dst or die("$!\n");
+        print FO $title,"\n","\n";
+        print FO @{$text},"\n" if($text);
+        close FO;
+    }
+    else {
+            print_e 0,"size to small,skipped!\n";
+    }
+}
+
+
+sub download_url {
+    my $url=shift;
+    my $prefix = shift || "";
+    print_n 1,"$prefix processing $url\n";
+    my $page_exp = get_page_exp($url);
+    unless($page_exp) {
+        print_e 1,"$prefix $url not supportted!\n";
+        return undef;
+    }
+    my $title;
+    my $count=0;
+    my $index = $page_exp->{index};
+    my $page_pre = "";
+    my $page_suf = "";
+    open my $fh,"-|","httpcat '$url'";
+    foreach(read_html($fh)) {
+        chomp;
+        $title = get_title($_) unless($title);
+        my @hrefs = get_hrefs($_);
+        foreach(@hrefs) {
+            #print_n "Testing $_ against " .  $page_exp{page} . "\n";
+            if($_ =~ $page_exp->{page}) {
+                if($2 > $count) {
+                    $page_pre = $1; 
+                    $count = $2;
+                    $page_suf = $3;
+                }
+            }
+        }
+    }
+    close $fh;
+    $title = clear_title($title);
+    print_n 1,"$prefix Get titls: $title\n";
+    my @pages;
+    if($index) {
+        push @pages,build_url($index,$url);
+    }
+    else {
+        push @pages,build_url($page_pre . "1" . $page_suf,$url);
+    }
+    foreach my $idx(2 .. $count) {
+        push @pages,build_url("$page_pre$idx$page_suf",$url);
+    }
+    print_n 1,"$prefix got " . scalar(@pages) . " pages\n";
+    if(@pages) {
+        my $cwd = getcwd();
+        print_n 1,"$prefix add pages task...\n";
+        my $count = @pages;
+        foreach my $idx (1 .. $count) {
+            $HND->push("$cwd/$title",'download_page',$pages[$idx-1],$prefix . "[$idx/${count}P]",$page_exp->{list});
+        }
+    }
+}
+
+sub download_page {
+    my $url=shift;
+    my $prefix = shift || "";
+    my $exp = shift;
+    my %pages;
+    print_n2 1,"$prefix processing $url\n";
+    unless($exp) {
+        $exp = get_page_exp($url);
+        $exp = $exp->{list};
+    }
+    unless($exp) {
+        print_e 1,"$prefix $url not supported\n";
+        return undef;
+    }
+    open my $fh,"-|","httpcat '$url'";
+    while(<$fh>) {
+        chomp;
+        my @hrefs = get_hrefs($_);
+        foreach(@hrefs) {
+            if($_ =~ $exp) {
+                $pages{$_}=1;
+            }
+        }
+    }
+    close $fh;
+    my @pages = keys %pages;
+    if(@pages) {
+        mkdir_check(SOURCE_D) or return undef;
+        mkdir_check(TEXT_D) or return undef;
+        mkdir_check(IMAGE_D) or return undef;
+        print_n2 1,"$prefix Get " . scalar(@pages) . " entries..."; 
+        map {$_ = URI->new_abs($_,$url)->as_string();} @pages;
+        print_n2 1,"$prefix downloading entries...\n";
+        if($DEBUG_MODE) {
+            use Data::Dumper;
+            print_e 0,Dumper(\@pages),"\n";
+            return undef;
+        }
+        my $cwd = getcwd();
+        print_n 1,"$prefix add entries task...\n";
+        my $count = @pages;
+        foreach my $idx (1 .. $count) {
+            $HND->push($cwd,'persist_entry',$pages[$idx-1],$prefix . "[$idx/${count}E]");
+        }
+    }
+}
+
+my $killingme=0;
+sub sig_killed {
+    return if($killingme);
+    $killingme=1;
+    print_e 1,"I AM KILLED!!!\n";
+    if($HND->{lastStack}) {
+        $HND->unshift(@{$HND->{lastStack}});
+    }
+    chdir($CWD);
+    print_e 1,"saving remained tasks...\n";
+    $HND->saveToFile(RESUME_FILE_NAME);
+    print_e 1,$HND->length," tasks saved to ",RESUME_FILE_NAME,"\n";
+    exit 2;
+}
+$SIG{INT}=\&sig_killed;
+#$SIG{KILL}=\&sig_killed;
+#$SIG{CHLD}=sub {print_e 1,"Child Terminated\n";};
+binmode STDOUT,"utf8";
+binmode STDERR,"utf8";
+
+
+my @urls;
+foreach(@ARGV) {
+    if($_ eq "--dump") {
+        $DEBUG_MODE = 1;
+    }
+    elsif($_ eq "--page") {
+        $PAGE_MODE = 1;
+    }
+    else {
+        push @urls,$_ if($_);
+    }
+}
+if(@urls) {
+    my $cmd = $PAGE_MODE ? "download_page" : "download_url";
+    foreach(@urls) {
+        $HND->push($CWD,$cmd,$_);
+    }
+}
+else {
+    print_e 1,"Loading resuming data...";
+    $HND->loadFromFile(RESUME_FILE_NAME);
+    print_e 0,"\tGet " . $HND->length . " tasks\n";
+}
+die("Nothing to do!\n") unless($HND->length);
+
+while(my $tasks = $HND->length) {
+    print_e 1,"[$tasks] tasks remained\n";
+    $HND->run();
+}
+

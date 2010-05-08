@@ -1,0 +1,288 @@
+#!/usr/bin/perl -w
+###APPNAME:     discuz_download
+###APPAUTHOR:   duel
+###APPDATE:	2009-01-26 07:54:08
+###APPVER:	0.1
+###APPDESC:     discuz_download	
+###APPUSAGE:	
+###APPEXAMPLE:	discuz_download
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+use MyPlace::Discuz;
+use MyPlace::ReEnterable;
+use Cwd qw/getcwd/;
+use constant {
+    RESULE_DATA_FILE=>".discuz_download.resume",
+    THREAD_DBASE_FILE=>".threads",
+};
+use utf8;
+
+binmode STDERR,"utf8";
+
+my %THREAD_DBASE;
+my $CWD = getcwd();
+my $HND = MyPlace::ReEnterable->new('main');
+my ($url,$TYPE,$USER,$PASS) = @ARGV;
+$TYPE ||= "text";
+$USER ||= "keyduel";
+$PASS ||= "absfreedom";
+
+sub build_dir {
+    my $f =shift;
+    my $s = shift;
+    #$s =~ s/^(\[[^\[\]]+\]\s*)+//g;
+    $s =~ s/\s*[\/\\\|]\s*/-/g;
+    $s =~ s/【[^【】]+\s*阅\s*】//;
+    $s =~ s/【\s*作者(?:：|:)不(?:祥|详)\s*】\s*//;
+    $s =~ s/^\s+//;
+    $s =~ s/\s+$//;
+    return "$f/$s";
+}
+sub loadpage {
+    my ($url,$USER,$PASS) = @_;
+    print STDERR "> $url...";
+    sleep 2;
+    my $page = MyPlace::Discuz->new(user=>$USER,pass=>$PASS);
+    if($page->init_with_url($url)) {
+        print STDERR "\t[OK]\n";
+        return $page;
+    }
+    else {
+        print STDERR "\t[Failed]\n";
+        return undef;
+    }
+}
+
+sub save_post {
+    my ($dir,$filename,$url,$prompt) = @_;
+    $prompt = $prompt ? "[$prompt]" : "";
+    my $subpage = loadpage($url,$USER,$PASS);
+    print STDERR "$prompt $url ...";
+    unless($subpage and $subpage->{post}) {
+        print STDERR "\tEmpty post...\n";
+        return undef;
+    }
+    mkdir $dir unless(-d $dir);
+    if($TYPE eq "images") {
+        print STDERR "\nSaving Images...";
+        save_images($dir,$filename,$subpage);
+        print STDERR "\n";
+    }
+    elsif($TYPE eq "all") {
+        print STDERR "\nSaving Images...";
+        save_images($dir,$filename,$subpage);
+        print STDERR "\nSaving Text";
+        save_text($dir,$filename,$subpage);
+    }
+    else {
+        print STDERR "\nSaving Text ";
+        save_text($dir,$filename,$subpage);
+    }
+    $THREAD_DBASE{$url}=1;
+}
+
+sub save_images {
+    my $dir = shift;
+    my $filename = shift;
+    my $subpage = shift;
+#    my $prompt = shift;
+    my @images = $subpage->get_post_images($subpage->{post});
+    unless(@images) {
+        print STDERR "\tNO IMAGES";
+        return undef;
+    }
+    my $dst = build_dir($dir,$filename);
+    mkdir $dst unless(-d $dst);
+    foreach my $idx (0 .. $#images) {  
+        print STDERR "\n[" . ($idx+1)  . "/$#images]" if(@images > 1);
+        print STDERR "$images[$idx]\n-->$dst/$idx.jpg ...";
+        if(-f "$dst/$idx.jpg") {
+            print STDERR "\t[Skipped] File exists\n";
+            next;
+        }
+        print "\n";
+        open FI,"-|","netcat",$images[$idx];
+        my @data = <FI>;
+        unless(@data) {
+            close FI;
+            next;
+        }
+        unless(open FO,">","$dst/$idx.jpg") {
+            print STDERR "\nError:$!\n";
+            close FI;
+            next;
+        }
+        print FO @data;
+        close FO;
+        close FI;
+    }
+}
+
+sub save_text {
+    my $dir = shift;
+    my $filename = shift;
+    my $subpage = shift;
+#    my $prompt = shift;
+    my $dst = build_dir($dir,$filename);
+    $dst .= ".txt";
+    print STDERR "==>$dst ...";
+    mkdir $dir unless(-d $dir);
+    return (print STDERR "\t[Failed:]$dir not exists!\n") unless(-d $dir);
+    if(-f $dst) { 
+        print STDERR "\t[Skipped] File exists\n";
+        return undef;
+    }
+    print STDERR "\n";
+    my $text;
+    if($subpage) {
+        $text = $subpage->get_post_text($subpage->{post});
+    }
+    else {
+        $text = shift;
+    }
+    unless($text) {
+        print STDERR "\tNo text to save [Failed]\n";
+        return undef;
+    }
+    open FO,">:utf8",$dst or return (print STDERR "\t[Failed:]$!\n");
+    print FO @{$text};
+    close FO;
+#    print STDERR "\t[Done]\n";
+    return 1;
+}
+
+
+sub min_max {
+    return (shift() + 1) . "/" .  (shift() + 1)
+}
+
+sub process_url {
+    my $dir = shift;
+    my $url = shift;
+    my $no_subpage = shift;
+    my $prompt = shift;
+    my $page = loadpage($url,$USER,$PASS);
+    mkdir $dir unless(-d $dir);
+    return unless($page);
+    if($page->{post}) {
+        save_post($dir,$page->{title} ,undef,$prompt,$page->get_post_text($page->{post}));
+        $page->delete();
+        return 1;
+    }
+    if(!$no_subpage and $dir eq ".") {
+        my $title = $page->{title};$title =~ s/\s*-.*//g;
+        $dir = build_dir($dir,$title);
+        mkdir $dir unless(-d $dir);
+    }
+    if($page->{forums}) {
+        foreach my $idx (0 .. $#{$page->{forums}}) {
+            my $subdir = build_dir($dir,$page->{forums}->[$idx]->[1]);
+            my $suburl = $page->build_url($page->{forums}->[$idx]->[0],$url);
+            $HND->push(undef,"process_url", $subdir,$suburl,0,$prompt . " forum " . min_max($idx,$#{$page->{forums}}));
+        }
+    }
+    if((!$no_subpage) and  $page->{pages}) {
+            #use Data::Dumper;die(Dumper($page->{pages}),"\n");
+        foreach my $idx (0 .. $#{$page->{pages}}) {
+            my $suburl = $page->build_url($page->{pages}->[$idx],$url);
+            $HND->push(undef,"process_url", $dir,$suburl,1,$prompt . " page " . min_max($idx,$#{$page->{pages}}));
+        }
+    }
+    else {
+        foreach my $idx (0 .. $#{$page->{threads}}) {
+            my $suburl = $page->build_url($page->{threads}->[$idx]->[0],$url);
+            if($THREAD_DBASE{$suburl}) {
+                print STDERR "$suburl in THREAD_DBASE, ignored it\n";
+                next;
+            }
+            my $subfile = $page->{threads}->[$idx]->[1];
+            $HND->push(undef,"save_post",$dir,$subfile,$suburl,$prompt . " thread " . min_max( $idx,$#{$page->{threads}} . " "));
+        }
+    }
+    $page->delete();
+}
+
+my $killingme=0;
+sub sig_killed {
+    return if($killingme);
+    $killingme=1;
+    print STDERR "I AM KILLED!!!\n";
+    if($HND->{lastStack}) {
+        $HND->push(@{$HND->{lastStack}});
+    }
+    chdir($CWD);
+    print STDERR "saving remained tasks...\n";
+    $HND->saveToFile(RESULE_DATA_FILE);
+    print STDERR "saving thread dbase...\n";
+    open FO,">",THREAD_DBASE_FILE;
+    foreach(keys %THREAD_DBASE) {
+        print FO "$_\n";
+    }
+    close FO;
+    print STDERR $HND->length," tasks saved to ",RESULE_DATA_FILE,"\n";
+    exit 2;
+}
+$SIG{INT}=\&sig_killed;
+
+my @urls;
+if($url) {
+    if($url eq '-') {
+        print STDERR "Input URLs:\n";
+        while(<STDIN>) {
+            push @urls,$_;
+        }
+        print STDERR scalar(@urls)," URLs read.\n";
+    }
+    else {
+        push @urls,$url;
+    }
+}
+
+if(@urls) {
+    $url = $urls[0];
+    $HND->setState("type",$TYPE);
+    $HND->setState("user",$USER);
+    $HND->setState("urls",[@urls]);
+    $HND->setState("pass",$PASS);
+    $HND->push(undef,"process_url",".",$_,0,"") foreach(@urls);
+    $HND->saveToFile(RESULE_DATA_FILE);
+}
+else {
+    if(-f THREAD_DBASE_FILE) {
+        open FI,"<",THREAD_DBASE_FILE;
+        while(<FI>) {
+            chomp;
+            $THREAD_DBASE{$_}=1;
+        }
+        close FI;
+    }
+    print STDERR "Loading resuming data...";
+    $HND->loadFromFile(RESULE_DATA_FILE);
+    $TYPE = $HND->getState("type") || "text";
+    $USER = $HND->getState("user") || "keyduel";
+    $PASS = $HND->getState("pass") || "absfreedom";
+    print STDERR "\tGet " . $HND->length . " tasks\n";
+}
+die("Usage:$0 (URL) [text/images] [username] [password]\n") unless($HND->length);
+
+while(my $tasks = $HND->length) {
+    print STDERR "[$tasks] tasks remained\n";
+    $HND->run();
+}
+
+
+
+
+
+
+

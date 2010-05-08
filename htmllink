@@ -1,0 +1,69 @@
+#!/usr/bin/perl -w
+use strict;
+
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+#http://www.google.com/intl/
+sub GetBaseUrl($) {
+    my $result=shift; 
+    if (! $result) {return "";}
+    if ($result !~ /^\w+:\/\//i) {
+        $result = "http://" . $result;
+        $result =~ s/^http:\/\/\/*/http:\/\//;
+    }
+    $result =~ s/(\w+):\/\/(.*)\/[^\/]*$/$1:\/\/$2/;
+    $result .= "/";
+    $result =~ s/([^:\/])\/\//$1\//g;
+    return $result;
+}
+
+#http://www.google.com
+sub GetRootUrl($) {
+    my $result=shift;
+    $result =~ s/(\w+):\/\/([^\/]*).*/$1:\/\/$2/;
+    return $result;
+}
+
+sub FullUrl($$@) {
+    my $base = shift;
+    my $root = shift;
+    my @result=();
+    foreach(@_) {
+        my $url=$_;
+        if ($url =~ /^\//) {
+            $url = $root . $url;
+        }
+        else {
+            if ($url !~ /^(\w+):\/\//i) {
+                $url = $base . $url;
+            }
+        }
+        if ($url !~ /^(\w+):\/\//i) {
+            $url = "http://" . $url;
+        }
+        push @result,$url;
+    }
+    return @result;
+}
+
+
+my $BaseUrl=GetBaseUrl($ARGV[0]);
+my $RootUrl=GetRootUrl($BaseUrl);
+
+my @urls=();
+
+#sub ripurl
+while(<STDIN>) {
+#    s/[\n\t]//g;
+    s/"/'/g;
+    s/(href|src)\s*=\s*/HREF=/gi;
+    s/'((http|ftp):\/\/[^']+?)'/HREF='$1'/g;
+    s/[^']((http|ftp):\/\/[^ \<\>]+)/HREF='$1'/g;
+    s/HREF=([^'][^ \<\>]+)/HREF='$1'/g;
+    s/HREF='HREF=/HREF=/g;
+    my @match = ( $_ =~ /HREF='\s*([^']+?)\s*'/g );
+    @match = FullUrl($BaseUrl,$RootUrl,@match);# if ($BaseUrl);
+    foreach(@match) {
+        print "$_\n";
+    }
+}

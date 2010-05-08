@@ -1,0 +1,77 @@
+#!/usr/bin/perl -w
+
+#http://www.viksoe.dk/code/windowless1.htm
+
+
+sub file_name {
+    my $r = shift;
+    $r =~ s/.*\/\///;
+    $r =~ s/^[^\/]*\///;
+    $r =~ s/\?/@/g;
+    return $r;
+
+}
+
+sub article_name {
+    my $r = shift;
+    $r =~ s/.*[\\\/]//g;
+    return $r;
+}
+
+my @exclude = (
+    "/script/Jobs",
+    "/script/Catalog",
+    "/script/Membership",
+    "/Forums",
+    "/script/Forums",
+    "/info",
+    "/webservices",
+    "/script/Ratings",
+    "/script/Catalog",
+);
+sub start_wget {
+    my $url = shift;
+    my @wget = ("wget","-N","-nH","-r","-l","1","-A","htm,css,js,zip,rar,exe,gif,jpg,jpeg","-k","-E","-t",3);
+    if(@exclude) {
+        push @wget,"-X";
+        push @wget,join(",",@exclude);  
+    }
+    return (system(@wget,$url)==0);
+}
+
+sub get_article {
+    my $url=shift;
+    return unless($url);
+    $url =~ s/\.aspx.*/\.aspx\?display=PrintAll/;
+    my $file_name = file_name($url);
+    my $article_name = article_name($file_name);
+    if(start_wget($url)) {
+        open FO,">",$article_name;
+        print FO <<EOF;
+    <frameset>
+        <frame border=0 src="$file_name">
+    </frameset>
+EOF
+    print STDERR "$article_name ==> $file_name\n";
+        return 1,$url,"OK";
+    }
+
+    return undef,$url,"Download failed";
+}
+
+if(@ARGV) {
+    foreach(@ARGV) {
+        my @r = get_article($_);
+        if($r[0]) {
+            print STDERR "$r[2]:$r[1]\n";
+        }
+        else {
+            print STDERR "$r[2]:$r[1]\n";
+        }
+    }
+}
+else {
+    print STDERR $0,"\n";
+    print STDERR "Usage:\n\t$0 (Viksoe URLs)\n";
+}
+

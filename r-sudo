@@ -1,0 +1,35 @@
+#!/usr/bin/perl -w
+###APPNAME:     r-sudo
+###APPAUTHOR:   duel
+###APPDATE:	Sat Mar 22 03:05:47 2008
+###APPVER:	0.1
+###APPDESC:     A su front-end	
+###APPUSAGE:	username cmd
+###APPEXAMPLE:	r-sudo xiaoranzzz firefox -P xiaoranzzz
+###APPOPTION:	
+use lib $ENV{XR_PERL_MODULE_DIR};
+use strict;
+use MyPlace::Script::Usage qw/help_even_empty/;
+
+exit 0 if(help_even_empty($0,@ARGV));
+
+
+my $U=shift;
+my $CMD=shift;
+
+if($U eq $ENV{USER}) {
+    exit exec($CMD,@ARGV);
+}
+
+my $DOER="gksu";
+$DOER="su" unless(`which "$DOER"`);
+
+if($DOER eq "su") {
+    my $LCMD=$CMD;
+    $LCMD = $LCMD . " \"" . join("\" \"",@ARGV) . "\"" if(@ARGV);
+    exec $DOER,"-c",$LCMD,$U;
+}
+else {
+    exec "gksu","--user",$U,"--message","Password of $U needed to run '$CMD @ARGV'","--",$CMD,@ARGV;
+}
+

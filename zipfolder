@@ -1,0 +1,101 @@
+#!/usr/bin/perl -w
+###APPNAME:     zipfolder
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Wed Oct 17 07:51:57 2007
+###APPVER:	0.1
+###APPDESC:     Packup a folder as a zip file,with pathname excluded.
+###APPUSAGE:	[OPTIONS] (Directories...)
+###APPOPTION:	-m [0-9]:Compress Level|-d:Delete directory after successful zipped|-e:Ext Name
+###APPEXAMPLE:  zipfolder -d -m9 -e .zip music/ pictures/\n\tzipfolder music/ pictures
+use strict;
+use Getopt::Std;
+use File::Glob qw/bsd_glob/;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_even_empty format_help/;
+
+exit 0 if(help_even_empty($0,@ARGV));
+
+my $OptFlag='hdm:e:';
+my %OPT;
+exit(format_help $0) unless(getopts($OptFlag,\%OPT));
+
+my $lvl = $OPT{m};
+$lvl = 5 if((!defined $lvl) or $lvl<0 or $lvl>9);
+my $do_unlink = $OPT{d} ? 1 : 0;
+my $ext = $OPT{e} ? $OPT{e} : ".zip";
+my @dirs;
+foreach(@ARGV) {
+    foreach(bsd_glob($_)) {
+    if(-d $_) {
+        push(@dirs,$_);
+        next;
+    }
+    print STDERR ("\"$_\" Ingored\n");
+    }
+}
+die("Nothing to do\n") unless(@dirs);
+
+my $USER=$ENV{USER} || "xiaoranzzz";
+my $HOSTNAME=`hostname` || "myplace.hell";
+my $MACHINE=`uname -omsr` || "windows";
+my $DATE =  localtime;
+my $COMMENT="Creator  :  $USER\n" . 
+            "Host     :  $HOSTNAME" .
+            "Machine  :  $MACHINE" .
+            "Date     :  $DATE";
+
+my $ZIPPROGRAM="zip -Xrz";
+
+sub resetLine {
+    print "\r" . " "x50;
+    print "\r";
+}
+sub dosys {
+    return system(@_);
+}
+
+use Cwd qw/cwd/;
+use File::Spec::Functions;
+
+my $pwd=cwd();
+
+
+foreach my $idx(0 .. $#dirs) {
+    my $src = $dirs[$idx];
+    chdir($pwd) or die("$!\n");
+    my $bn=$src;
+    $bn =~ s/[\/\\]$|^.*[\/\\]//g;
+    $bn .= $ext;
+    my $fn= File::Spec->rel2abs($src,$pwd) . $ext;
+    my $comment="Filename  : $bn\n" . $COMMENT;
+    print("$src->$bn\n$comment");
+    if(!chdir($src)) {print STDERR ("$!\n");next;}
+
+    open ZIPP,"|-","$ZIPPROGRAM -$lvl \"$fn\" ." or die("$!\n");
+    print ZIPP ($comment);
+    close ZIPP;
+
+    if(-f $fn) {
+        resetLine;
+        print("[",$idx+1,"/",$#dirs+1,"] \"$src\"->\"$bn\" [Done]\n");
+        if($do_unlink) {
+            chdir($pwd);
+            print("Deleting \"$src\" ...");
+            if(dosys("rm","-fdr","--",$src)==0) {
+                resetLine;
+                print("Deleting \"$src\" [OK]\n");
+            }
+            else {
+                resetLine;
+                print("Deleting \"$src\" [Failed]\n");
+            }
+        }
+    }
+    else {
+        resetLine;
+        print("\"$src\"->\"$bn\" [Failed]\n");
+    }
+}
+
+
+

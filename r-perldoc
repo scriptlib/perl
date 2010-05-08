@@ -1,0 +1,6 @@
+#!/usr/bin/perl 
+push @INC,$ENV{XR_PERL_MODULE_DIR};
+use lib $ENV{XR_PERL_MODULE_DIR};
+my $app = `which podbrowser`;
+chomp($app);
+require $app;

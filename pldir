@@ -1,0 +1,11 @@
+#!/usr/bin/perl
+my $PERLDIR="/share/workspace/perl";
+my $BINDIR="/share/bin";
+
+if ("-b" eq $ARGV[0] ) {
+    print($BINDIR);
+} 
+else {
+    print($PERLDIR);
+}
+exit 0

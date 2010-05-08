@@ -1,0 +1,9 @@
+#!/usr/bin/perl -w
+use XML::Simple;
+use Data::Dumper;
+my %arg = (KeepRoot=>1);
+my $xml = XMLin($ARGV[0] ? $ARGV[0] : "/dev/stdin",%arg);
+print Dumper($xml);
+
+
+

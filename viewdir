@@ -1,0 +1,68 @@
+#!/usr/bin/perl -w
+###APPNAME:     viewdir
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Thu Feb 14 14:30:06 2008
+###APPVER:	0.1
+###APPDESC:     View Directory	
+###APPUSAGE:	(directory)
+###APPEXAMPLE:	viewdir /usr/share/doc/fvwm-crystal
+###APPOPTION:	
+use strict;
+
+foreach(@ARGV){
+    exit (system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $docdir=shift;
+$docdir = "." unless $docdir;
+my $gzview = "zless";
+my $bzview = "bzless";
+my $view = "less";
+
+chdir($docdir) or die("$!\n");
+
+my @docs;
+foreach(glob("*")) {
+    if(-f "$_") {
+        push(@docs,$_);
+    }
+}
+
+sub listDoc {
+    my $basedir=shift;
+    my @files=@_;
+    print STDERR $basedir,"\n";
+    my $r = system("ui-select-list","Document list ($basedir:)",@files);
+    return $r>>8;
+}
+
+sub viewdoc($) {
+    my $file = $_[0];
+    if(! -f "$file" ){
+        print STDERR "File not exist:$file\n";
+    }
+    else {
+        $file =~ m/\.([^.]*$)/;
+        my $ext = $1 ? $1 : "";
+        my $cmd = $view;
+        if($ext eq "html") {
+            $cmd = "htmlview";
+        }
+        elsif($ext eq "gz") {
+            $cmd = $gzview;
+        }
+        elsif($ext eq "bz" || $ext eq "bz2") {
+            $cmd = $bzview
+        }
+        system($cmd,$file);
+    }
+}
+
+my $choice;
+while($choice = listDoc($docdir,@docs)) {
+    viewdoc($docdir . "/" . $docs[$choice-1]);
+};
+
+
+
+

@@ -1,0 +1,97 @@
+#!/usr/bin/perl -w
+#!/bin/sh
+###APPNAME:     r-kvm
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Wed Oct  3 09:58:14 2007
+###APPVER:	0.1
+###APPDESC:     qemu with default arguments	
+###APPUSAGE:	
+###APPEXAMPLE:	r-kvm -hda boot.raw
+###APPOPTION:	?:see qemu --help
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+#Parse options
+sub getOpt(@) {
+    my $flag=0;
+    my $last="";
+    my %result;
+    foreach(@_) {
+        if(m/^-/) {
+            if($flag) {
+                $result{$last}=$last;
+            }
+            else {
+                push @{$result{noname}},$last if($last);
+            }
+            $flag=1;
+            $last=$_;
+        }
+        else {
+            if($flag) {
+                $result{$last}=$_;
+            }
+            else {
+                push @{$result{noname}},$_;
+            }
+            $flag=0;
+            $last="";
+        }
+    }
+    if($flag) {
+        $result{$last}=$last;
+    }
+    return %result;
+}
+
+my %OPTS=getOpt(@ARGV);
+my @noname=();
+@noname=@{$OPTS{noname}} if($OPTS{noname});
+
+foreach my $arg (@noname) {
+    foreach(qw/-hda -hdb -hdc -hdd -cdrom -fda -fdb/) {
+        if(!$OPTS{$_}) {
+            $OPTS{$_}=$arg;
+            last;
+        }
+    }
+}
+$OPTS{noname}=0;
+
+if(!$OPTS{-boot}) {
+    foreach(["-fda","a"],["-hda","c"],["-cdrom","d"]) {
+        if(defined($OPTS{@$_[0]})) {
+            $OPTS{-boot}=@$_[1];
+            last;
+        }
+    }
+}
+
+my @args;
+push @args,qw/-localtime -soundhw sb16 -m 256/;# -monitor stdio';# -soundhw sb16';
+#push @args,qw'-hdd /myplace/emuos/datapool.raw' if(-f "/myplace/emuos/datapool.raw");
+foreach(sort keys %OPTS) {
+    next if($_ eq "noname"); 
+    if($OPTS{$_} eq $_) {
+        push @args,$_;
+    }
+    else {
+        push @args,$_;
+        push @args,$OPTS{$_};
+    }
+}
+system("printarg", "%-10s :\t%s\n",@args);
+#print("qemu ",join(" ",@args),"\n");
+$ENV{QEMU_AUDIO_DRV}="alsa";
+exec("kvm",@args);
+
+    if ($>==0) {
+        exec("kvm",@args);
+    }
+    else {
+        exec("sudo","kvm",@args);
+    }
+
+

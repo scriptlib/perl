@@ -1,0 +1,186 @@
+#!/usr/bin/perl -w
+###APPNAME:     r-test
+###APPAUTHOR:   duel
+###APPDATE:	2008-08-27 12:46:27
+###APPVER:	0.1
+###APPDESC:     test for CONDITIONS, if true perform ACTIONS on testing output
+###APPUSAGE:    [Options] -if (COND) [-do (ACTION)]
+###APPEXAMPLE:	r-test -key .c -if find /src/ -do echo
+###APPOPTION:	-key (key):the key to test|-from-file (file):read options from file|-if (COND):support "find" "grep"|-do (ACTION):buildin actions are "rm" "mv" "cp" "echo"|-dest [text]:append text as arguments for action
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+#use MyPlace::Script::Debug qw/dump_var/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+my $option_exp = qr/^(:?-key|-if|-do|-from-file|-dest)$/;
+my $mul_exp = qr/^(:?-key|-from-file|-dest)/;
+my $alias_exp = qr/^(:?-find|-grep|-move|-copy|-delete|-echo)$/;
+my %alias = (
+    "-find"=>["-if","find"],
+    "-grep"=>["-if","grep"],
+    "-move"=>["-do","mv"],
+    "-copy"=>["-do","cp"],
+    "-echo"=>["-do","echo"]
+);
+
+my @last_test;
+my @test_result;
+
+sub getopt(@) {
+    my @args = @_;
+    my $opt_key = "";
+    my %result;
+    foreach my $opt(@args) {
+        if($opt_key) {
+            if($opt =~ $option_exp) {
+                $opt_key = $opt;
+                @{$result{$opt}}=() unless($opt =~ $mul_exp);
+            }
+            elsif($opt =~ $alias_exp) {
+                $opt_key = "";
+                redo;
+            }
+            else {
+                push @{$result{$opt_key}},$opt;
+            }
+        }
+        else {
+            if($opt =~ $option_exp) {
+                $opt_key = $opt;
+                if($opt !~ $mul_exp) {
+                    @{$result{$opt}}=();
+                }
+            }
+            elsif ($opt =~ $alias_exp) {
+                ($opt_key,$opt) = @{$alias{$opt}};
+                redo;
+            }
+            else {
+                push @{$result{"default"}},$opt;
+            }
+        }
+    }
+    return \%result;
+}
+
+sub do_if_key($$$$) {
+    my @keys = @{ shift @_};
+    my @conds = @{ shift @_};
+    my @actions = @{ shift @_ };
+    my @dests = @{ shift @_ };
+    
+    my $action = @actions ? shift @actions : "echo";
+    my $test = @conds ? shift @conds : "find";
+    my @prev_act;
+    my @post_act;
+
+    if($action eq "mv" or $action eq "cp") {
+        my $dstdir = shift @actions;
+        $dstdir = shift @dests if(@dests and !$dstdir);
+        $dstdir = join("_",@keys) unless($dstdir);
+        mkdir $dstdir unless(-d $dstdir);
+        @prev_act = ($action,"-v","--");
+        @post_act = ($dstdir);
+    }
+    elsif($action eq "rm") {
+        @prev_act = ("rm","-v","--");
+    }
+    elsif($action eq "rmdir") {
+        @prev_act = ("rm","-fdr");
+    }
+    else {
+        push @prev_act,$action;
+        my $post=0;
+        foreach(@actions) {
+            if($post) {
+                push @post_act,$_;
+            }
+            else {
+                if($_ eq '{}') {
+                    $post = 1;  
+                }
+                else {
+                    push @prev_act,$_;
+                }
+            }
+        }
+        push @post_act,@dests;
+    }
+    if($test eq "find") {
+        foreach(@keys) {
+            push @conds,"-iname","*$_*","-or";
+        }
+        pop @conds if(@keys);
+    }
+    elsif($test eq "grep") {
+        my $pattern;
+        foreach(@keys) {
+            if($pattern) {
+                $pattern = $pattern . "|$_";
+            }
+            else {
+                $pattern = $_;
+            }
+        }
+        push @conds,"-H","-q",$pattern;
+    }
+    print STDERR "Key:",join(" ",@keys);
+    my @test_result = ();
+    unless(open FI,"-|",$test,@conds) {
+        print STDERR "\nCan't fork $test ",join(" ",@conds),"\n";
+        return;
+    }
+    while(<FI>) {
+        chomp;
+        push @test_result,$_ if($_);
+    }
+    close FI;
+    print STDERR " (",$#{test_result} + 1," matched)\n";
+    system(@prev_act,$_,@post_act) foreach(@test_result);
+}
+
+sub process(@) {
+    my @PARGS = @_;
+    my $options = &getopt(@PARGS);
+    my @keys = $options->{"-key"} ? @{$options->{"-key"}} : ();
+    my @conds = $options->{"-if"} ? @{$options->{"-if"}} : ();
+    my @actions = $options->{"-do"} ? @{$options->{"-do"}} : ("echo");
+    my @files = $options->{"-from-file"} ? @{$options->{"-from-file"}} : ();
+    my @dests = $options->{"-dest"} ? @{$options->{"-dest"}} : ();
+    #dump_var(\@_,$options,\@keys,\@conds,\@actions,\@dests,\@files);
+
+    if(@files) {
+        foreach my $file(@files) {
+            $file="/dev/stdin" if($file eq "-");
+            if(!-e $file) {
+                print STDERR "File not exists:$file...\n";
+                next;
+            }
+            if(!open FI,"<",$file) {
+                print STDERR ("File not readable:$file...\n");
+                next;
+            }
+            print STDERR "From file : $file\n";
+            my @LINES = <FI>;
+            close FI;
+            foreach(@LINES){
+                chomp;
+                my @args = split(" ",$_);
+                &process("-key",@keys,"-if",@conds,"-do",@actions,"-dest",@dests,@args) if(@args);
+            }
+        }
+    }
+    else {
+        &do_if_key(\@keys,\@conds,\@actions,\@dests);
+    }
+}
+
+process(@ARGV);
+

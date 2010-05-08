@@ -1,0 +1,45 @@
+#!/usr/bin/perl
+
+use utf8;
+use File::Glob qw/bsd_glob/;
+
+die("Filename required\n") unless(@ARGV);
+
+sub process() {
+foreach my $fn(@_) {
+    print STDERR "processing $fn...";
+    if(!-f "$fn") {
+        print STDERR "\t[Ignored]\n";
+        return;
+    }
+    open FI,"<:utf8",$fn or die("$!\n");
+    my $data=join("",<FI>);
+    close FI;
+    $data =~ s/\smlns=/ xmlns=/;
+    $data =~ s/<dc:rights>[^>]+>/<dc:rights>created by xiaoranzzz\@myplace<\/dc:rights>/;
+    $data =~ s/http:\/\/www.cnepub.com/xiaoranzzz\@myplace/g;
+    $data =~ s/epub掌上书苑/xiaoranzzz\@myplace/g;
+    $data =~ s/简介/About/g;
+    $data =~ s/封面/Cover/g;
+    $data =~ s/\&amp;/\&/g;
+    $data =~ s/\&nbsp;/ /g;
+    $data =~ s/\&\#174;/®/g;
+    open FO,">:utf8",$fn or die("$!\n");
+    print FO $data;
+    close FO;
+    print STDERR "\t[OK]\n";
+}
+}
+
+
+
+my @files;
+foreach(@ARGV) {
+    if(-f $_) {
+        push @files,$_;
+    }
+    else {
+        push @files,bsd_glob("$_");
+    }
+}
+&process(@files) if(@files);

@@ -1,0 +1,79 @@
+#!/usr/bin/perl -w
+###APPNAME:     zim-create-aptlog
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Wed Apr  2 00:42:39 2008
+###APPVER:	0.1
+###APPDESC:	
+###APPUSAGE:	
+###APPEXAMPLE:	
+###APPOPTION:	
+use strict;
+use Data::Dumper;
+
+my $zimdir="/myplace/workspace/Wiki/myplace/Works/SystemAdmin/Packages";
+mkdir $zimdir unless(-d $zimdir);
+my $logfile=shift;
+my $log_h;
+if($logfile && -f $logfile) {
+    if(!open $log_h,"<",$logfile) {
+        print STDERR "Open $logfile for reading error:$!\n";
+        print STDERR "Trying sudo...\n";
+        open $log_h,"-|","sudo cat '$logfile'" or die("$!\n");
+    }
+}
+else {
+    open $log_h,"<&0";
+}
+my %logs;
+my $date;
+my $time;
+while(<$log_h>) {
+    chomp;
+    s/\s+$//g;
+    if(!$date) {
+        next unless(/^Log started:\s+([^\s]+)\s+([^\s]+)\s*$/);
+        $date=$1;
+        $logs{$date}=() unless(exists $logs{$date});
+        push(@{$logs{$date}},"\n== $2 ==\n");
+    }
+    elsif(/^Log ended:/){
+        $date=undef;
+    }
+    else {
+        if(/^\s*(:?dpkg|debconf)\b/) {
+            push(@{$logs{$date}},"    **$_**");
+            next;
+        }
+        if(/^\s*Setting up\s+([^\s]+)\s+\(([^\(\)]+)\)/) {
+            push(@{$logs{$date}},"* Setting up __$1__ ($2)");
+            next;
+        }
+        if(/^\s*Removing\s+([^\s]+)\s+...\s*$/) {
+            push(@{$logs{$date}},"* ~~Removing~~ __$1__");
+            next;
+        }
+    }
+}
+close $log_h;
+if(open FI,"<","$zimdir.txt") {
+    my $text=join("",<FI>);
+    close FI;
+    open FO,">>","$zimdir.txt";
+    foreach (sort keys %logs) {
+        next if($text =~ /^\s*\*\s*\[\[\.$_\|$_\]\]/m);
+        print FO "* [[.$_|$_]]\n";
+    }
+    close FO;
+}
+
+foreach my $date(sort keys(%logs)) {
+    print STDERR "Writing $zimdir/$date.txt...\n";
+    open FO,">>","$zimdir/$date.txt" or die("$!\n");
+    foreach(@{$logs{$date}}) {
+        print FO $_,"\n";
+    }
+    close FO;
+}
+
+
+

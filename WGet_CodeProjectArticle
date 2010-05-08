@@ -1,0 +1,102 @@
+#!/usr/bin/perl -w
+
+#$0 http://www.codeproject.com/KB/cpp/SDIMultiSplit_Part1.aspx?display=Print
+#$0 http://www.codeproject.com/KB/mobile/CHMReader.aspx
+
+
+sub file_name {
+    my $r = shift;
+    $r =~ s/.*\/\///;
+    $r =~ s/^[^\/]*\///;
+    $r =~ s/\?/@/g;
+    $r = $r . ".html";
+    return $r;
+
+}
+
+sub article_name {
+    my $r = shift;
+    $r =~ s/.*[\\\/]//g;
+    $r =~ s/\.aspx@.*//;
+#    $r =~ s/\.aspx$/\.htm/g;
+    return $r;
+}
+
+sub file_title {
+    my $file = shift;
+    open FI,"<",$file or return undef;
+    while(<FI>) {
+        if(/\<\s*title\s*\>\s*([^\<\>]+)\s*\</) {
+            my $title = $1;
+            $title =~ s/^CodeProject:?\s*//;
+            $title =~ s/\s*Free source code and.*$//;
+            return $title;
+        }
+    }
+    return undef;
+}
+
+my @exclude = (
+    "/script/Jobs",
+    "/script/Catalog",
+    "/script/Membership",
+    "/Forums",
+    "/script/Forums",
+    "/info",
+    "/webservices",
+    "/script/Ratings",
+    "/script/Catalog",
+);
+sub start_wget {
+    my $url = shift;
+    my @wget = ("wget","-N","-nH","-p","-k","-E","-t",3);
+    if(@exclude) {
+        push @wget,"-X";
+        push @wget,join(",",@exclude);  
+    }
+    return (system(@wget,$url)==0);
+}
+
+sub get_article {
+    my $url=shift;
+    return unless($url);
+    $url =~ s/\.aspx.*/\.aspx\?display=PrintAll/;
+    my $file_name = file_name($url);
+    my $article_name = article_name($file_name);
+    if(start_wget($url)) {
+        my $title = file_title($file_name);
+        $article_name = $title if($title);
+        if($url =~ /[^\/]+\/([^\/]+)\/([^\/]+)\//) {
+            if(-f "files.js") {
+                open FO,">>","files.js";
+            }
+            else {
+                open FO,">","files.js";
+                print FO "var files=new Array();\n";
+            }
+            print FO "files.push([\"$1\",\"$2\",\"$article_name\",\"$file_name\"]);\n";
+        }
+        close FO;
+        print STDERR "$article_name ==> $file_name\n";
+        return 1,$url,"OK";
+    }
+
+    return undef,$url,"Download failed";
+}
+
+if(@ARGV) {
+    foreach(@ARGV) {
+        my @r = get_article($_);
+        if($r[0]) {
+            print STDERR "$r[2]:$r[1]\n";
+        }
+        else {
+            print STDERR "$r[2]:$r[1]\n";
+        }
+    }
+}
+else {
+    print STDERR $0,"\n";
+    print STDERR "Usage:\n\t$0 (CodeProject URLs)\n";
+}
+

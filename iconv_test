@@ -1,0 +1,46 @@
+#!/usr/bin/perl -w
+###APPNAME:     iconv_test
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	2008-09-10 01:52:04
+###APPVER:	0.1
+###APPDESC:     iconv_test	
+###APPUSAGE:	
+###APPEXAMPLE:	iconv_test
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+my @charsets;
+open FI,"-|",'iconv -l';
+while(<FI>) {
+    chomp;
+    s/\/+$//;
+    push @charsets,$_;
+}
+close FI;
+
+my @text;
+while(<>) {
+    push @text,$_;
+}
+
+foreach(@charsets) {
+    my $answer;
+    print STDERR "Try $_ (y/n)? ";
+    $answer = <STDIN>;
+    print STDERR "\n";
+    last if($answer eq "n\n");
+    open FO,"|-","iconv","-f",$_;
+    print FO $_ foreach(@text);
+    close FO;
+    print STDERR "="x40,"\n","iconv -f $_\n";
+}
+

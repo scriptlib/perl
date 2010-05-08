@@ -1,0 +1,18 @@
+#!/usr/bin/perl -w
+###APPNAME:     plrun
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	2008-05-09 04:01:39
+###APPVER:	0.1
+###APPDESC:     execute perl script	
+###APPUSAGE:	
+###APPEXAMPLE:	plrun
+###APPOPTION:	
+use strict;
+use lib $ENV{XR_PERL_MODULE_DIR};
+my $plrun_script=shift;
+print $plrun_script;
+#$plrun_script=`which "$plrun_script"` unless(-f "$plrun_script");
+#$0=$plrun_script;
+#do $plrun_script;
+
+

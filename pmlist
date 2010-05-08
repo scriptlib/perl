@@ -1,0 +1,59 @@
+#!/usr/bin/perl -w
+###APPNAME:     pmlist
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sun Apr  6 15:07:18 2008
+###APPVER:	0.1
+###APPDESC:     List local perl modules
+###APPUSAGE:	[pattern]
+###APPEXAMPLE:	pmlist MyPlace::NewModule
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_required/;
+exit 0 if(help_required($0,@ARGV));
+
+my $exp=shift;
+$exp=qr/$exp/ if($exp);
+
+sub listmodule($$$);
+
+sub listmodule($$$) {
+    my $dir=shift;
+    my $exp=shift;
+    my $prefix=shift;
+    my @result=();
+    $prefix="" unless($prefix);
+    my @dirs;
+    my @files;
+    chdir $dir or return \@result;
+    foreach(glob("*")) {
+        next if($_ eq ".");
+        next if($_ eq "..");
+        if(-d $_) {
+            push @dirs,$_;
+        }
+        elsif(/\.pm$/) {
+            $_ =~ s/\.pm$//;
+            push @files,$_;
+        }
+    }
+    foreach(@files) {
+        my $mod=$prefix . $_;
+        push @result,$mod if((!defined($exp)) or $mod =~ m/$exp/);
+    }
+    foreach(@dirs) {
+        push @result,@{listmodule($_,$exp,$prefix . $_ . "::")};
+    }
+    return \@result;
+}
+
+foreach($ENV{XR_PERL_MODULE_DIR},@INC) {
+    my @result=@{listmodule($_,$exp,"")};
+    print join("\n",@result),"\n" if(@result);
+}
+
+

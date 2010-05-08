@@ -1,0 +1,36 @@
+#!/usr/bin/perl -w
+use strict;
+###APPNAME:	apt-change-codename
+###APPAUTHOR:	xiaoranzzz
+###APPDATE:	Tue Sep 18 17:11:42 2007
+###APPVER:	0.1
+###APPDESC:	change apt sources.list
+###APPUSAGE:	(Name)
+###APPEXAMPLE:	apt-change-codename etch testing
+###APPOPTION:	
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+my $newName=shift;
+
+if (!$newName) {
+    help();
+    exit 0;
+}
+
+my $aptEtcDir="/etc/apt";
+my $baseName="$aptEtcDir/sources.list";
+my $newSource=$baseName . "." . $newName;
+die("$newSource not exists\n") unless(-f $newSource);
+system("ln", "-vsfT", "$newSource","$baseName")==0 or die("$?\n");
+
+my $aptDBDir="/var/lib/apt";
+my $newDBDir="$aptDBDir.$newName";
+die("$newDBDir not exists\n") unless(-d $newDBDir);
+system("rm", "-v","$aptDBDir")==0 or die("$?\n");
+system("ln", "-vsfT", "$newDBDir","$aptDBDir")==0 or die("$?\n");
+
+
+
+
+

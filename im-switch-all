@@ -1,0 +1,64 @@
+#!/usr/bin/perl -w
+###APPNAME:	im-switch-all
+###APPAUTHOR:	root
+###APPDATE:	Fri Sep 21 09:57:23 2007
+###APPVER:	0.1
+###APPDESC:	required im-switch,will set input-method for all locales
+###APPUSAGE:	(IM Name)
+###APPEXAMPLE:	im-switch-all scim-immodule
+###APPOPTION:	
+use strict;
+use Env qw(HOME);
+
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+die("\$HOME is null,$0 abort...\n") unless($HOME);
+
+my $inputDir="/etc/X11/xinit/xinput.d";
+chdir "$inputDir" || die ("$!\n");
+
+my @inputMethods;
+my @locales;
+
+foreach(glob("*")) {
+    if (/^\w+_\w+$/) {
+        push (@locales,$_);
+    }
+    else {
+        push (@inputMethods,$_);
+    }
+}
+print("Supported locales found:\n\t",join(" ",@locales),"\n");
+print("InputMethods found:\n\t",join(" ",@inputMethods),"\n");
+
+my $prefer;
+foreach(@inputMethods) {
+    if ($_ eq $ARGV[0]) {
+        $prefer = $_ ;
+        last;
+    }
+}
+
+if ($prefer) {
+    my $userInputDir="$HOME/.xinput.d";
+    mkdir $userInputDir unless(-d "$userInputDir");
+    chdir($userInputDir) or die("Error when cd \"$userInputDir\" : $!\n");
+    foreach(@locales) {
+        print("Setting input method of \"$prefer\" for \"$_\" ...");
+        if(!system("ln","-s","-f","$inputDir/$prefer","$_")) {
+            print("\b\b\b[OK]\n");
+        }
+        else {
+            print("\b\b\b[Failed]\n");
+        }
+    }
+}
+else {
+    print STDERR ("Input Method \"$ARGV[0]\" not found.\nAvailable ones listed below:\n");
+    my $count=0;
+    foreach(@inputMethods) {
+        print STDERR (" ",++$count," -> \"$_\"\n");
+    }
+}
+

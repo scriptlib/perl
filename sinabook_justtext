@@ -1,0 +1,32 @@
+#!/usr/bin/perl -w
+###APPNAME:     sinabook_justtext
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 11 14:04:50 2008
+###APPVER:	0.1
+###APPDESC:     download from book.sina.bom.cn and convert it to plain-text	
+###APPUSAGE:	indexURL
+###APPEXAMPLE:	sinabook_justtext http://book.sina.com.cn/nzt/lit/1110855627_tianshiyumogui/index.shtml
+###APPOPTION:	
+use strict;
+use File::Temp qw/tempdir/;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+my $url = $ARGV[0];
+my $savein = "";
+open FI,"-|","sinabook_download '$url'";
+while(<FI>) {
+    my @match = $_ =~ /^Done saved in \"(.*)\/src\"$/;
+    if(@match) {
+        $savein = $match[0];
+        last;
+    }
+}
+close FI;
+chdir "$savein";
+system "sinabook_maketext","src";
+exit 0;
+
+
+

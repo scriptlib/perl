@@ -1,0 +1,130 @@
+#!/usr/bin/perl -w
+###APPNAME:     zim-add-entry
+###APPAUTHOR:   duel
+###APPDATE:	2008-05-11 14:27:04
+###APPVER:	0.1
+###APPDESC:     add a link entry to a zim txt file
+###APPUSAGE:	[--read] [--test] (entry Name) [entry Location] [entry Description] [destination]
+###APPEXAMPLE:	zim-add-entry Test .test abc.txt 
+###APPOPTION:   --read:Append text to entry from STDIN|--test:No writing will be made
+use strict;
+use utf8;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_even_empty($0,@ARGV));
+
+my $read=0;
+my $test=0;
+
+if($ARGV[0] eq "--read") {
+    $read=1;
+    shift;
+}
+elsif($ARGV[0] eq "--test") {
+    $test=1;
+    shift;
+}
+
+if($ARGV[0] eq "--read") {
+    $read=1;
+    shift;
+}
+elsif($ARGV[0] eq "--test") {
+    $test=1;
+    shift;
+}
+
+my ($ename,$eloc,$edesc,$dist) = @ARGV;
+my $edir;
+sub tee($) {
+    my $str=shift;
+    print STDERR "\t$str";
+    return $str;
+}
+
+unless($eloc) {
+    $eloc = $ename;
+    $eloc =~ s/[ ,\+　～×]/_/g;
+    $eloc = ".$eloc";
+}
+if($eloc =~ /^\./) {
+    $edir = $eloc;
+    $edir =~ s/^\.//g;
+    unless(-d $edir) {
+        print STDERR "Creating directory $edir ...";
+        unless($test) {
+            mkdir $edir or die("\n$!");
+        }
+        print STDERR "\n";
+    }
+}
+
+unless($dist) {
+    $dist=$ENV{PWD};
+    $dist =~ s/\/?$/.txt/;
+}
+
+
+if($edir) {
+    print STDERR "Writing $edir.txt...\n";
+    if($test) {
+        open FO,">>","/dev/null";
+    }
+    else {
+        unless(-f "$edir.txt") {
+            open FO,">","$edir.txt";
+            print FO tee("=" x 6 . " " . $ename . " " .  "=" x 6 . "\n");
+            print FO tee(scalar(localtime()) . "\n\n");
+        }
+        else {
+            open FO,">>","$edir.txt";
+        }
+    }
+    if($read) {
+        print STDERR ("Prepairing text to $edir.txt from STDIN(CTRL-D to END)...\n");
+        while(<STDIN>) {
+            print FO tee($_);
+        }
+    }
+    close FO;
+}
+
+my $entry = "* [[$eloc|$ename]]";
+my $exists=0;
+if(-f $dist) {
+    open FI,"<",$dist;
+    while(<FI>) {
+        chomp;
+        if($_ eq $entry) {
+            $exists=1;
+            last;
+        }
+    }
+    close FI;
+}
+
+if($exists) {
+    print STDERR "Entry $entry exists\n";
+}
+else {
+    print STDERR "Add entry to $dist:\n";
+    if($test) {
+        open FO,">","/dev/null";
+    }
+    else {
+        open FO,">>",$dist;
+    }
+    print FO tee("$entry\n");
+    print FO tee("    $edesc\n") if($edesc);
+    print FO tee("\n");
+    close FO;
+}
+
+
+
+

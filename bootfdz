@@ -1,0 +1,46 @@
+#!/usr/bin/perl -w
+###APPNAME:     bootfdz
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	2009-06-25 05:12:10
+###APPVER:	0.1
+###APPDESC:     bootfdz	
+###APPUSAGE:	
+###APPEXAMPLE:	bootfdz
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+#
+use File::Temp qw/tempfile/;
+use File::Spec;
+
+my $fdz=shift;
+die("File not exist:$fdz\n") unless(-r $fdz);
+
+my ($fh,$fd)=tempfile("fdz.XXXXXXXXX",DIR=>'/tmp');
+print STDERR "Decompressing $fdz to $fd...";
+open FI,"-|","bzcat",$fdz or die("$!\n");
+print $fh <FI>;
+close FI;
+close $fh;
+print STDERR "\n";
+
+system("bootfd",$fd,@ARGV);
+
+
+print STDERR "Compressing $fd to $fdz...\n";
+open FI,"-|","bzip2","-vc",$fd or die("$!\n");
+open FO,">",$fdz or die("$!\n");
+print FO <FI>;
+close FI;
+close FO;
+print STDERR "\n";
+unlink $fd or die("$!\n");
+

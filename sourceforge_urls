@@ -1,0 +1,86 @@
+#!/usr/bin/perl -w
+
+my $project = shift;
+die("Give me a project name!\n") unless($project);
+
+my $full = "http://sourceforge.net/projects/" . $project . "/files/";
+print STDERR "Downling files list...";
+open FI,"-|","wget \"$full\" -O -";
+my $count;
+my @urls_all;
+my @urls_src;
+my @urls_lic;
+my @urls_pre;
+my @urls_old;
+my @urls;
+my %filemap = (
+    "urls.all"=>\@urls_all,
+    "urls.src"=>\@urls_src,
+    "urls.lic"=>\@urls_lic,
+    "urls.pre"=>\@urls_pre,
+    "urls.old"=>\@urls_old,
+    "urls.bin"=>\@urls_bin,
+    "urls"=>\@urls,
+);
+
+while(<FI>) {
+#<a class="dload { url: 'http://downloads.sourceforge.net/project/mingw/MSYS%20man/man-1.6f-1/man-1.6f-1-msys-1.0.11-bin.tar.lzma' }"
+    if(m/dload\s+\{\s+url:\s+'([^\']+)\'/) {
+        my $url = $1;
+        $count++;
+        push @urls_all,$url;
+        print STDERR "Get URL:[$count]$url. ==>urls.all\n";
+        if($url =~ m/preview|candidate/i) {
+            print STDERR "\tPreview package. ==>urls.pre\n";
+            push @urls_pre,$url;
+        }
+        elsif($url =~ m/previous|older/i) {
+            print STDERR "\tOld package. ==>urls.old\n";
+            push @urls_old,$url;
+        }
+        elsif($url =~ m/\.exe$/) {
+            print STDERR "\tExecutable package. ==>urls.bin\n";
+            push @urls_bin,$url;
+        }
+        elsif($url =~ m/-src\./) {
+            print STDERR "\tSource package. ==>urls.src\n";
+            push @urls_src,$url;
+        }
+        elsif($url =~ m/-lic\./) {
+            print STDERR "\tLicence package. ==>urls.lic\n";
+            push @urls_lic,$url;
+        }
+        else {
+            print STDERR "\tInteresting... ==>urls\n";
+            push @urls,$url;
+        }
+    }
+}
+close FI;
+print STDERR "Start writing file if got some urls\n";
+foreach my $file(keys %filemap) {
+    my $rdata = $filemap{$file};
+    next unless($rdata);
+    my @data = @{$rdata};
+    next unless(@data);
+    print STDERR "Writing $file...";
+    open FO,">",$file or die("\t$!\n");
+    print FO join("\n",@data);
+    close FO;
+    print STDERR "\t" . @data . " item(s) , OK.\n";
+}
+print STDERR "Writing download script (using wget)\n";
+open FO,">","download.bat";
+print FO "set urls=%1\nif \"\"==\"%1\" set urls=urls\n";
+print FO "wget -i %urls% -x -nH --cut-dirs=2 -nc\n";
+close FO;
+open FO,">","download.sh";
+print FO "#!/bin/sh\n";
+print FO "set urls=\$1\nif [ -z \"\$1\" ] ; then set urls=urls ; fi\n";
+print FO "exec wget -i \$urls -x -nH --cut-dirs=2 -nc\n";
+close FO;
+
+
+
+
+

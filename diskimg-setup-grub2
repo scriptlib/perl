@@ -1,0 +1,64 @@
+#!/usr/bin/perl -w
+###APPNAME:     diskimg-setup-grub2
+###APPAUTHOR:   duel
+###APPDATE:	2008-10-07 04:15:35
+###APPVER:	0.1
+###APPDESC:     setup grub2 on disk image
+###APPUSAGE:    (diskImg file) [GrubDeviceMap]
+###APPEXAMPLE:	diskimg-setup-grub2
+###APPOPTION:	
+use strict;
+use File::Temp qw/tempfile/;
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+#exit 0 if(help_required($0,@ARGV));
+exit 0 if(help_even_empty($0,@ARGV));
+
+my $diskimg=shift;
+die("File not exist:$diskimg\n") unless(-f $diskimg);
+my $dmap;#=shift;
+#if($dmap && $dmap !~ m/^\s*\(?(:?hd|sd|fd)\d+$/) {
+#    unshift @ARGV,$dmap;
+#    $dmap = "";
+#}
+$dmap="hd0" unless($dmap);
+$dmap =~ s/^\((.*)\)$/$1/;
+
+my $ddmap = $dmap;$ddmap =~ s/,.*//g;
+
+my $rdev = $dmap;
+if($rdev =~ /^hd\d+/) {
+    $rdev = "$rdev,1" unless($rdev =~ /^hd\d+\s*,\s*\d+$/);
+}
+
+
+my $grubsetup="/usr/sbin/grub-setup";
+my ($fh,$mapfile)=tempfile();
+print STDERR "($ddmap) $diskimg\n";
+print $fh "($ddmap) $diskimg\n";
+close $fh;
+
+
+my @args=("-v",@ARGV);
+#if(-f "core.img") {
+#	push @args,"-c","./core.img";
+#}
+#elsif(-f "../../../../../myplace/emuos/bootloader/grub2.img") {
+#	push @args,"-c","../../../../../myplace/emuos/bootloader/grub2.img";
+#}
+#push @args,"-b","./boot.img" if(-f "./boot.img");
+push @args,("-d","/myplace/emuos/bootloader/grub2");
+push @args,("-m",$mapfile,"-r","($rdev)");
+#,$diskimg);
+push @args,@ARGV,$diskimg;
+print STDERR join(" ",$grubsetup,@args),"\n";
+system($grubsetup,@args);
+unlink $mapfile;
+
+
+
+

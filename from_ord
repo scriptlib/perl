@@ -1,0 +1,18 @@
+#!/usr/bin/perl -w
+###APPNAME:     from_ord
+###APPAUTHOR:   duel
+###APPDATE:	2009-01-13 17:55:26
+###APPVER:	0.1
+###APPDESC:     from_ord	
+###APPUSAGE:	
+###APPEXAMPLE:	from_ord
+###APPOPTION:	
+use strict;
+
+my $old=join("",@ARGV);
+$old =~ s/\s*,\s*,\s*/,/g;
+$old =~ s/^,+//;
+#$old =~ s/,+$//;
+$old =~ s/([^,]+)(:?,|$)/chr($1)/ge;
+print $old;
+

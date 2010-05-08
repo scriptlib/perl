@@ -1,0 +1,175 @@
+#!/usr/bin/perl -w
+###APPNAME:     download
+###APPAUTHOR:   geek
+###APPDATE:	Fri Sep 28 08:31:24 2007
+###APPVER:	0.2
+###APPDESC:	A downloader,nothing else.
+###APPUSAGE:	[options] URL
+###APPEXAMPLE:	download www.google.com/index.html
+###APPOPTION:	-v:Verbose Output|-u:URL to download|-s:Filename for output|-d:Create directories|-n:Task name|-r:Referer URL|-b:cookie file|-l:Enable Logging|-a:Auto rename if file exists|-p:Downloader - wget or curl
+use strict;
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+use Cwd;
+use Getopt::Std;
+use MyPlace::Script::Message;
+
+exit 0 if(help_even_empty($0,@ARGV));
+
+
+sub log($$) {
+    my $text=shift;
+    my $fn=shift;
+    open FO,">>",$fn or return;
+    print FO $text;
+    close FO;
+}
+
+sub build_cmdline {
+    my($name,$url,$saveas,$refer,$cookie,$verbose) = @_;
+    return undef unless($url);
+    my @result;
+    if($name =~ /^wget$/i) {
+        push @result,"wget";
+        push @result,qw(--user-agent Mozilla/5.0);
+        push @result,"--connect-timeout",15;
+        push @result,"--referer",$refer ? $refer : $url;
+        push @result,"--output-document",$saveas if($saveas);
+        push @result,"--load-cookie",$cookie if(-f $cookie);
+        push @result,"--save-cookie",$cookie if($cookie);
+        #$verbose ? push @result,"--verbose" : push @result,"--no-verbose";
+        push @result,"-q";
+        push @result,"--progress","bar";
+        push @result,$url;
+    }
+    else {
+        push @result,"curl";
+        push @result,qw(--fail --globoff --location --user-agent Mozilla/5.0 --progress-bar --create-dirs);
+        push @result,"--connect-timeout",15;
+        push @result,"--url",$url;
+        push @result,"--referer",$refer ? $refer : $url;
+        push @result,"--output",$saveas if($saveas);
+        push @result,"--cookie",$cookie if(-f $cookie);
+        push @result,"--cookie-jar",$cookie if($cookie);
+    }
+    return @result;
+}
+
+sub process {
+    my $taskname=shift;
+    my $cmdline=shift;
+    my $retry = shift || 2;
+    my $r=0;
+    while($retry) {
+        $retry--;
+        $r=system(@{$cmdline});
+        return 0 if($r==0);
+        return 2 if($r==2); #/KILL,TERM,USERINT;
+        $r = $r>>8;
+        return 2 if($r==2);
+        return $r if($r==22 || $r==52);
+        app_warning "\rdownload:error($r), wait 1 second,retry $taskname\n";
+        sleep 1;
+    }
+    return 1;
+}
+
+
+my $OptFlag='lvu:s:dn:r:b:ap:';
+my %OPT;
+getopts($OptFlag,\%OPT);
+
+my $verbose= $OPT{"v"} ? $OPT{"v"} : 0;
+my $url= $OPT{"u"} ? $OPT{"u"} : $ARGV[@ARGV-1];
+my $saveas= $OPT{"s"} ? $OPT{"s"} : "";
+my $createdir= $OPT{"d"} ? $OPT{"d"} : 0;
+my $name= $OPT{"n"} ? $OPT{"n"} : "";
+my $refer= $OPT{"r"} ? $OPT{"r"} : "";
+my $cookie= $OPT{b} ? $OPT{b} : "";
+my $logging= $OPT{l} ? $OPT{l} : "";
+my $autorename = $OPT{a} ? $OPT{a} : "";
+my $downloader = $OPT{p} ? $OPT{p} : "curl";
+my $FAILLOG="download.failed";
+my $DOWNLOADLOG="download.log";
+
+if ($url !~ m/^\w+:\/\// ) {
+    app_message("invaild URL:\"",$url,"\"\n");
+    exit 1;
+}
+
+$url =~ s/\ /%20/g;
+$refer=$url unless($refer);
+if($createdir && !$saveas) {
+    my $filename=$url;
+    $filename =~ s/^\w+:\/+[^\/]*\/+//;
+    $filename =~ s/^[^\?]*\?[^\/]*\/+//g;
+    $saveas=$filename;
+}
+if(!$saveas) {
+    my $basename=$url;
+    $basename =~ s/^.*\///g;
+    $basename = "index.htm" unless($basename);
+    $saveas=$basename;
+}
+if($saveas =~ m/\/$/) {
+    $saveas .= "index.htm";
+}
+if($saveas and $autorename and -f $saveas) {
+    my $base = $saveas;
+    my $ext;
+    if($saveas =~ m/^(.*)(\.[^\.]*)$/) {
+        $base = $1;
+        $ext = $2;
+    }
+    use MyPlace::Filename qw/get_uniqname/;
+    $saveas = get_uniqname($base,$ext);
+}
+
+if($verbose) {
+    app_message(sprintf("%s\n%-8s: %s\n%-8s: %s\n%-8s: %s\n",
+            $name ? "\n$name" : "",
+            "URL",$url,
+            "SaveAs",$saveas,
+            "Refer",$refer));
+}
+else {
+    app_message "$name$url\t[starting]\n";
+}
+
+if ( -f "$saveas" ) {
+    app_warning "$saveas exists\t[canceled]\n";
+    exit 0;
+}
+
+if($cookie) {
+    if(!-f $cookie) {
+        app_message "creating cookie for $url...\n";
+        my @match = $url =~ /^(http:\/\/[^\/]+)\//;
+        if(@match) {
+            my $domain=$match[0];
+            system("curl --url '$domain' -c '$cookie' -o '/dev/null'");
+        }
+    }
+}
+
+my $saveas_temp = "$saveas.downloading";
+my @cmdline = build_cmdline($downloader,$url,$saveas_temp,$refer,$cookie,$verbose);
+my $r=process("$name$url",\@cmdline,2);
+
+if($r==0 and -f $saveas_temp) {
+    rename($saveas_temp,$saveas) or die("$!\n");
+    &log("$url->$saveas\n","$DOWNLOADLOG") if($logging);;
+    app_ok "$name$saveas\t[completed]\n";
+    exit 0;
+}
+elsif($r==2) {
+    app_warning "$name$url\t[killed]\n";
+    exit 2;
+}
+else {
+    app_error "$name$url\t[failed]\n";
+    &log("$url->$saveas\n","$FAILLOG") if($logging);;
+    exit 0;
+}
+

@@ -1,0 +1,125 @@
+#!/usr/bin/perl
+###APPNAME:     xrbook_writeinfo.pl
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 11 04:58:02 2008
+###APPVER:	0.1
+###APPDESC:     create bookinfo.xml	
+###APPUSAGE:    indexURL [directory]	
+###APPEXAMPLE:	xrbook_writeinfo http://book.sina.com.cn/nzt/lit/wodemingzijiaohong/index.shtml src
+use strict;
+use XML::Simple;
+use Data::Dumper;
+
+
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+die("Usage: $0 indexURL [directory]\n") unless(@ARGV);
+
+sub getTextBetween {
+    my $text=shift;
+    my $begin=shift;
+    my $end=shift;
+    $end='[\<\n]' unless($end);
+    my @match = $text =~ m{$begin\s*([^\<\>]*)\s*$end}i;
+    return $match[0] if(@match);
+    return "";
+}
+
+my %book;
+$book{URL}=$ARGV[0];
+$book{saveto}= $ARGV[1];
+
+my @match = ($book{URL} =~ /^(http:\/\/|)(.*\/)catalog\.php\?book=([0-9]+)/);
+if(@match) {
+        $book{base}=$match[1];
+        $book{dirname}=$match[2];
+}
+else {
+    if($book{URL} =~ /\/$/) { 
+        $book{URL} .= "index.shtml";
+    }
+    @match=($book{URL} =~ /^(http:\/\/|)([^\/]+)\/.*\/([^\/]+)\/[^\/]*$/);
+    if(@match) {
+    $book{base}=$match[1];
+    $book{dirname}=$match[2];
+    }
+}
+
+die("Invalid index URL:\n$book{URL}\n") unless(@match);
+
+open(SOURCE,"-|", "netcat '$book{URL}' | iconv -f gb2312 -t utf8 -c")
+    or die("Cant't fork netcat | iconv\n");
+my $TEXT="[^\<\>]*";
+my @pages=(());
+while(<SOURCE>) {
+    unless($book{title}) {
+        $book{title} = getTextBetween($_,'\<\s*title\s*\>');
+        $book{title} =~ s/_.*$//g;
+        $book{title} =~ s/.*(代表作|作品)：//g;
+    }
+    unless($book{author}) {
+        $book{author} = getTextBetween($_,'\<span class=td_m\>作者：\<\/span\>\<a[^\>\<]*\>\<span class=td_m\>');
+        $book{author} = getTextBetween($_,"\<span\>作者：") unless($book{author});
+    }
+    unless($book{description}) {
+        $book{description} = getTextBetween($_,
+                '\<meta\s*name=\"*description\"*\s*content=\"',
+                '\"\s*\>');
+    }
+    unless($book{about}) {
+        $book{about} = getTextBetween($_,'\<span class=td_m\>');
+    }
+    unless($book{cover}) {
+        my @match = $_ =~ /src\s*=\s*(.*$book{dirname}.*\.jpg)/;
+        if(@match) {
+            $book{cover}=$match[0];
+        }
+    }
+    my @match = $_ =~ /\<a[^\<\>]*href\s*=\s*($TEXT$book{dirname}${TEXT}html)$TEXT\>($TEXT)\<\/a\>/i;
+    @match = $_ =~ /\<a[^\<\>]*href\s*=\s*(\/longbook\/$TEXT\.shtml)$TEXT\>($TEXT)\<\/a\>/i unless(@match);
+    if(@match) {
+        next if($match[0] =~ /index/);
+        $match[1] =~ s/^\s*[0-9]*//g;
+        $match[1] =~ s/^．\s*//;
+        $match[0] =~ s/\"//g;
+        push(@pages,{"NAME"=>$match[1],"URL"=>$match[0]});
+    }
+}
+
+$book{pages}=\@pages;
+$book{title}=$book{dirname} unless($book{title});
+if(! $book{saveto}) {
+    if($book{author}) {
+        $book{saveto}=$book{author} . "/" . $book{title};
+        if(! -d $book{author}) {mkdir $book{author} or die("$!\n");}
+    }
+    else {
+        $book{saveto}=$book{title};
+    }
+    if(! -d $book{saveto}) {mkdir $book{saveto} or die("$!\n");}
+    $book{saveto} .= "/src";
+}
+
+if(! -d $book{saveto}) {
+    mkdir $book{saveto} or die("$!\n");
+}
+chdir $book{saveto};
+
+open fO,"|-","batchget -m 1 -n '$book{title}' -r '$book{URL}'";
+for(my $i=0;$i<@pages;$i++) {
+    print fO "http://$book{base}$pages[$i]{URL}\n";
+}
+print fO $book{cover},"\n" if($book{cover});
+print fO $book{URL},"\n";
+close fO;
+
+my $xml = XMLout(\%book,SuppressEmpty=>1,KeyAttr=>[],NoAttr=>1,NumericEscape=>0) or die("$!\n");
+open fO,">","bookinfo.xml";
+print fO $xml;
+close fO;
+print "Done saved in \"$book{saveto}\"\n";
+
+

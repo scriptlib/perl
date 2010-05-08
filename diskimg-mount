@@ -1,0 +1,93 @@
+#!/usr/bin/perl -w
+###APPNAME:     diskimg-mount
+###APPAUTHOR:   root
+###APPDATE:	Sun Oct  7 01:45:28 2007
+###APPVER:	0.1
+###APPDESC:     mount partition of disk image	
+###APPUSAGE:	(disk image file) [partition NUM] (mount point)
+###APPEXAMPLE:	diskimg-mount disk.img 1 /mnt
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+#die("You must be root for running $0.\n") unless($>==0);
+
+sub sudo_system {
+    print STDERR ("[sudo:]",join(" ",@_),"\n");
+    if ($>==0) {
+        return (system(@_)==0);
+    }
+    else {
+        return (system("sudo",@_)==0);
+    }
+}
+
+sub sudo_qx($) {
+    if ($>==0) {
+        return `$_[0]`;
+    }
+    else {
+        return `sudo $_[0]`;
+    }
+}
+
+my $uid=$>;
+my $disk=shift;
+my $num=shift;
+my $fstype;
+my $mountpoint;
+
+if(!$num or $num !~ m/^[0-9]$/) {
+    $mountpoint=$num;
+    $num="";
+} 
+else {
+    $mountpoint=shift;
+}
+
+$num=1 unless($num);
+$disk="" unless($disk);
+$mountpoint="/mnt/diskimg" unless($mountpoint);
+
+die("File not exists\n") unless(-f $disk);
+die("Mount point not exists:$mountpoint\n") unless( -d $mountpoint);
+
+
+my $type="RAW";
+$type="ISO" if($disk =~ m/\.iso$/i);
+
+
+my $offset=$type eq "RAW" ? `diskimg-offset "$disk" "$num"` : "\n";
+chomp($offset);
+$offset=0 unless($offset);
+die("Could not calculat offset for $disk partition $num\n") unless($offset>=0);
+
+$fstype = $type eq "ISO" ? "iso9660\n" : `diskimg-fstype "$disk" "$num"`;
+chomp($fstype);
+$fstype="msdos" unless($fstype);
+
+my $freeloop=sudo_qx("/sbin/losetup -f");
+chomp($freeloop);
+die("No free loopback device found\n") unless($freeloop);
+
+my @mountopt = ("-v","-t",$fstype);
+push @mountopt,"-o","uid=$uid" if($fstype eq "vfat" or $fstype eq "msdos");
+push @mountopt,$freeloop,$mountpoint;
+
+if (sudo_system("losetup","-v","-o",$offset,$freeloop,$disk)) {
+    print("losetup: $disk(\+$offset) setuped on $freeloop\n");
+    if(sudo_system("mount",@mountopt)) {
+#    if(sudo_system("mount","-v","-t",$fstype,$freeloop,$mountpoint)) {
+#        print("mount: $freeloop mounted at $mountpoint\n");
+    }
+    else {
+        sudo_system("losetup","-d",$freeloop);
+        print("losetup:$freeloop deleted.\n");
+    }
+}
+
+
+

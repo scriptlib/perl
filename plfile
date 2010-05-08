@@ -1,0 +1,22 @@
+#!/usr/bin/perl -w
+###APPNAME:     plfile
+###APPAUTHOR:   geek
+###APPDATE:	Sun Sep 30 07:48:09 2007
+###APPVER:	0.1
+###APPDESC:     find perl script file	
+###APPUSAGE:	(script name)
+###APPEXAMPLE:	plfile plfile
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("formathelp $0 1>&2")) if($_ eq "-h" || $_ eq "--help");
+}
+my $pldir=qx/pldir/;
+my $name=shift;
+
+foreach my $filename($name,"include/$name","$name.pl","include/$name.pl","$name.inc","include/$name.inc") {
+    exit(print("$pldir/$filename")) if(-f "$pldir/$filename");
+}
+print STDERR("***PLFILE***:$name not found under $pldir\n");
+

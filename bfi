@@ -1,0 +1,164 @@
+#!/usr/bin/perl -w
+###APPNAME:     bfir
+###APPAUTHOR:   duel
+###APPDATE:	2009-05-21 13:38:24
+###APPVER:	0.1
+###APPDESC:     Creates a FAT12 floppy image from files.
+###APPUSAGE:	[-v] [-t=type] [-o=file] [-o=file] [-l=mylabel] [-b=file] -f=file.img path [path ...]
+###APPEXAMPLE:	
+###APPOPTION:	-v:Verbose mode (talk more)|-t=type|Disktype use string "144", "120" or "288" or number:\n\t4=720K,6=1440K,7=2880K,8=DMF2048,9=DMF1024,10=1680K\n\t0=160K,1=180K,2=320K,3=360K,5=1200K\n\tDefault is 1.44MB|-f=file:Image filename|-o=file:Order file, put these file on the image first|-l=mylabel:Set volume label to "mylabel"|-b=file:Install bootsector from "file"|path:Input folder(s) to inject files from
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+#exit 0 if(help_required($0,@ARGV));
+exit 0 if(help_even_empty($0,@ARGV));
+
+sub ieq {
+    return 1 if($_[0] eq $_[1] or $_[0] eq uc($_[1]));
+    return undef;
+}
+
+sub msg {
+    if(@_) {
+        print STDERR "$0: ",@_;
+    }
+    else {
+        print STDERR "\n";
+    }
+}
+
+sub run {
+    if(system(@_)==0) {
+        return 1;
+    }
+    else {
+        msg("Invalid exit code while runing \"",join(" ",@_),"\"\n");
+        msg("Aborted!\n");
+        die();
+    }
+    return 1;
+}
+
+sub copy {
+    my $file=shift;
+    my $dest=shift;
+    return unless($file);
+    $dest="" unless($dest);
+    foreach(@_) {
+        my $destname = $_;
+        $destname =~ s/^.*[\/\\]//;
+        run("mcopy","-sQm","-i",$file,$_,"::$dest/". uc($destname));
+    }
+}
+
+my @TARG;
+foreach(@ARGV) {
+    if(/^-(\w)\s*=\s*(.+)/) {
+        push @TARG,"-$1",$2;
+    }
+    else {
+        push @TARG,$_;
+    }
+}
+
+my %o;my $op;
+foreach(@TARG) {
+    if($_ eq '-v' or $_ eq '-V') {
+        $o{-v}=1;
+    }
+    elsif(/^-/) {
+        $op=lc($_);
+    }
+    elsif($op) {
+        if($op eq '-o') {
+            push @{$o{$op}},$_;
+        }
+        else {
+            $o{$op}=$_;
+        }
+        $op=undef;
+    }
+    else {
+        push @{$o{path}},$_;
+    }
+}
+#use Data::Dumper;warn Dumper(\%o),"\n";
+die("$0: Error, image filename required.(-f)\n") unless($o{-f});
+my $size;
+my %type_map = (
+   "144"=>"1440",
+   "120"=>"1200",
+   "288"=>"2880",
+   "1440"=>"1440",
+   "1200"=>"1200",
+   "2880"=>"2880",
+   4=>"720",
+   6=>"1440",
+   7=>"2880",
+   8=>"2048",
+   9=>"1024",
+   10=>"1680",
+   0=>"160",
+   1=>"180",
+   2=>"320",
+   3=>"360",
+   5=>"1200"
+);
+if(defined $o{"-t"}) {
+    $size=$type_map{$o{"-t"}};    
+}
+$size="1440" unless($size);
+my @sys;
+if(-f $o{"-f"}) {
+    msg("Unlink ". $o{-f},"\n");
+    unlink $o{"-f"} or die("$!\n");
+}
+msg("filename [",$o{"-f"},"]\n");
+msg("size [$size]\n");
+msg("bootsector [" . $o{"-b"} . "]\n") if($o{"-b"});
+msg("label [" . $o{"-l"} . "]\n") if($o{-l});
+msg("file creating...\n");
+#@sys=("qemu-img","create","-f","raw",$o{"-f"},"$size" . "K");
+@sys=("dd","status=noxfer","if=/dev/zero","of=" . $o{"-f"},"bs=1024", "count=$size");
+run(@sys);
+msg("formating...\n");
+if(-f $o{-b}) {
+    @sys=("diskimg-format",$o{"-f"});
+    push @sys,"-l",$o{"-l"} if($o{-l});
+    push @sys,"-b",$o{"-b"} if($o{-b});
+    run(@sys);
+}
+else {
+    @sys=("mformat","-i",$o{"-f"},,"-f",$size,);
+    #@sys=("mformat","-i",$o{"-f"},,"-f",$size,"-C");
+    push @sys,"-k","-B",$o{"-b"} if($o{-b});
+    push @sys,"-v",$o{"-l"} if($o{-l});
+    push @sys,"::";
+    run(@sys);
+}
+if($o{"-o"}) {
+    msg("copying ordered file...\n");
+    copy($o{"-f"},"",@{$o{"-o"}});
+}
+if($o{path}) {
+    msg("copying directory...\n");
+    foreach(@{$o{path}}) {
+        s/[\/\\]+$//;
+        #system("ls","-l",$_);
+        copy($o{"-f"},"",glob($_ . "/*"));
+    }
+}
+msg("done.\n");
+#msg("content list:\n");
+msg("="x60,"\n");
+#run("mdir","-i",$o{"-f"},"-a","::/");
+#msg("="x60,"\n");
+msg($o{"-f"}," created.\n");
+
+
+
+

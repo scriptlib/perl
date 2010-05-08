@@ -1,0 +1,22 @@
+#!/usr/bin/perl -w
+###APPNAME:     ftp_files
+###APPAUTHOR:   duel
+###APPDATE:	Sun Mar 30 00:39:31 2008
+###APPVER:	0.1
+###APPDESC:     print ftp files	
+###APPUSAGE:	[ftpURL]
+###APPEXAMPLE:	ftp_files ftp://202.96.64.144/pub/books/ 
+###APPOPTION:   	
+use strict;
+do `IncludeFile Help`;
+
+$ARGV[0]="-h" unless(@ARGV);
+exit 0 if(Help::do_and_exit($0,@ARGV));
+
+my $url=shift;
+open FI,"-|","netcat '$url'";
+while(<FI>) {
+    my @match = $_ =~ /(([^\s]+\s+){8}(.*)$)/;
+    print($url . $match[-1],"\n") if(@match);
+}
+close FI;

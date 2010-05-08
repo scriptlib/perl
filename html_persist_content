@@ -1,0 +1,146 @@
+#!/usr/bin/perl -w
+###APPNAME:     lcyl_persist_content
+###APPAUTHOR:   duel
+###APPDATE:	2009-01-29 02:50:08
+###APPVER:	0.1
+###APPDESC:     lcyl_persist_content	
+###APPUSAGE:    [options] [urls|files]	
+###APPEXAMPLE:	lcyl_persist_content
+###APPOPTION:	--save-images --save-text --save-all
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+use utf8;
+use MyPlace::HTML::Content;
+
+binmode STDERR,"utf8";
+
+use constant {
+    BODY_ID=>[
+        {class=>"NewsBody"},
+        {id=>"NewsContentLabel"},
+    ],
+    SOURCE_D=>"src/",
+    IMAGE_D=>"img/",
+    TEXT_D=>"txt/",
+};
+
+sub download_url {
+    my($url) = @_;
+    my $filename = $url;$filename =~ s/^.*\///;$filename ||= "index.html";
+    mkdir_check(SOURCE_D) or die();
+    $filename = SOURCE_D . "$filename";
+    goto download_end if(-f $filename);
+    print STDERR "Downloading $url->$filename ...\n";
+    unless(system("curl","-#","--url",$url,"-o",$filename) == 0) {
+       unlink $filename if(-f $filename);
+    }
+    download_end:
+    return $filename;
+}
+
+my %dir_check;
+sub mkdir_check {
+    my $dir = shift;
+    return 1 unless($dir);
+    return 1 if($dir_check{$dir});
+    unless(-d $dir) {
+        unless(mkdir $dir) {
+            print STDERR "$!\n";return 0;
+        }
+        $dir_check{$dir}=1;
+    }
+    else {
+        $dir_check{$dir}=1;
+    }
+    return 1;
+}
+
+my ($save_image,$save_text,@files) = (1,1);
+foreach(@ARGV) {
+    if($_ eq "--save-image") {
+        $save_image=1;
+        $save_text=0;
+    }
+    elsif($_ eq "--save-text") {
+        $save_text=1;
+        $save_image=0;
+    }
+    elsif($_ eq "--save-all") {
+        $save_image = $save_text = 1;
+    }
+    else {
+        push @files,$_;
+    }
+}
+unless(@files) {while(<>){chomp;push @files,$_;}}
+die("No files specified\n") unless(@files);
+
+
+
+my $idx = 1;
+my $count = @files;
+foreach my $file (@files) {
+    print STDERR "[$idx/$count] Process $file ...\n";
+    $idx++;
+    if($file =~ /^http:\/\//i) {
+        #print STDERR "Downloading $file...\n";
+        $file = download_url($file);
+    }
+    unless (-f $file) {
+        print STDERR "File not exists : $file\t[Skipped]\n";
+        next;
+    }
+    my $page = MyPlace::HTML::Content->new_from_file($file,@{&BODY_ID});
+    unless($page) {
+        print STDERR "Can't no parse $file...\n";
+        next;
+    }
+    my $title = $page->{title};
+#    print STDERR "##File title:\t$title\n";
+    if($save_image) {
+        print STDERR "##Persist images ...\t";
+        if($page->{images}) {
+            my @images = @{$page->{images}};
+            print STDERR scalar(@images) . " image(s)\n";
+            mkdir_check(IMAGE_D) or die();
+            my $imgd = IMAGE_D . "$title";
+            mkdir_check($imgd) or next;
+            open FO,"|-","batchget","-a","-w",$imgd or die("$!\n");
+            print FO $_,"\n" foreach(@images);
+            close FO;
+            $save_text = 0;
+        }
+        else {
+            print STDERR "[No images found]\n";
+        }
+    }
+    if($save_text) {
+        my $dst = TEXT_D . "$title.txt";
+        print STDERR "##Persist text to \"$dst\" ...\t";
+        my $text = $page->{text};
+        unless($text) {
+            print STDERR "No text content!\n";
+            next;
+        }
+        mkdir_check(TEXT_D) or die();
+        if(-f $dst) {
+            print STDERR "[Skipped(File exists)]\n";
+            next;
+        }
+        open FO,">:utf8",$dst or die("$!\n");
+        print FO $title,"\n","\n";
+        print FO @{$text},"\n" if($text);
+        close FO;
+#        print STDERR "[OK]\n";
+    }
+}
+
+

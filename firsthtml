@@ -1,0 +1,62 @@
+#!/usr/bin/perl -w
+use strict;
+###APPNAME:	firsthtml
+###APPAUTHOR:	root
+###APPDATE:	Tue Sep 18 10:56:07 2007
+###APPVER:	0.1
+###APPDESC:	grep the first html file name
+###APPUSAGE:	
+###APPEXAMPLE:	ls | firsthtml
+###APPOPTION:	
+#$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+my @INDEXS=qw(cs2w_index cover index toc default aaa bbb content first);
+my @EXTS=qw(htm html shtml txt);
+sub isIndexFile($) {
+    my $target=shift;
+    return 0 unless($target);
+    foreach my $indexName(@INDEXS) {
+        return 1 if ($target =~ m/\b${indexName}\b[^\/\\]*$/i);
+    }
+}
+sub isHtmlFile($) {
+    my $target=shift;
+    return 0 unless($target);
+    foreach my $extName(@EXTS) {
+        return 1 if ($target =~ m/\.\b$extName\b$/i);
+    }
+}
+
+sub getFirst() {
+    my @allFiles;
+    my @htmlFiles;
+    my @indexFiles;
+    while(<>) {
+        chomp;
+        push(@allFiles,$_);
+        if (isHtmlFile($_)) {
+            push(@htmlFiles,$_);
+            push(@indexFiles,$_) if(isIndexFile($_));
+        }
+    }
+#    return if (@allFiles<1);
+#    return $allFiles[0] if(@allFiles==1 or @htmlFiles<1);
+    return if(@htmlFiles<1);
+    return $htmlFiles[0] if(@htmlFiles==1 or @indexFiles<1);
+    return $indexFiles[0] if(@indexFiles==1);
+    
+    my $result;
+    my $minSlashCount=256;
+    foreach my $filename(@indexFiles) {
+        my $slashCount=$filename =~ tr /\//\//;
+        if($slashCount<$minSlashCount) {
+            $result=$filename;
+            $minSlashCount=$slashCount;
+        }
+        return $result if($minSlashCount==0);
+    }
+    return ($result);
+}
+
+print &getFirst();    

@@ -1,0 +1,51 @@
+#!/usr/bin/perl -w
+###APPNAME:     printarg
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Fri Oct  5 02:42:22 2007
+###APPVER:	0.1
+###APPDESC:     just print arguments to stdout with format	
+###APPUSAGE:	[Format] [Args...]
+###APPEXAMPLE:	printarg "%s\t%s" -test 1 -no 2
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $format="%s\t=\t%s\n";
+if($ARGV[0] =~ m/^.*%.*s.*%.*s.*/g) {
+    $format=$ARGV[0];
+    $format =~ s/\\n/\n/g;
+    $format =~ s/\\t/\t/g;
+    shift @ARGV;
+}
+
+my %ARGS;
+my $last="";
+my @NOARG;
+
+foreach(@ARGV) {
+    if(m/^-/) {
+        $ARGS{$_}="true";
+        $last=$_;
+    }
+    else {
+        if($last) {
+            $ARGS{$last}=$_;
+            $last="";
+        }
+        else {
+            push @NOARG,$_;
+        }
+    }
+}
+
+foreach (keys(%ARGS)) {
+    printf($format,$_,$ARGS{$_});
+}
+foreach (@NOARG) {
+    printf($format,"No flag",$_);
+}
+
+

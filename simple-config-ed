@@ -1,0 +1,150 @@
+#!/usr/bin/perl -w
+###APPNAME:     simple-config-ed
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sat Apr  5 20:46:01 2008
+###APPVER:	0.1
+###APPDESC:     modifiy keys in config file\n\taction:\t del add(default)
+###APPUSAGE:	file [action] key [[+ value,...] [- value ...]]
+###APPEXAMPLE:	simple-config-ed /path/to/config.file x11-wm/fluxbox + gtk X - -motif + threads
+use strict;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_even_empty/;
+use MyPlace::SimpleConfig qw/sc_from_file sc_to_file/;
+use Term::ANSIColor;
+exit 0 if(help_even_empty($0,@ARGV));
+
+sub printKey {
+   my $color=shift;
+   my $pkg=shift;
+   return undef unless($pkg);
+   printf "%-30s%s\n", "$pkg  ",color($color) . join(" ",@_) . color('reset');
+}
+
+sub u_push(\@$) {
+    my $a=shift;
+    my $s=shift;
+    return $a unless($s);
+    foreach(@{$a}) {
+        return $a if($_ eq $s);
+    }
+    push @{$a},$s;
+    return @{$a};
+}
+
+sub u_remove(\@$) {
+    my $a=shift;
+    my $s=shift;
+    return $a unless($a and $s);
+    my @b;
+    foreach(@{$a}) {
+        push @b,$_ unless($_ eq $s);
+    }
+    @{$a}=@b;
+    return $a;
+}
+
+my $file=shift;
+my $action=shift;
+my $pkg;
+if ($action and ($action eq "del" or $action eq "add")) {
+    $pkg=shift;
+}
+else {
+    $pkg=$action;
+    $action="add";
+}
+unless($pkg) {
+    die ("File not exist:$file\n") unless(-f $file);
+    system("cat",$file);
+    exit 0;
+}
+
+print STDERR "   file:\t\"$file\"\n";
+print STDERR " action:\t\"$action\"\n";
+print STDERR "    key:\t\"$pkg\"\n";
+print STDERR "additon:\t",join(" ",@ARGV),"\n";
+
+my %UF =%{sc_from_file($file)};
+
+my $writeback=0;
+
+if($action eq "del") {
+    if(exists $UF{$pkg}) {
+        $writeback=1;
+        print STDERR "="x40,"\n";
+        print STDERR "Delete key \"$pkg\"\n";
+        print STDERR "="x40,"\n";
+        delete $UF{$pkg};
+    }
+    else {
+        $writeback=0;
+        print STDERR "Key \"$pkg\" not exists\n";
+    }
+}
+else {
+    my @old= $UF{$pkg} ? @{$UF{$pkg}} : ();
+    my @result=@old;
+    my $state=1;#1 Enable next flag #0 Disable next flag;
+    foreach(@ARGV) {
+        if($_ eq "+") {
+            $state=1;
+            next;
+        }
+        elsif($_ eq "-") {
+            $state=0;
+            next;
+        }
+        elsif($_ =~ /^\s*$/) {
+            next;
+        }
+        else {
+            if($state == 1) {
+                u_push(@result,$_);
+            }
+            else {
+                u_remove(@result,$_);
+            }
+        }
+    }
+    print STDERR "="x40,"\n";
+    if(@old) {
+        printKey "blue","<<<$pkg",@old;
+        printKey "green",">>>$pkg",@result;
+    }
+    else {
+        print STDERR "Add key \"$pkg\"\n";
+    }
+    print STDERR "="x40,"\n";
+    my $oldstr = join(" ",sort @old);
+    my $newstr = join(" ",sort @result);
+    $writeback = 1 unless($oldstr eq $newstr);
+    $writeback = 1 unless(exists $UF{$pkg});
+    $UF{$pkg}=\@result;
+}
+
+if($writeback) {
+    print STDERR "Writing $file ...";
+    unless(open FO,">",$file) {
+        if($ENV{USER} eq "root") {
+            die("Unable to write \"$file\"\n");
+        }
+        else {
+            print "\nRun as super users...\n";
+            open FO,"|-","sudo dd status=noxfer of=\"$file\" 2>/dev/null" or die("$!\n");
+        }
+    }
+    if(sc_to_file(\*FO,\%UF)) {
+        close FO;
+        print STDERR "\b\b\b[OK]\n";
+        exit 0;
+    }
+    else {
+        close FO;
+        print STDERR "\b\b\b[Failed]\n";
+        print STDERR "$!\n";
+        exit 1;
+    }
+}
+
+
+

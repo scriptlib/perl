@@ -1,0 +1,103 @@
+#!/usr/bin/perl -w
+###APPNAME:     tidywenku2
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Fri Oct  5 12:37:53 2007
+###APPVER:	0.2
+###APPDESC:	将文心阁小说转为UTF8,并整理页面
+###APPUSAGE:	[目录名]
+###APPEXAMPLE:	tidywenk2 "在人间"
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my @PAT;
+my @REP;
+
+sub buildRule($$) {
+    push @PAT,shift;
+    push @REP,shift;
+}
+
+#my $SIGN="<div align=right id=sign>Reproduced by <b>Xiaoranzzz<\/b><br>" . `date` . "<\/div>";
+my $SIGN='<div align="right" id="sign">WenKuV2.0 Geek@MYPLACE</b><br>' . `date` . '</div>';
+
+buildRule qr//,'';
+buildRule qr/--.*<\/title>/,'</title>';
+buildRule qr/<script src=.*<\/script>/,"";
+buildRule qr/gb2312/,"utf-8";
+buildRule qr/<body .*  marginwidth="20">/,'<body class="mainBody">' . "\n";
+buildRule qr/class='middle'/,'class="mtext"';
+buildRule qr/.*<a href='(http\:\/\/www\.wenku\.com|\/)'>.*$/i,"$SIGN";
+buildRule qr/<script language='JavaScript'>/,"\n" . '<!--/';
+buildRule qr/<\/script>/,"-->\n" . 
+                '<script language="JavaScript" src="wenku.js"></script>' . "\n" .
+                '<script language="JavaScript" src="file:///c:/windows/wenku.js"></script>' . "\n" .
+                '<script language="JavaScript" src="file:///etc/wenku.js"></script>' . "\n";
+buildRule qr/<link[^<>]*new.css[^<>]*>/,
+                '<link rel="stylesheet" href="wenku.css" type="text/css">' . "\n" .
+                '<link rel="stylesheet" href="file:///c:/windows/wenku.css" type="text/css">' . "\n" .
+                '<link rel="stylesheet" href="file:///etc/wenku.css" type="text/css">' . "\n"; 
+                
+buildRule qr/<table[^<>]*width=[\'\"]*100%[^><]*>/,'<table id="headTable">';
+buildRule qr/<table[^<>]*width=[\'\"]*93%[^<>]*>/,'<table id="contentTable">';
+buildRule qr/<td[^<>]*width=[\"\']*80%[^<>]*>/,'<td id="contentText">';
+buildRule qr/class=\"title\"/,'id="bookTitle"';
+buildRule qr/<center><\/center>/,'';
+buildRule qr/<hr[^<>]*>/,'';
+
+my $TEMPFILE=`mktemp`;
+
+sub GB2UTF($) {
+    my $filename=shift;
+    return 0 unless(-f "$filename");
+    if (system("iconv","-c","-f","gb18030","-t","utf8","-o","$TEMPFILE","--","$filename")==0){
+        return 1;
+    }
+    else {
+        print STDERR "Error while convert $filename from gb2312 to utf8\n";
+        return 0;
+    }
+}
+sub TidyFile($) {
+    my $filename=shift;
+    if(GB2UTF($filename)) {
+        open(TEMP,"<",$TEMPFILE) or die("$!\n");
+        open(FH,">",$filename) or die("$!\n");
+        while(<TEMP>) {
+            my $LINE=$_;
+            $LINE =~ s#<a.*bookroom.php.*>(.*)<\/a>》#<b id="title">$1</b>#;
+            for(my $i=0;$i<@PAT;$i++) {
+                $LINE =~ s/$PAT[$i]/$REP[$i]/g;
+            }
+            print FH ($LINE,"\n");
+        }
+       close(TEMP);
+       close(FH);
+    }
+}
+
+
+foreach my $cur(@ARGV) {
+    if(-f $cur) {
+        print STDERR ("$cur ...                                \r");
+        TidyFile $cur;
+        print STDERR ("$cur [Done]                                 \n");
+    }
+    elsif(-d $cur) {
+        foreach my $sub(glob("$cur/*")) {
+            if( -f $sub) {
+                print STDERR ("$sub  ...                                      \r");
+                TidyFile $sub;
+            }
+        }
+        print STDERR ("$cur [Done]                                                                    \n");
+    }
+    else {
+        print STDERR ("$cur [Ingored]\n");
+    }
+}
+
+

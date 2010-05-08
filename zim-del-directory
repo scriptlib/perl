@@ -1,0 +1,99 @@
+#!/usr/bin/perl -w
+###APPNAME:     zim-del-directory
+###APPAUTHOR:   duel
+###APPDATE:	2008-05-11 14:27:04
+###APPVER:	0.1
+###APPDESC:     delete zim directory entry
+###APPUSAGE:	[--test] (directory) [level] 
+#[entry Name] [entry Description] [destination]
+###APPEXAMPLE:	zim-del-directory Test .test abc.txt 
+###APPOPTION:   --test:No writing will be made
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use Cwd;
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_even_empty($0,@ARGV));
+
+my $test=0;
+
+if($ARGV[0] eq "--test") {
+    $test=1;
+    shift;
+}
+my ($root_d,$level) = @ARGV;
+$level=32768 unless($level);
+
+#my ($edir,$ename,$edesc,$dist) = @ARGV;
+#my $eloc;
+sub tee($) {
+    my $str=shift;
+    print STDERR "\t$str";
+    return $str;
+}
+#
+#unless($ename) {
+#    $ename = $edir;
+#    $ename =~ s/\/$//g;
+#    $ename =~ s/^.*\///g;
+#}
+#
+#unless($eloc) {
+#    $eloc = $ename;
+##    $eloc =~ s/[ ,\+　～×]/_/g;
+#    $eloc = ".$eloc";
+#}
+#
+#unless($dist) {
+#    $dist=$ENV{PWD};
+#    $dist =~ s/\/?$/.txt/;
+#}
+
+sub error_chdir($) {
+    my $dir=shift;
+    warn "Can't change to $dir!\n";
+}
+
+sub do_unlink {
+    if($test) {
+        print STDERR "[Test]unlink $_...\n" foreach(@_);
+    }
+    else {
+        print STDERR "Unlink $_...\n" foreach(@_);
+        unlink @_ or warn("$!\n");
+    }
+}
+
+sub deleteDirectory($) {
+    $level--;
+    my $edir=shift;
+    my $ename = $edir;
+    $ename =~ s/\/$//g;
+    $ename =~ s/^.*\///g;
+    my @dirs;
+    my $olddir=cwd();
+    do_unlink "$edir.txt" if(-f "$edir.txt");
+    chdir($edir) or return(error_chdir($edir));
+    do_unlink "$edir.txt" if(-f "$edir.txt");
+    foreach my $file (glob("*")) {
+        next if($file eq ".");
+        next if($file eq "..");
+        if(-d $file && $level>=0) {
+            push @dirs,$file;
+        }
+    }
+    foreach(@dirs) {
+        do_unlink "$_.txt" if(-f "$_.txt");
+    }
+    foreach(@dirs) {
+        &deleteDirectory($_);
+    }
+    chdir($olddir) or return(error_chdir($olddir));
+}
+
+&deleteDirectory($root_d);
+

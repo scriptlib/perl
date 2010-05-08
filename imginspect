@@ -1,0 +1,86 @@
+#!/usr/bin/perl -w
+###APPNAME:     imginspect
+###APPAUTHOR:   geek
+###APPDATE:	Sun Sep 30 09:58:16 2007
+###APPVER:	0.1
+###APPDESC:     inspect images directories	
+###APPUSAGE:	(directories...)
+###APPEXAMPLE:	imginspect *
+###APPOPTION:   
+#-r Revert mode(Make deletion as default)	
+use strict;
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+#my @viewer=(qw/feh -Z -g 1024x768 --scale-down -r/);
+#my @viewer=(qw/feh -F/);
+my @viewer=(qw/feh -g 1024x768 -r/);
+my @delcmd=(qw/rm -fdr/);
+
+my @dirs;
+my $count=0;
+my $countrm=0;
+my $sizerm=0;
+my $c_yes=0;
+my $c_no=0;
+
+sub getsize($) {
+    my $dir=shift;
+    my $size=qx/du -s "$dir"/;
+    $size =~ s/^\s*([0-9]+)\s*.*$/$1/gm;
+    return $size;
+}
+
+foreach(@ARGV) {
+    if(-d $_) {
+        $count++;
+        push(@dirs,$_);
+        print("\r$count directorie(s) read      ");
+    }
+}
+print("\n");
+
+my $index;
+foreach(@dirs) {
+    print("[",++$index,"/$count]Inspecting $_...");
+    system(@viewer,$_);
+    print("\n");
+    if(defined(*STDIN)) {
+        ($c_yes,$c_no)=(0,0) if($c_yes>10 or $c_no>10);
+        my $action= $c_yes>$c_no ? 1 : 0;
+        print("Delete $_ ? ", $action ? "(yes)" : "(no)"," ");
+        my $ans=<STDIN>;
+        chomp($ans);
+        $ans=lc($ans);
+        if($ans eq "n" or $ans eq "no") {
+            $action=0;
+        }
+        elsif($ans eq "y" or $ans eq "yes") {
+            $action=1;
+        }
+        else {
+            print("Take that as a ", $action ? "\"yes\"" : "\"no\"","\n");
+        }
+        if($action) {
+            $c_yes++;
+            my $size=getsize($_);
+            if(system(@delcmd,$_)==0) {
+                print("Removed $_\n");
+                $countrm++;
+                $sizerm += $size;
+            }
+            else {
+                print("$!\n");
+            }
+        } 
+        else {
+            $c_no++;
+        }
+    }
+}
+
+print "Directory processed: $count\n";
+print "Directory removed  : $countrm\n";
+print "$sizerm K freed\n";
+

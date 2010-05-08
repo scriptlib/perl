@@ -1,0 +1,49 @@
+#!/usr/bin/perl -w
+###APPNAME:     fluxbox-edit
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Fri Apr  4 16:13:30 2008
+###APPVER:	0.1
+###APPDESC:     fluxbox-edit	
+###APPUSAGE:	
+###APPEXAMPLE:	fluxbox-edit
+###APPOPTION:	
+use strict;
+
+my $valid="init|slitlist|groups|overlay|menu|apps|style";
+sub usage() {
+    print STDERR "$0\nusage: fluxbox-edit ($valid)\n";
+    exit 0;
+}
+
+my $what=shift;
+&usage unless($what);
+$what=lc($what);
+&usage unless($what =~ m/^(:?$valid)$/i);
+
+my $fb_dir="$ENV{HOME}/.fluxbox";
+my $fn;
+my %exps=(
+            style   => "session.styleFile:",
+            menu    => "session.menuFile:",
+            groups  => "session.groupFile:",
+            keys  => "session.keyFile:",
+            overlay => "session.styleOverlay:",
+            slitlist=> "session.slitlistFile:",
+            apps    => "session.appsFile:"
+         );
+if($exps{$what}) {
+    open FI,"<","$fb_dir/init" or die("$!\n");
+    while(<FI>) {
+        if(/^\s*$exps{$what}\s*([^\s].+[^\s])\s*$/) {
+            $fn=$1;
+            last;
+        }
+    }
+    close FI;
+}
+$fn="$fb_dir/$what" unless($fn);
+die("Cant't locate $what for fluxbox\n") unless(-f $fn);
+print STDERR "$fn\n";
+system("vim",$fn);
+
+

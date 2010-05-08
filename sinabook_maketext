@@ -1,0 +1,108 @@
+#!/usr/bin/perl 
+###APPNAME:     sinabook_maketext
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 11 05:01:19 2008
+###APPVER:	0.1
+###APPDESC:     create plain-text from bookinfo.xml created by sinabook_download	
+###APPUSAGE:	<bookinfo directory> [text directory] [chapter directory name]\n\t"text directory" and "chapter directory name" may be specified using following text substitions:\n\t%t\t-\tbook title\n\t%a\t-\tbook author\n
+###APPEXAMPLE:	sinabook_maketext booksrc "%a" "%t"
+use strict;
+use XML::Simple;
+use Data::Dumper;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $WD = shift;
+$WD="." unless($WD);
+
+my $TXTD = shift;
+$TXTD="." unless($TXTD);
+
+my $CHAD = shift;
+$CHAD = "txt" unless($CHAD);
+
+my $xmlfile = "$WD/bookinfo.xml";
+die("File not exist: $xmlfile\n") unless(-f $xmlfile);
+
+binmode STDERR,":utf8";
+
+my $book = XMLin("$xmlfile",SuppressEmpty=>1,NoAttr=>1,KeyAttr=>[]);
+#print Dumper($book),"\n";
+#exit 0;
+$TXTD =~ s/%a/$book->{author}/g;
+$TXTD =~ s/%t/$book->{title}/g;
+$TXTD="." unless($TXTD);
+$CHAD =~ s/%a/$book->{author}/g;
+$CHAD =~ s/%t/$book->{title}/g;
+$CHAD = "txt" unless($CHAD);
+
+sub getTextFrom($) {
+    my $fn = shift;
+    $fn =~ s/.*\///g;
+    $fn = "$WD/$fn";
+    open FI,"-|:utf8","sinabook_h2t '$fn'";
+    my $result=join("",<FI>);
+    close FI;
+    return $result;
+}
+
+if(!-d "$TXTD") {
+    mkdir "$TXTD" or die("$!\n");
+}
+
+if(!-d "$TXTD/$CHAD") {
+    mkdir "$TXTD/$CHAD" or die("$!\n");
+}
+
+my $header =  $book->{title} . "\n\n";
+$header .= "  --  " . $book->{author} . "\n\n" if($book->{author});
+$header .= "\t" . $book->{about} . "\n" . "=" x 80 . "\n\n" if($book->{about});
+
+my $fulltxt = "$TXTD" . "/" .  $book->{title} . ".txt";
+
+print STDERR "Generating book header ...\n";
+#Write header
+#to txt\about.txt
+
+open FO,">:utf8","$TXTD/$CHAD/00 - about.txt";
+print FO $header;
+close FO;
+#to fulltxt
+open FTXT,">:utf8",$fulltxt;
+print FTXT $header;
+
+my @pages;
+@pages = @{$book->{pages}} if($book->{pages});
+my $lastpage;
+my $index=0;
+
+for(my $i=0;$i<@pages;$i++) {
+    my $pagename = $pages[$i]{NAME};
+    $pagename =~ s/\s+$//g;
+    $pagename =~ s/\(\d+\)$//g;
+    $index++ unless($pagename eq $lastpage);
+    my $pageindex = sprintf("%.2d",$index);
+    print STDERR "Generating $TXTD/$CHAD/$pageindex - $pagename.txt ...\n";
+    my $text = getTextFrom($pages[$i]{URL});
+    if($pagename eq $lastpage) {
+        open FO,">>:utf8","$TXTD/$CHAD/$pageindex - $pagename.txt";
+        print FO "$text";
+        close FO;
+        print FTXT "$text";
+    }
+    else {
+        open FO,">:utf8","$TXTD/$CHAD/$pageindex - $pagename.txt";
+        print FO "\n$pagename\n\n\n$text";
+        close FO;
+        print FTXT "\n\n\n\n$pagename\n\n\n$text";
+    }
+    $lastpage=$pagename;
+    
+}
+close FTXT;
+
+print STDERR "All done!\n\n";
+
+

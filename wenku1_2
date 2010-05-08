@@ -1,0 +1,84 @@
+#!/usr/bin/perl -w
+###APPNAME:     wenku1_2
+###APPAUTHOR:   geek
+###APPDATE:	Sat Oct  6 02:39:49 2007
+###APPVER:	0.1
+###APPDESC:     Convert tidywenku1 to tidywenku2	
+###APPUSAGE:	
+###APPEXAMPLE:	
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my @PAT;
+my @REP;
+
+sub buildRule($$) {
+    push @PAT,shift;
+    push @REP,shift;
+}
+my $SIGN='<div align="right" id="sign">WenkuV2.0 Geek@MYPLACE</b><br>' . `date` . '</div>';
+buildRule qr/<div[^<>]*id\s*=\s*["']*sign\s*["']*[^<>]*>.*$/,$SIGN;
+buildRule qr/<\/script>/,"</script>" . "\n" . 
+                '<script language="JavaScript" src="file:///c:/windows/wenku.js"></script>' . "\n" .
+                '<script language="JavaScript" src="file:///etc/wenku.js"></script>' . "\n";
+buildRule qr/<link[^<>]*wenku.css[^<>]*>/,
+                '<link rel="stylesheet" href="wenku.css" type="text/css">' . "\n" .
+                '<link rel="stylesheet" href="file:///c:/windows/wenku.css" type="text/css">' . "\n" .
+                '<link rel="stylesheet" href="file:///etc/wenku.css" type="text/css">' . "\n"; 
+
+my $TEMPFILE=`mktemp`;
+
+sub TidyFile($) {
+    my $filename=shift;
+    return 0 unless(-w $filename);
+    system("cp","-f",$filename,$TEMPFILE) and return 0;
+    if(-r $TEMPFILE and -w $filename) {
+        open(TEMP,"<",$TEMPFILE) or die("$!\n");
+        open(FH,">",$filename) or die("$!\n");
+        #open(FH,">/dev/stdout") or die("$!\n");
+        while(<TEMP>) {
+            my $LINE=$_;
+            for(my $i=0;$i<@PAT;$i++) {
+                $LINE =~ s/$PAT[$i]/$REP[$i]/g;
+            }
+            $LINE =~ s/='([^']*)'/="$1"/g;
+            print FH ($LINE,"\n");
+        }
+       close(TEMP);
+       close(FH);
+       return 1;
+    }
+    return 0;
+}
+
+
+foreach my $cur(@ARGV) {
+    if(-f $cur and $cur =~ m/\.(htm|html)$/i) {
+        print STDERR ("$cur ...                                \r");
+        if (TidyFile $cur) {
+            print STDERR ("$cur [Done]                                 \n");
+        }
+        else {
+            print STDERR ("$cur [Failed]                                 \n");
+        }
+    }
+    elsif(-d $cur) {
+        foreach my $sub(glob("$cur/*")) {
+            if($sub =~ m/\.(htm|html)$/i) {
+                print STDERR ("$sub  ...                                      \r");
+                TidyFile $sub;
+            }
+        }
+        print STDERR ("$cur [Done]                                                                    \n");
+    }
+    else {
+        print STDERR ("$cur [Ingored]\n");
+    }
+}
+
+
+

@@ -1,0 +1,28 @@
+#!/usr/bin/perl -w
+###APPNAME:     IncludeFile
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sun Mar 23 16:46:29 2008
+###APPVER:	0.1
+###APPDESC:     find perl script include file	
+###APPUSAGE:	(name)
+###APPEXAMPLE:	IncludeFile AppMessage
+use strict;
+push(@ARGV,"-h") unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $name=shift;
+$name =~ s/::/\//g;
+my $pldir=qx/pldir/;
+die("pldir::perl script directory not found.\n") unless(-d $pldir);
+
+my @pref=("","include/",$pldir,"$pldir/include/");
+my @suf=("",".pm",".pl",".inc");
+foreach my $p(@pref) {
+    foreach my $s(@suf) {
+        exit(print("$p$name$s")) if(-f "$p$name$s");
+    }
+}
+
+

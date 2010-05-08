@@ -1,0 +1,45 @@
+#!/usr/bin/perl -w
+###APPNAME:     cmdedit
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Fri Sep 21 22:33:33 2007
+###APPVER:	0.1
+###APPDESC:     edit editable command	
+###APPUSAGE:	(cmdname)
+###APPEXAMPLE:	cmdedit cmdinfo
+###APPOPTION:	
+use strict;
+
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+my $support="x-awk|x-shellscript|text\/plain|x-perl";
+my $editor="vim";
+
+my $cmdname=shift;
+my $location=`which -- "$cmdname"`;
+chomp($location);
+die("Command not found: $cmdname\n") unless($location);
+my $info=`file -biL "$location"`;
+chomp($info);
+$info =~ s/,.*$//g;
+print("    Name:\t",$cmdname,"\n");
+print("FileType:\t",$info,"\n"),;
+print("Location:\t",$location,"\n");
+print("  LinkTo:\t",readlink($location),"\n")if( -l $location);
+
+if ($info =~ m/$support/) {
+    exec($editor,$location);
+}
+else {
+    print("Not supported type!Edit it anyway?(y/n)");
+    my $answer="n";
+    read STDIN,$answer,1;
+    exec($editor,$location) if (lc($answer) eq "y");
+}
+
+
+
+
+
+
+

@@ -1,0 +1,46 @@
+#!/usr/bin/perl -w
+###APPNAME:     cleanname
+###APPAUTHOR:   geek
+###APPDATE:	Sat Mar  1 02:33:41 2008
+###APPVER:	0.1
+###APPDESC:     clean filenames	
+###APPUSAGE:	filename
+###APPEXAMPLE:	cleanname a - b , c d.txt
+###APPOPTION:	
+use strict;
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my @oldnames=@ARGV;
+if(!@oldnames) {
+    while(<STDIN>) {
+        chomp;
+        push(@oldnames,$_);
+    }
+}
+
+my @pair=([qw/\( \)/],[qw/\[ \]/],[qw/\{ \}/],[qw/\（ \）/]);
+my @exp_d;
+foreach(@pair) {
+    my $l=@{$_}[0];
+    my $r=@{$_}[1];
+    push @exp_d,qr/\s*$l[^$l$r]*$r\s*/;
+}
+my @exp_s=(qr/-\s*-/,qr/_\s*_/,qr/_/,qr/[&,\s]+/);
+
+my $new;
+foreach my $old(@oldnames) {
+    $new=$old;
+    $new =~ s/[\#\*]//gi;
+    $new =~ s/$_//gi foreach @exp_d;
+    $new =~ s/$_/ /gi foreach @exp_s;
+    $new =~ s/^[\s\-_]+//;
+    $new =~ s/[\s\-_]+(\.[^\.]*)$/$1/;
+   if($new eq $old) {
+        print STDERR "$old: No changes made\n";
+        next;
+   };
+    print STDERR ($old,"->",$new,"\n");
+    rename $old,$new or print("$!");
+}

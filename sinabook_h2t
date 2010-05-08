@@ -1,0 +1,28 @@
+#!/usr/bin/perl -w
+###APPNAME:     sinabook_h2t
+###APPAUTHOR:   duel
+###APPDATE:	Wed Mar 12 01:44:35 2008
+###APPVER:	0.1
+###APPDESC:     convert html file download from book.sina.com.cn to plain-text	
+###APPUSAGE:	[html file]
+###APPEXAMPLE:	sinabook_h2t foo.htm\n\tcat foo.htm | sinabook_h2t
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $processor="htm2txt";
+my $rootid = '-s "<font id=\"zoom\" class=f14><p>" -e "<table align=right><tr><td>"';
+#my $rootid = '-r contTxt,artibody,article -s "<div id=article>" -e "返回目录"';
+if(@ARGV) {
+    open FI,"-|","iconv -f gb2312 -t utf8 '$ARGV[0]' | $processor $rootid";
+}
+else {
+    open FI,"-|","$processor $rootid";
+}
+while(<FI>) {
+    s/^.*(新浪|相关链接|读书频道).*$//g;
+    print;
+}
+close FI;

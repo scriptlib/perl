@@ -1,0 +1,22 @@
+#!/usr/bin/perl -W
+use encoding utf8;
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+sub js_unescape {
+    foreach(@_) {
+        $_ =~ s/%u([0-9a-f]+)/chr(hex($1))/eig;
+        $_ =~ s/%([0-9a-f]{2})/chr(hex($1))/eig;
+        print($_);
+    }
+}
+if ( @ARGV<1 ) {
+    &js_unescape(<STDIN>);
+}
+else {
+    my @strings;
+    foreach(@ARGV) {
+        push(@strings,Encode::decode("utf8",$_));
+    }
+    &js_unescape(@strings);
+}

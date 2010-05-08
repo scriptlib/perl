@@ -1,0 +1,114 @@
+#!/usr/bin/perl 
+###APPNAME:     book_maketext
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 11 05:01:19 2008
+###APPVER:	0.1
+###APPDESC:     create plain-text from bookinfo.xml 	
+###APPUSAGE:	<bookinfo directory> [text directory] [chapter directory name]\n\t"text directory" and "chapter directory name" may be specified using following text substitions:\n\t%t\t-\tbook title\n\t%a\t-\tbook author\n
+###APPEXAMPLE:	book_maketext booksrc "%a" "%t"
+use strict;
+use XML::Simple;
+
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+do `plinclude AppMessage`;
+
+my $WD = shift;
+$WD="." unless($WD);
+
+my $TXTD = shift;
+$TXTD="." unless($TXTD);
+
+my $CHAD = shift;
+$CHAD = "txt" unless($CHAD);
+
+my $xmlfile = "$WD/bookinfo.xml";
+AppMessage::abort("File not exist: $xmlfile\n") unless(-f $xmlfile);
+
+binmode STDERR,":utf8";
+
+my $book = XMLin("$xmlfile",SuppressEmpty=>1,NoAttr=>1,KeyAttr=>[]);
+my $html_filter;
+if(!$book->{encoding} or $book->{encoding} eq "utf8") {
+    $html_filter="cat";
+}
+else {
+    $html_filter="iconv -f '$book->{encoding}' -t utf8 -c";
+}
+$book->{contentId}="" unless($book->{contentId});
+$book->{filter}="" unless($book->{filter});
+my $text_filter="htm2txt '" . $book->{contentId} . "' '" . $book->{filter} . "'"; 
+
+$TXTD =~ s/%a/$book->{author}/g;
+$TXTD =~ s/%t/$book->{title}/g;
+$TXTD="." unless($TXTD);
+$CHAD =~ s/%a/$book->{author}/g;
+$CHAD =~ s/%t/$book->{title}/g;
+$CHAD = "txt" unless($CHAD);
+
+sub filename($) {
+    my $fn = shift;
+    $fn =~ s/.*\///g;
+    return "$WD/$fn";
+}
+
+sub getTextFrom($) {
+    my $fn = shift;
+    return unless(-f $fn);
+    open FI,"-|:utf8","$html_filter '$fn' | $text_filter";
+    my $result=join("",<FI>);
+    close FI;
+    return $result;
+}
+
+if(!-d "$TXTD") {
+    mkdir "$TXTD" or die("$!\n");
+}
+
+if(!-d "$TXTD/$CHAD") {
+    mkdir "$TXTD/$CHAD" or die("$!\n");
+}
+
+
+my $header =  $book->{title} . "\n\n";
+$header .= "  --  " . $book->{author} . "\n\n" if($book->{author});
+$header .= "\t" . $book->{about} . "\n" . "=" x 80 . "\n\n" if($book->{about});
+$header .= getTextFrom(filename($book->{source})) . "\n\n";
+
+my $fulltxt = "$TXTD" . "/" .  $book->{title} . ".txt";
+
+AppMessage::message("Generating book header ...\n");
+
+open FO,">:utf8","$TXTD/$CHAD/00 - index.txt";
+print FO $header;
+close FO;
+#to fulltxt
+open FTXT,">:utf8",$fulltxt;
+print FTXT $header;
+
+my @pages;
+@pages = @{$book->{pages}} if($book->{pages});
+
+for(my $i=0;$i<@pages;$i++) {
+    my $pageindex = sprintf("%.2d",$i + 1);
+    my $pagename = $pageindex . " - " . $pages[$i]{title};
+    my $source = filename($pages[$i]{url});
+    if(!-f $source) {
+        AppMessage::error("File not exist:$source\n");
+        next;
+    }
+    AppMessage::message("Generating $TXTD/$CHAD/$pagename.txt ...\n");
+    my $text = getTextFrom($source);
+    open FO,">:utf8","$TXTD/$CHAD/$pagename.txt";
+    print FO "$pagename\n\n\n$text";
+    close FO;
+    print FTXT "\n\n$pagename\n\n\n$text\n\n";
+}
+close FTXT;
+
+AppMessage::message("All done!\n");
+
+

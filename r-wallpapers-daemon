@@ -1,0 +1,109 @@
+#!/usr/bin/perl -w
+###APPNAME:     r-wallpapers-daemon
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 25 21:36:40 2008
+###APPVER:	0.1
+###APPDESC:     set wallpaper randomly,timely
+###APPUSAGE:	[seconds] [directories...]
+###APPEXAMPLE:	
+###APPOPTION:	
+use strict;
+use Env qw/HOME/;
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $CONFIG_D = "$HOME/.xiaoranzzz";
+unless(-d $CONFIG_D) {mkdir $CONFIG_D or die("$!\n");};
+unless(-d $CONFIG_D) {mkdir $CONFIG_D or die("$!\n");};
+my $WP_LIST = "$CONFIG_D/wallpapers";
+#my $WP_LAST = "$CONFIG_D/last-wallpaper";
+my $wait=shift;
+$wait=300 unless($wait);
+my @dirs=@ARGV;
+my @WPS;
+if(@dirs) {
+    print STDERR "Building wallpaper list...";
+    open FO,">",$WP_LIST;
+    foreach(@dirs) {
+        next unless(-d $_);
+        open FI,"-|","find '$_' -name '*.png' -or -name '*.jpg'";
+        foreach my $png(<FI>) {
+            chomp($png);
+            push(@WPS,$png);
+            print FO $png,"\n";
+        }
+        close FI;
+    }
+    close FO;
+    print STDERR " [Done]\n";
+}
+else {
+    print STDERR "Reading wallpaper list...";
+    if(-f $WP_LIST) {
+        open FI,"<",$WP_LIST;
+        while(<FI>) {
+            chomp;
+            push(@WPS,$_);
+        }
+        close FI;
+    }
+    print " [DONE]\n";
+}
+
+unless(@WPS) {
+    print STDERR "No wallpaper found, the list is empty\n";
+    exit 1;
+}
+
+my $nextid=0;
+
+#sub on_exit {
+#    print STDERR "$0 quiting ...\n";
+#    print STDERR "Save $WPS[$nextid] as last wallpaper\n";
+#    open FO,">",$WP_LAST;
+#    print FO $WPS[$nextid],"\n";
+#    close FO;
+#    print STDERR "$0 quit\n";
+#    exit 0;
+#}
+
+my $action="";
+sub do_exit {
+    $action="exit";
+    print STDERR "\n$0 quit\n";
+    exit 0;
+}
+sub do_change {
+    $action="change";
+}
+
+$SIG{INT}=\&do_exit;
+$SIG{USR1}=\&do_change;
+
+while(1) {
+    $nextid=int(rand(@WPS));
+    my @app = ($nextid % 9) ? qw/set_wallpaper/ : qw/set_wallpaper 1/;
+    if( -f $WPS[$nextid] ) {
+        print STDERR "\nSetting wallpaper to $WPS[$nextid] ...";
+        if(system(@app,$WPS[$nextid])==0) {
+            print STDERR "\rSetting wallpaper to $WPS[$nextid] ... [Done]";
+        }
+        else {
+            print STDERR "\rSetting wallpaper to $WPS[$nextid] ... [Failed]";
+        }
+    }
+    if($action eq "change") {
+        $action = "";
+    }
+    elsif($action eq "exit") {
+        do_exit;
+        exit 0;
+    }
+    else {
+        sleep $wait;
+        $action="" if($action eq "change");
+    }
+}
+
+

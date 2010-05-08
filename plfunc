@@ -1,0 +1,4 @@
+#!/usr/bin/perl -w
+my $func = shift;
+eval {$func->(@ARGV);};
+

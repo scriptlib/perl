@@ -1,0 +1,30 @@
+#!/usr/bin/perl -w
+###APPNAME:     cmdinfo
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Fri Sep 21 22:33:33 2007
+###APPVER:	0.1
+###APPDESC:     show cmd related information,output it's location	
+###APPUSAGE:	(cmdname)
+###APPEXAMPLE:	cmdinfo perl
+###APPOPTION:	
+use strict;
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+my $cmdname=shift;
+my $location=`which "$cmdname"`;
+chomp($location);
+die("Command $cmdname not found in PATH\n") unless($location);
+my $info=`file -biL "$location"`;
+chomp($info);
+$info =~ s/,.*$//g;
+
+my $format="%-15s%s\n";
+printf ($format,"Name:",$cmdname);
+printf ($format,"FileType:",$info);
+printf ($format,"Location:",$location);
+printf ($format,"LinkTo:",readlink($location)) if(-l $location);
+
+
+
+

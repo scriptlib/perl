@@ -1,0 +1,32 @@
+#!/usr/bin/perl -w
+###APPNAME:     proxy-download
+###APPAUTHOR:   duel
+###APPDATE:	2008-09-19 01:59:04
+###APPVER:	0.1
+###APPDESC:     proxy-download	
+###APPUSAGE:	
+###APPEXAMPLE:	proxy-download
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+#exit 0 if(help_required($0,@ARGV));
+exit 0 if(help_even_empty($0,@ARGV));
+my $default_proxy='http://proxy-https.net/index.php?hl=f5&q=';
+my $default_encoder='rotate13';
+my $url=shift;
+my $proxy=shift;
+my $encoder=shift;
+$proxy |= $default_proxy;
+$encoder |= $default_encoder;
+
+$url=`echo "$url" | $encoder`;
+chomp $url;
+
+system("download",$proxy . $url);
+

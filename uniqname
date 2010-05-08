@@ -1,0 +1,13 @@
+#!/usr/bin/perl -w
+sub Uniqname($);
+sub Uniqname($) {
+    my $ext = $_[0] ? $_[0]: "";
+    my $max = 10000000000;
+    my $n1 = int (rand($max));
+    my $n2 = log($max / $n1)/log(10);
+    my $result=$n1 . "0"x$n2 . $ext;
+    return $result unless(-f $result);
+    return Uniqname($ext);
+}
+print(Uniqname(shift),"\n");
+

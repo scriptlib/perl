@@ -1,0 +1,260 @@
+#!/usr/bin/perl -w
+###APPNAME:     filescript
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	2009-06-19 22:41:01
+###APPVER:	0.1
+###APPDESC:     filescript	
+###APPUSAGE:	
+###APPEXAMPLE:	filescript
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+my @blocks;
+
+sub new_block {
+    return {
+	'+'=>[],
+	'-'=>[],
+	"<"=>[],
+	'>'=>shift,
+	"@"=>[],
+	"#"=>[],
+    };
+}
+sub add_block {
+    push @blocks,@_ if(@_);
+    return new_block();
+}
+use constant {
+    OPG_NULL=>0,
+    OPG_TEXT_INPUT => 1,
+    OPG_NEW_BLOCK => 2,
+    OPG_COMMENT => 3,
+    OPG_TEXT_END =>4,
+    OPG_CMD=>5,
+    OPG_ARGS=>6,
+};
+sub is_text_end {
+    return 1 if($_[0] && substr($_[0],0,1) eq ">");
+    return undef;
+}
+sub is_comment {
+    return 1 if($_[0] && substr($_[0],0,1) eq "#");
+    return undef;
+}
+
+my $f = 0;
+my $newblock = new_block();
+my $lastop="";
+while(<>) {
+    chomp;
+    #CHECK BLOCK TEXT INPUT
+    if($lastop eq '<') {
+	if(substr($_,0,1) eq '>') {
+	    $_ = substr($_,1);
+	    $lastop = '>';
+	}
+	else {
+	    push @{$newblock->{text}},$_;
+	    next;
+	}
+    }
+    s/^\s+//g;
+    s/\s+$//g;
+    next unless($_);
+    #CHECK COMMENTS
+    if(substr($_,0,1) eq '#') {
+	push @{$newblock->{'#'}},$_;
+	next;
+    }
+    my $line = $_;
+    my @words;
+    foreach(split(/\t+/,$line)) {
+	if(/^([-\+><])(.+)$/) {
+	    push @words,$1,$2;
+	}
+	elsif(/^(.+)([-\+><])$/) {
+	    push @words,$1,$2;
+	}
+	else {
+	    push @words,$_;
+	}
+    }
+    my $text_input="";
+    foreach(@words) {
+	if($lastop eq '<' and (!$_ eq '>') ) {
+		$text_input = "$text_input $_";
+	}
+	elsif($lastop eq '>') {
+	    $newblock->{'>'}=$_;
+	    $lastop = '@';
+	}
+	elsif($_ eq '>' || $_ eq '<' || $_ eq '+' || $_ eq '-') {
+	    $newblock = add_block($newblock) if($newblock->{'>'});
+	    $lastop = $_;
+	}
+	else {
+	    push @{$newblock->{$lastop}},$_;
+	}
+   }
+   push @{$newblock->{'<'}},$text_input if($text_input);
+}
+add_block($newblock) if($newblock->{'>'});
+use Data::Dumper;
+#print STDERR Dumper($newblock),"\n";
+#print STDERR Dumper(\@blocks),"\n";
+#exit 0;
+
+my $source=".";
+my $target=".";
+my %cmds = (
+    "write"=>"write",
+    "source"=>"source",
+    "target"=>"target",
+    "delete"=>"delete",
+    "copy"=>"copy"
+);
+sub buildpath {
+	my ($src,$name) = @_;
+    return $src . "/" unless($name);
+    $name =~ s/\\/\//g;
+    return $src . "/$name";
+}
+sub buildsource {
+	return buildpath($source,@_);
+}
+sub buildtarget {
+	return buildpath($target,@_);
+}
+sub getarray0 {
+    my $arr = shift;
+    return undef unless(ref $arr);
+    return undef unless(@{$arr});
+    return $arr->[0];
+}
+sub selectfiles {
+    my ($src,$include,$exclude) = @_;
+    my @include_exp = @{$include};
+    @include_exp = ("*") unless(@include_exp);
+    my @exclude_exp = @{$exclude};
+    my @in_files;
+    my @ex_files;
+    foreach(@include_exp) {
+		my $exp = buildpath($src,$_);
+		push @in_files,glob($exp);
+    }
+    foreach(@exclude_exp) {
+		push @ex_files,glob(buildpath($src,$_));
+    }
+    my @files;
+    foreach my $file (@in_files) {
+	my $f=0;
+	foreach(@ex_files) {
+	    if($file eq $_) {
+		$f=1;
+		last;
+	    }
+	}
+	push @files,$file unless($f);
+    }
+    return @files;
+}
+sub cmd_target {
+    my ($include,$exclude,$text,$arg) = @_;
+    my $val = getarray0($include);
+    if($val) {
+		$target = $val;
+		$target =~ s/\\/\//g;
+		$target =~ s/\/+$//g;
+		return 1;
+    }
+    else {
+		return undef;
+    }
+}
+sub cmd_source {
+    my ($include,$exclude,$text,$arg) = @_;
+    my $val = getarray0($include);
+    if($val) {
+		$source = $val;
+		$source =~ s/\\/\//g;
+		$source =~ s/\/+$//g;
+		return 1;
+    }
+    else {
+		return undef;
+    }
+}
+sub cmd_write {
+    my ($include,$exclude,$text,$arg) = @_;
+    if($arg && @{$arg}) {
+	my $dst = buildtarget($arg->[0]);
+	print STDERR "Writing ",$dst," ...";
+	open FO,">",$dst or return undef;
+	print FO join("\n",@{$text}) or return undef;
+	close FO;
+	print STDERR "\t[OK]\n";
+    }
+    else {
+	print STDOUT join("\n",@{$text});
+    }
+    return 1;
+}
+sub cmd_copy {
+    die("No source set.\n") unless($source);
+    my ($include,$exclude,$text,$arg) = @_;
+    my @files = selectfiles($source,$include,$exclude);
+    return undef unless(@files);
+    my $dst = buildtarget(getarray0($arg));
+    if(system("cp","-av",@files,$dst)==0) {
+        return 1;
+    }
+    return undef;
+}
+sub cmd_delete {
+    die("No target set.\n") unless($target);
+    my ($include,$exclude,$text,$arg) = @_;
+    my @files = selectfiles($target,$include,$exclude);
+    return undef unless(@files);
+    if(system("rm","-v",,"--",@files)==0) {
+        return 1;
+    }
+    return undef;
+}
+foreach(@blocks) {
+    my $abort_flag=1;    
+    my $cmd = $_->{'>'};
+    next unless($cmd);
+    if(substr($cmd,0,1) eq '_') {
+		$cmd = substr($cmd,1);
+		$abort_flag=0;
+    }
+    if($cmds{$cmd}) {
+		my $realcmd = "cmd_" . $cmds{$cmd};
+		no strict;
+		my $r = &$realcmd($_->{'+'},$_->{'-'},$_->{'<'},$_->{'@'});
+		if($abort_flag and (!$r)) {
+			print STDERR "Error occured when running \'$cmd\'\n";
+			die("Abort!\n");
+		};
+    }
+    else {
+		die("Command not support:$cmd\n");
+    }
+}
+
+
+
+
+
+
+

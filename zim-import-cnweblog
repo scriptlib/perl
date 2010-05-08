@@ -1,0 +1,165 @@
+#!/usr/bin/perl -w
+###APPNAME:     zim-import-cnweblog
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	2008-09-05 00:40:06
+###APPVER:	0.1
+###APPDESC:     import from cnweblog.com xml backup files	
+###APPUSAGE:    [input file]	
+###APPOPTION:	
+use strict;
+no warnings;
+
+use XML::Simple;
+use Data::Dumper;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+use MyPlace::HTML::Convertor;
+use MyPlace::Zim;
+
+sub html_text {
+    my $text = join("",@{text_from_string(\@_,undef,undef,undef,undef)}) if(@_);
+    $text =~ s/\n\n+$/\n/gm;
+    return $text;
+}
+
+sub zim_entry_text($) {
+    my %entry = (@_ && $_[0]) ? %{$_[0]} : ();
+    my @result;
+    push @result,"="x6," ",$entry{Title}," ","="x6,"\n";
+    push @result,"Created ",$entry{DateAdded},"\n";
+    push @result,"Updated ",$entry{DateUpdated},"\n";
+    push @result,$entry{Text},"\n";
+    if($entry{comments} and @{$entry{comments}}) {
+        my $cmt = $entry{comments};
+        push @result,"\n","="x2," Comments: ","="x2,"\n\n";
+        foreach(@{$cmt}) {
+            push @result,"* **",$_->{"Title"},"**\n";
+            push @result,$_->{"Text"},"\n";
+            push @result,"*"x2,$_->{"Author"},'*'x2,",",$_->{"DateUpdated"},"\n","\n";
+        }
+    }
+    return \@result;
+}
+
+my $xml = $ARGV[0] ? XMLin($ARGV[0]) : XMLin("/dev/stdin");
+
+my %blogs;
+my %comments;
+
+my $blog_content = $xml->{"blog_Content"};
+if($blog_content) {
+foreach(@{$blog_content}) {
+    if($_->{"PostType"} == "1") {
+        $blogs{$_->{"ID"}}=$_;
+    }
+    else {
+        $comments{$_->{"ID"}}=$_;
+    }
+}
+}
+
+foreach(values %comments) {
+    my $pid = $_->{"ParentID"};
+    if(exists $blogs{$pid}) {
+        push @{$blogs{$pid}->{"comments"}},$_;
+    }
+    else {
+        print STDERR "For ",$_->{"Title"},"(",$_->{"PostType"},") parent_blog [$pid] not exists!\n"; 
+    }
+}
+
+my @blogs = sort {$a->{"DateUpdated"} cmp $b->{"DateUpdated"}} values %blogs;
+
+foreach(@blogs) {
+    if($_->{"DateUpdated"} =~ /^(\d+)-(\d+)-(\d+)T/) {
+        $_->{"y"}=$1;
+        $_->{"m"}=$2;
+        $_->{"d"}=$3;
+    }
+    $_->{"Text"}=&html_text($_->{"Text"});
+    $_->{"DateAdded"} =~ s/T/ /;
+    $_->{"DateUpdated"} =~ s/T/ /;
+    if($_->{"comments"}) {
+        @{$_->{"comments"}} = sort {$a->{"DateUpdated"} cmp $b->{"DateUpdated"}} @{$_->{"comments"}};
+        foreach(@{$_->{"comments"}}) {
+            $_->{"Text"}=&html_text($_->{"Text"});
+            $_->{"DateUpdated"} =~ s/T/ /;
+        }
+    }
+}
+
+sub my_mkdir($) {
+    my $dir = shift;
+    unless(-d $dir) {
+        print STDERR "Creating directory $dir ...";
+        mkdir $dir or die("$!\n");
+        print STDERR "\n";
+    }
+}
+
+my %top;
+foreach(@blogs) {
+    my $basename = get_filename($_->{"Title"});
+    push @{$top{$_->{"y"}}->{"Files"}},"* [[." . $_->{"m"} . ":" . $_->{"d"} . ":" . $basename . "|" . $_->{"Title"} . "]]" ;
+    push @{$top{$_->{"y"}}->{$_->{"m"}}->{"Files"}},"* [[." . $_->{"d"} . ":" . $basename . "|" . $_->{"Title"} . "]]" ;
+    push @{$top{$_->{"y"}}->{$_->{"m"}}->{$_->{"d"}}->{"Files"}},"* [[." . $basename . "|" . $_->{"Title"} . "]]" ;
+    my_mkdir $_->{"y"};
+    my_mkdir $_->{"y"} . "/" . $_ -> {"m"};
+    my_mkdir $_->{"y"} . "/" . $_ -> {"m"} . "/" . $_->{"d"};
+    my $filename = $_->{"y"} . "/" . $_ -> {"m"} . "/" . $_->{"d"} . "/" . $basename . ".txt";
+    print STDERR "Creating $filename ..."; 
+    open FO,">",$filename;
+    print FO @{zim_entry_text($_)};
+    close FO;
+    print STDERR "\n";
+}
+
+sub print_node($$$) {
+    my $out = shift(@_);
+    my $pdir = shift(@_);
+    my %n = %{shift(@_)};
+    my @keys;
+    my @files;
+    foreach(keys %n) {
+        push @keys,$_ unless($_ eq "Files");
+    }
+    @keys = sort @keys;
+    @files = @{$n{"Files"}};
+
+    if(@keys) {
+        print $out "\n\n","="x2," Date: ","="x2,"\n";
+        foreach(@keys) {
+                print $out "\n* [[.$_|$pdir/$_]]";
+        }
+    }
+    if(@files) {
+        print $out "\n\n","="x2," Files: ","="x2,"\n";
+        foreach(@files) {
+            print $out "\n$_"; 
+        }
+    }
+    print $out "\n";
+    foreach(@keys) {
+        my $rout;
+        open $rout,">","$pdir/$_.txt" or die("$!\n");
+        print $rout "="x6," $pdir/$_ ","="x6,"\n";
+        &print_node($rout,"$pdir/$_",$n{$_});
+        close $rout;
+    }
+}
+
+foreach my $year (keys %top) {
+    my $out;
+    open $out,">","$year.txt" or die("$!\n");
+    print $out '='x6," ",$year," ",'='x6,"\n";
+    &print_node($out,$year,$top{$year});
+    close $out;
+}
+
+

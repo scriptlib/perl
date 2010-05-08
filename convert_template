@@ -1,0 +1,59 @@
+#!/usr/bin/perl -w
+###APPNAME:     convert_template
+###APPAUTHOR:   root
+###APPDATE:	Fri Sep 21 12:11:45 2007
+###APPVER:	0.1
+###APPDESC:     convert old perl script_template	
+###APPUSAGE:	(Filename)
+use strict;
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+foreach(@ARGV) {
+    my $filename=$_;
+    my $tempfile=`mktemp`;
+    die("File not exists:\"$filename\"\n") unless(-f $filename);
+    system("cp",$filename,$tempfile);
+    
+    open(TEMP,">",$filename) or die("$!\n");
+    open(TEXT,"<",$tempfile) or die("$!\n");
+    
+    
+    my $end=1;
+    while(<TEXT>) {
+        if(/^#/ or /^my\s*\$APP/ or /^use/ or /^APP/)  {
+            if(/^my\s*\$(\w+)\s*=\s*"(.*)"\s*;\s*$/ or 
+               /^#*(\w+)\s*=\s*"([^"=]*)"/ or 
+               /^(APP\w+)\s*=\s*"([^"=]*)"/ or
+               /^(APP\w+)\s*=\s*(.*)\s*$/
+               ) {
+                my $result=$2;
+                $result =~ s/\t/\\t/g;
+                $result =~ s/\n/\\n/g;
+                print TEMP ("###",$1,":\t",$result,"\n");
+            }
+            else {
+                print TEMP ($_);
+                $end=0 if(/^###APP/);
+            }
+        } 
+        else {
+            if($end) {
+                print TEMP '$ARGV[0]="-h" unless(@ARGV);';
+                print TEMP 'foreach(@ARGV){';
+                print TEMP '    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");';
+                print TEMP '}';
+                $end=0;
+            }
+            print TEMP ($_) unless(/plmodule.*module\/App\.pl.*/ or /defined\(&help\)/);
+        }
+    }
+    close(TEXT);
+    close(TEMP);
+    unlink($tempfile);
+    print($filename," updated!\n");
+}
+
+
+
+

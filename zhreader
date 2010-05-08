@@ -1,0 +1,60 @@
+#!/usr/bin/perl -w
+###APPNAME:     zhreader
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Mon Mar 31 11:23:00 2008
+###APPVER:	0.1
+###APPDESC:     build jar url,open it in browser	
+###APPUSAGE:	(zipfile) [browser]
+###APPEXAMPLE:	
+###APPOPTION:	
+use strict;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_even_empty/;
+use MyPlace::Filename;
+
+exit 0 if(help_even_empty($0,@ARGV));
+
+
+my @p_browser= (
+    ["r-firefox","-new-tab"],
+    ["firefox","-new-tab"],
+    ["epiphany","-n"],
+    );
+@p_browser = grep(`which "$_->[0]"`,@p_browser);
+die("No browser found\n") unless(@p_browser);
+
+my $zipfile=shift;
+my $browser=shift;
+my $arg="";
+
+$zipfile=get_fullname($zipfile);
+die("File not exist $zipfile\n") unless(-r $zipfile);
+my $index=`listzip "$zipfile" | firsthtml`;
+chomp($index) if($index);
+my $url="jar:file://$zipfile!/$index";
+
+$url =~ s/#/%23/g;
+$url =~ s/ /%20/g;
+
+if(!$browser) {
+    my @running=`ps -A -u \$UID`;
+    foreach(@p_browser){
+        my $exp=@{$_}[0];
+        my $opt=@{$_}[1];
+        last if($browser);
+        next unless `which "$exp" 2>/dev/null`;
+        foreach(@running) {
+            chomp;
+            if(/\b$exp\b/) {
+                $browser=$exp;
+                $arg=$opt;
+                last;
+            }
+        }
+    }
+}
+
+($browser,$arg) = ($p_browser[0][0],$p_browser[0][1]) unless($browser);
+print STDERR "$browser $arg $url\n";
+exec("exec_silently",$browser,$arg,$url);
+

@@ -1,0 +1,294 @@
+#!/usr/bin/perl -w
+###APPNAME:     bfd
+###APPAUTHOR:   duel
+###APPDATE:	2009-05-21 15:08:33
+###APPVER:	0.1
+###APPDESC:     floppy building system
+###APPUSAGE:	[-w dir][-c file][-o os] [-d] [-i file] [-t type] name [target]
+###APPOPTION:   name:name of the disk or image to build (see bfd.cfg)|target:target drive or file (default is "a:")|-o os:os to use (default is "md701")|-d:print debug messages|-i file:create an image file (optional winimage!)|-t type:image type (144 or 288,see "bfi")|-n:don't wait for the user to insert a diskette|-w dir:specify working directory|-c file:specify configure file(default bfd.cfg)
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+#exit 0 if(help_required($0,@ARGV));
+exit 0 if(help_even_empty($0,@ARGV));
+my ($debug,$os,$filename,$type,$name,$target);
+my %o;my $op;
+
+foreach(@ARGV) {
+    if($_ eq '-d' or $_ eq '-d') {
+        $o{-d}=1;
+    }
+    elsif(/^-/) {
+        $op=lc($_);
+    }
+    elsif($op) {
+        $o{$op}=$_;
+        $op=undef;
+    }
+    else {
+        if($o{name}) {
+            $o{target}=$_;
+        }
+        else {
+            $o{name}=$_;
+        }
+    }
+}
+#use Data::Dumper;warn Dumper(\%o),"\n";
+
+sub maybe_uc($$) {
+    my ($fst,$sec) = @_;
+    return "$fst/" . uc($sec) if(-f "$fst/" . uc($sec));
+
+}
+
+sub msg {
+    if(@_) {
+        print STDERR "$0: ",@_;
+    }
+    else {
+        print STDERR "\n";
+    }
+}
+sub abort {
+    msg @_;
+    die();
+}
+sub cmd_abort {
+    print STDERR "\t[" . "@_" ."]\n";
+    return undef;
+}
+sub run {
+    if($o{-d}) {
+        msg("@_","\n");
+        return 1;
+    }
+    if(system(@_)==0) {
+        return 1;
+    }
+    else {
+        msg("Invalid exit code while runing \"",join(" ",@_),"\"\n");
+        return undef;
+    }
+    return 1;
+}
+sub t_run {
+    if($o{-d}) {
+        msg("@_","\n");
+    }
+    else {
+        system(@_);
+    }
+    return 1;
+}
+
+abort("Error, name required.\n") unless($o{name});
+abort("Error, filename required.(-i)\n") unless($o{-i});
+
+my $bfd_src= $o{-w} ||  ".";
+my $bfd_config;
+$o{-c} = "bfd.cfg" unless($o{-c});
+foreach($o{-c}, "bfd.cfg","$bfd_src/$o{-c}","$bfd_src/bfd.cfg") {
+    if(-f $_) {
+        $bfd_config=$_;
+        last;
+    }
+}
+abort("Error, configure file not found\n") unless($bfd_config);
+my $bfd_work=$bfd_config;
+$bfd_work =~ s/\/[^\/]+$//;
+$bfd_work = "." unless(-d $bfd_work);
+
+my %cached;
+sub read_cfg {
+    my $fn=shift;
+    return undef unless($fn);
+    return $cached{$fn} if($cached{$fn});
+#    warn("reading $fn ...\n");
+    open FI,"<",$fn or return undef; my @text=<FI>; close FI;
+    my @result=();
+    foreach(@text) {
+        chomp;
+        next if((!$_) or /^\s*$/ or /^\s*#/);
+        s/\\/\//g;
+        if(/^\s*i\s+/) {
+            $_ =~ s/^\s*i\s+//;
+            my @files = split(/\s+/,$_);
+            foreach(@files) {
+                my $rr = &read_cfg($bfd_work . "/$_");
+                push @result,@{$rr} if($rr);
+            }
+        }
+        else {
+            push @result,$_;
+        }
+    }
+    $cached{$fn} = [@result];
+    return \@result;
+}
+
+sub parse_cfg {
+    my $text = shift;
+    return undef unless($text);
+    my %result; my $name = "default";
+    foreach(@{$text}) {
+        my @arg=split(/\s+/,$_);
+        next unless(@arg);
+        $arg[0] = lc($arg[0]);
+        if($arg[0] eq 'n') {
+            $name = $arg[1] if($arg[1]);
+        }
+        else {
+            push @{$result{$name}},[@arg];
+        }
+    }
+    return %result;
+}
+my $text = read_cfg($bfd_config);
+my %config = parse_cfg($text);
+abort("config name [" . $o{name} . "] not exist\n") unless($config{$o{name}});
+#print STDERR Dumper($config{$o{name}}),"\n";
+my @cmd = @{$config{$o{name}}};
+
+use File::Temp qw/tempdir/;
+my $bfd_target = tempdir();
+my $bfd_os = $o{-o} || "md701";
+my $bfd_file = $o{-i};
+my $bfd_label = "boot";
+my $bfd_type = $o{-t} || "144";
+my @bfd_cmds;
+
+foreach(@cmd) {
+    next unless($_);
+    my($name,@args) = @{$_};
+    if($name eq "f") {
+        next;
+    }
+    elsif($name eq "o" or $name eq "os") {
+        next if($o{-o});
+        $bfd_os = $args[0] if(@args);
+    }
+    elsif($name eq "b") {
+        $bfd_label = $args[0] if(@args);
+    }
+    elsif($name eq "it") {
+        $bfd_type = $args[0] if(@args);
+    }
+    else {
+        push @bfd_cmds,[$name,@args];
+    }
+}
+sub expand {
+    my @result;
+    foreach(@_) {
+        s/%bfd_os%/$bfd_os/g;
+        s/%bfd_file%/$bfd_file/g;
+        s/%bfd_label%/$bfd_label/g;
+        s/%bfd_target%/$bfd_target/g;
+        s/%bfd_type%/$bfd_type/g;
+        push @result,$_;
+    }
+    return @result;
+}
+($bfd_label)=expand($bfd_label);
+($bfd_file)=expand($bfd_file);
+@cmd=@bfd_cmds;
+@bfd_cmds=();
+foreach(@cmd) {
+    push @bfd_cmds,[expand(@{$_})];
+}
+
+sub cmd_c {
+    return cmd_abort("Invalid command") unless(@_);
+    my $dst="$bfd_target/" . ($_[1] ? $_[1] : ""); 
+    run("cp","-fa",glob("$bfd_src/$_[0]"),$dst);
+}
+sub cmd_t {
+    return cmd_abort("Invalid command") unless(@_);
+    my $dst="$bfd_target/" . ($_[1] ? $_[1] : ""); 
+    t_run("cp","-fa",glob("$bfd_src/$_[0]"),"$dst");
+}
+sub cmd_x {
+    return cmd_abort("Invalid command") unless(@_);
+    return cmd_abort("Directory not exist $_[0]") unless(-d "$bfd_src/$_[0]");
+    my $dst="$bfd_target/" . ($_[1] ? $_[1] : ""); 
+    my @src = glob("$bfd_src/$_[0]/*");
+    run("cp","-fa",@src,$dst) if(@src);
+    return 1;
+}
+sub cmd_m {
+    return cmd_abort("Invalid command") unless(@_);
+    run("mkdir","-p",map("$bfd_target/" . $_,@_));
+}
+sub cmd_d {
+    return cmd_abort("Invalid command") unless($_[2]);
+}
+
+sub cmd_k {
+    return cmd_abort("Invalid command") unless(@_);
+    run("rm","-f",map("$bfd_target/" . $_,@_));
+}
+
+msg("Checking OS...\n");
+my @ofile;
+abort("OS directory not readable\n") unless(-d "$bfd_src/os/$bfd_os");
+if(-f "$bfd_src/os/$bfd_os/ibmbio.sys") {
+    @ofile = qw/ibmbio.sys ibmdos.sys command.com/;
+}
+elsif(-f "$bfd_src/os/$bfd_os/kernel.sys") {
+    @ofile = qw/kernel.sys command.com/;
+}
+else {
+    @ofile = qw/io.sys msdos.sys command.com/;
+}
+my @tfile=@ofile;
+@ofile=();
+foreach(@tfile,"bootsect.bin") {
+    if (-f "$bfd_src/os/$bfd_os/$_") {
+        push @ofile,$_ unless($_ eq "bootsect.bin");
+    }
+    elsif(-f "$bfd_src/os/$bfd_os/" . uc($_)) {
+        push @ofile,uc($_) unless($_ eq "bootsect.bin");
+    }
+    else {
+        abort("OS file not exist \"$bfd_src/os/$bfd_os/$_\"\n");
+    }
+}
+
+msg("Processing commands...\n");
+foreach(@bfd_cmds) {
+    next unless($_);
+    my ($name,@args)=@{$_};
+    msg($name," @args...");# if($o{-d});
+    $name = "cmd_" . $name;
+    no strict;# refs;
+    if(&$name(@args)) {
+        print STDERR "\t[OK]\n";
+    }
+    else {
+        abort("Aborted...\n");
+    }
+}
+
+#my @bfi = ("bfi","-t",$bfd_type,"-l",$bfd_label,"-f",$bfd_file,-"b","$bfd_src/os/$bfd_os/bootsect.bin");
+my @bfi = ("bfi","-t",$bfd_type,"-f",$bfd_file,-"b","$bfd_src/os/$bfd_os/bootsect.bin");
+push(@bfi,"-o","$bfd_src/os/$bfd_os/$_") foreach(@ofile);
+@ofile=undef;
+#msg("OS   \t[$bfd_os]\n");
+#msg("File \t[$bfd_file]\n");
+#msg("Label\t[$bfd_label]\n");
+#msg("Type \t[$bfd_type]\n");
+#msg("BFI  \t[","@bfi","]\n");
+#system("ls","-l",$bfd_target);
+system(@bfi,$bfd_target);
+#system("rm","-fdr",$bfd_target);
+
+
+
+
+

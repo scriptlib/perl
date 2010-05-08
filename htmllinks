@@ -1,0 +1,49 @@
+#!/usr/bin/perl -w
+###APPNAME:     htmllinks
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Thu Mar 27 22:43:15 2008
+###APPVER:	0.1
+###APPDESC:     strip links from html source
+###APPUSAGE:	[BaseURL]
+###APPEXAMPLE:	cat index.htm | htmllinks www.google.com
+###APPOPTION:	
+use strict;
+use URI;
+use HTML::TreeBuilder;
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $base=shift;
+if($base) {
+    $base=URI->new($base);
+    $base="http://$base" unless($base->scheme);
+}
+
+my $tree=HTML::TreeBuilder->new();
+while(<STDIN>) {
+    $tree->parse($_);
+}
+$tree->eof();
+if($base) {
+    foreach my $node($tree->find("a","link")){
+        my $url=$node->attr("href");
+        print URI->new_abs($url,$base),"\n" if($url);
+    }
+    foreach my $node($tree->find("img")){
+        my $url=$node->attr("src");
+        print URI->new_abs($url,$base),"\n" if($url);
+    }
+}
+else {
+    foreach my $node($tree->find("a","link")){
+        my $url=$node->attr("href");
+        print ("$url\n") if($url);
+    }
+    foreach my $node($tree->find("img")){
+        my $url=$node->attr("src");
+        print ("$url\n") if($url);
+    }
+}
+$tree->delete();
+exit 0

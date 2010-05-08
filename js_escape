@@ -1,0 +1,21 @@
+#!/usr/bin/perl -W
+use encoding utf8;
+use Encode;
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+sub escape {
+  my $str = shift || '';
+  $str =~ s/([^\n()?%a-zA-Z0-9])/sprintf("%%u%04X",ord($1))/eg;
+  $str;
+}
+if (@ARGV < 1) {
+    foreach(<STDIN>) {
+        print(&escape($_));
+    }
+}
+else {
+    foreach(@ARGV) {
+        print(&escape((decode("utf8",$_))));        
+    }
+}

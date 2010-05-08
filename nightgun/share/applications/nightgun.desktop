@@ -1,0 +1,16 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Exec=nightgun
+Icon=nightgun
+StartupNotify=true
+Terminal=false
+Categories=Utility;MyPlace;Reader;TextEditor;GTK
+MimeType=application/x-ace;application/x-ar;application/x-arj;application/x-bzip;application/x-bzip-compressed-tar;application/x-compress;application/x-compressed-tar;application/x-cpio;application/x-deb;application/x-gtar;application/x-gzip;application/x-lha;application/x-lhz;application/x-rar;application/x-rar-compressed;application/x-tar;application/x-zip;application/x-zip-compressed;application/zip;multipart/x-zip;application/x-rpm;application/x-jar;application/x-war;application/x-ear;application/x-java-archive;application/x-lzma;application/x-lzma-compressed-tar;application/x-lzop;application/x-zoo;application/x-cd-image;application/x-7z-compressed;text/plain;text/html
+Name=Nightgun Text Viewer
+Comment=Reading
+GenericName=Nightgun Text Viewer
+Name[zh_CN]=夜枪
+Comment[zh_CN]=文本阅读器
+GenericName[zh_CN]=文本阅读器
+Encoding=UTF-8

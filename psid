@@ -1,0 +1,37 @@
+#!/usr/bin/perl -w
+###APPNAME:     psid
+###APPAUTHOR:   root
+###APPDATE:	Sat Sep 29 08:24:53 2007
+###APPVER:	0.1
+###APPDESC:     Return pid of the process name\nTake the same options as ps	
+###APPUSAGE:	[options...] (process name)
+###APPEXAMPLE:	psid -A mplayer
+use strict;
+$ARGV[0]="--help" unless(@ARGV);
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+my $OPTIONS="";
+my $NAME=$ARGV[@ARGV-1];
+for(my $i=0;$i<@ARGV-1;$i++) {
+    $OPTIONS .= " " . $ARGV[$i];
+}
+#print STDERR "Name:$NAME\nOptions:$OPTIONS\n";
+my @PSOUT=`ps $OPTIONS`;
+my @DebugInfo;
+my @PSID;
+foreach(@PSOUT) {
+    if(m/^\s*([0-9]+)\s+.*\b$NAME\b\s*$/gm) {
+        push @PSID,"$1";
+        push @DebugInfo,$_;
+    }
+}
+if(@DebugInfo) {
+    print STDERR "Process found:\n";
+    print STDERR @DebugInfo;
+}
+if(@PSID) {
+    print STDOUT join(" ",@PSID),"\n";
+}
+else {
+    print STDERR "Process \"$NAME\" not found\n";
+}

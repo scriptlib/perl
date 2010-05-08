@@ -1,0 +1,23 @@
+#!/usr/bin/perl -w
+###APPNAME:     loop_run
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 25 21:25:10 2008
+###APPVER:	0.1
+###APPDESC:     run and loop,based on time	
+###APPUSAGE:	(seconds) (cmd) [args...]
+###APPEXAMPLE:	
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+my $wait=shift;
+my $cmd=shift;
+my $count=0;
+while(1) {
+    $count++;
+    print STDERR ("[$count] Executing \"$cmd\" @ARGV...");
+    system("$cmd",@ARGV);
+    sleep $wait;
+}

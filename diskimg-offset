@@ -1,0 +1,53 @@
+#!/usr/bin/perl -w
+###APPNAME:     diskimg-offset
+###APPAUTHOR:   root
+###APPDATE:	Sun Oct  7 01:36:57 2007
+###APPVER:	0.1
+###APPDESC:     calculate partition offset of disk image.	
+###APPUSAGE:	(disk image file) (partition NUM)
+###APPEXAMPLE:	diskimg-offset disk.img 1
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+my $disk=shift;
+my $num=shift;
+
+die("File not exists\n") unless(-f $disk);
+$num=1 unless(defined($num));
+
+if($num == 0) {
+    print "0\n";
+    exit 0
+}
+
+my $name=$disk;
+#$name =~ s/.*\///;
+
+#my %fstype=(
+#    "83"=>"ext2",
+#    "82"=>"swap",
+#    "5"=>"",
+#    "6"=>"vfat",
+#    "b"=>"vfat",
+#);
+my $unitsize=512;
+
+open(TABLE,,"-|","/sbin/fdisk -ul $disk 2>/dev/null") or die("$!\n");
+
+while(<TABLE>) {
+#    print $_;
+    chomp;
+    #                      Device Boot      Start         End      Blocks   Id  System 
+    #/myplace/emuos/tinycore.img1   *          63      101807       50872    6  FAT1
+    if(m{$name$num\s+\*?\s+(\d+)\s+(\d+)\s+(\d+)\s+([a-z0-9]+)\s+([a-zA-z0-9]+)$}) {
+        my $fsid = $1;
+        print ($fsid*$unitsize,"\n");
+        last;
+    }
+}
+close TABLE;
+
+

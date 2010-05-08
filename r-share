@@ -1,0 +1,71 @@
+#!/usr/bin/perl -w
+###APPNAME:     r-share
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	2009-01-21 14:29:59
+###APPVER:	0.1
+###APPDESC:     r-share	
+###APPUSAGE:	
+###APPEXAMPLE:	r-share
+###APPOPTION:	
+use strict;
+
+my @files = @ARGV;
+unless(@files) {
+    while(<STDIN>) {
+       chomp;
+       push @files,$_;
+    }
+}
+#use Data::Dumper;print STDERR Dumper(\@files),"\n";
+print STDERR  "Get ",scalar(@files), " files\n";
+my $isroot = ($< == 0 or $ENV{USER} eq "root" or $ENV{USERNAME} eq "root");
+
+my @have_x;
+my @no_x;
+
+my $need_root = undef;
+foreach(@files) {
+    -x $_ ? push @have_x,$_ : push @no_x,$_;
+    if(not $isroot) {
+        unless(-o $_) {
+            $need_root=$_;
+            last;
+        }
+    }
+}
+if($need_root) {
+    print STDERR "No WRITE permission for $need_root\n";
+    print STDERR "Become superuser first\n";
+    open FO,"|-","sudo",$0,@ARGV or die("$!\n");
+    print FO "$_\n" foreach(@files);
+    close FO;
+    exit 0;
+}
+
+sub split_array {
+    my $max=shift;
+    my @arr=@_;
+    my @result;
+    while(@arr>$max) {
+        push @result,[splice(@arr,0,$max)];
+    }
+    push @result,[@arr] if(@arr);
+    return @result;
+}
+system("chown","-v","xiaoranzzz:myplace",@no_x,@have_x);
+@no_x = split_array(256,@no_x);
+foreach(@no_x) {
+#    print STDERR "run1\n";
+    system("chmod","-v","0664","--",@{$_});
+}
+
+@have_x = split_array(256,@have_x);
+foreach(@have_x) {
+    system("chmod","-v","0775","--",@{$_});
+}
+
+
+
+
+
+

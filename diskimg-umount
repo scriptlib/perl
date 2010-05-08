@@ -1,0 +1,75 @@
+#!/usr/bin/perl -w
+###APPNAME:     diskimg-umount
+###APPAUTHOR:   root
+###APPDATE:	Sun Oct  7 01:45:28 2007
+###APPVER:	0.1
+###APPDESC:     unmount partitions of disk image	
+###APPUSAGE:	(diskimage name) 
+###APPEXAMPLE:	diskimg-umount disk.img 
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+#die("You must be root for running $0.\n") unless($>==0);
+
+my $disk=shift;
+
+sub sudo_system {
+    if ($>==0) {
+        return (system(@_)==0);
+    }
+    else {
+        return (system("sudo",@_)==0);
+    }
+}
+
+sub sudo_qx($) {
+    if ($>==0) {
+        return `$_[0]`;
+    }
+    else {
+        return `sudo $_[0]`;
+    }
+}
+
+sub umount($) {
+    my $loopdev=shift;
+    print STDERR ("Unmounting $_...\n");
+    sudo_system("umount",$_) or print STDERR ("$!\n");
+    print STDERR ("Delete loopback device $_...\n");
+    sudo_system("losetup","-vd",$_) or print STDERR ("$!\n");
+}
+
+open(TABLE,"mount|") or die("$!\n");
+
+my @m_loop;
+while(<TABLE>) {
+    chomp;
+    if(m/^(\/dev\/loop.*)\s+on\s+/) {
+        push @m_loop,$1;
+    }
+}
+close TABLE;
+
+my $match=0;
+foreach(@m_loop) {
+    if($_ eq $disk) {
+        &umount($_);
+        $match++;
+    }
+    else {
+        my $info=sudo_qx("/sbin/losetup $_ 2>/dev/null");
+        chomp($info);
+        print $info,"\n";
+        if($info =~ m/\s*\($disk\)\s*,\s*offset/ or $info =~ m/\($disk\)\$*$/) {
+            &umount($_);
+            $match++;
+        }
+    }
+}
+print STDERR "$disk not mounted\n" unless($match);
+
+

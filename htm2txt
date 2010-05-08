@@ -1,0 +1,64 @@
+#!/usr/bin/perl -w
+###APPNAME:     htm2txt
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 11 05:03:49 2008
+###APPVER:	0.1
+###APPDESC:     convert html file download from book.sina.bom.cn to txt	
+###APPUSAGE:	[htmlfile] [[-r rootId,[rootId,...]] [-f filter,[filter,...]] [-s regexp -e regexp]]
+###APPEXAMPLE:	htm2txt booksrc/1.shtml "content,article" "sina.com" \n\tcat booksrc/1.shtml | htm2txt
+###APPOPTION:   -r:rootIds|-f:filters|-s:starting mark|-e ending mark	
+use strict;
+use HTML::TreeBuilder;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_required/;
+use MyPlace::HTML::Convertor;
+
+exit 0 if(help_required($0,@ARGV));
+
+my $fn;
+my @rootid = ();
+my @filter = ();
+my $start;
+my $end;
+my $what="";
+
+if(@ARGV) {
+    foreach my $opt (@ARGV) {
+        if($opt =~ /^-[rfse]$/) {
+            $what=$opt;
+            next;
+        }
+        else {
+            if($what eq "-r") {                
+                push @rootid,split(",",$opt);
+            }
+            elsif($what eq "-f") {
+                push @filter,split(",",$opt);
+            }
+            elsif($what eq "-s") {
+                $start = $opt;
+            }
+            elsif($what eq "-e") {
+                $end = $opt;
+            }
+            else {
+                $fn=$opt;
+            }
+        }
+    }
+    if(!$fn) {
+        $fn="/dev/stdin";
+    }
+}
+else {
+    $fn="/dev/stdin";
+}
+
+open FI,"<",$fn or die("$!\n");
+my @src=<FI>;
+close FI;
+
+my @result = @{text_from_string(\@src,$start,$end,\@rootid,\@filter)};
+print @result;
+
+

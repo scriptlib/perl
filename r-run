@@ -1,0 +1,56 @@
+#!/usr/bin/perl -w
+###APPNAME:     r-run
+###APPAUTHOR:   duel
+###APPDATE:	2009-02-23 00:48:38
+###APPVER:	0.1
+###APPDESC:     r-run	
+###APPUSAGE:	
+###APPEXAMPLE:	r-run
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+use MyPlace::ReEnterable;
+my $hnd = MyPlace::ReEnterable->new('main');
+
+sub process {
+    my $cmd = shift;
+    my $r=system($cmd,@_);
+    &sig_int if($r eq 2);
+}
+
+sub sig_int {
+    if($hnd->{lastStack}) {
+        $hnd->pushStack(@{$hnd->{lastStack}});
+    }
+    $hnd->saveToFile(".r-run.resume");
+    exit 1;
+}
+
+$SIG{INT}=\&sig_int;
+
+
+unless($hnd->loadFromFile(".r-run.resume")) {
+    foreach(1 .. 10) {
+        $hnd->pushStack(undef,'process',"echo",$_);
+    }
+    $hnd->pushStack(undef,'process','ls','-a','-l');
+    $hnd->pushStack(undef,'process','cat');
+    $hnd->pushStack(undef,'process','help');
+}
+else {
+    print STDERR "Loading resume...\n";
+}
+until($hnd->isEmpty) {
+    $hnd->run();
+}
+unlink ".r-run.resume";
+exit 0;
+

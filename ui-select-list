@@ -1,0 +1,64 @@
+#!/usr/bin/perl -w
+###APPNAME:     ui-select-list
+###APPAUTHOR:   duel
+###APPDATE:	2009-02-08 19:31:24
+###APPVER:	0.1
+###APPDESC:     ui-select-list	
+###APPUSAGE:    (title) (items ...)
+###APPEXAMPLE:	ui-select-list
+###APPOPTION:	ui-select-list "Where to go?" "goto hell" "goto heaven"
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+my $app = "whiptail";
+my $title=shift;
+my @items=@ARGV;
+
+unless(@items) {
+    print STDERR ("Usage: $0 <title> <items...>\n");exit 0;
+}
+
+my $width=length($title) + 8;
+my $list_height = 1 * @items;
+my $height= $list_height + 8;
+
+my @cmdline;
+
+my $idx = 0;
+foreach(@items) {
+    $idx++;
+    my $len = length($_) + 8;$width = $len if($len>$width);
+    push @cmdline,$idx,"- $_";
+}
+
+unshift @cmdline,$app,"--menu",$title,$height,$width,$list_height,"--";
+use File::Temp qw/tempfile/;
+my (undef,$filename) = tempfile();
+my $fh;
+my $olderr;
+open $olderr,">&",\*STDERR;
+open $fh,">",$filename;
+open STDERR,">&",$fh;
+my $r = system(@cmdline);
+close $fh;
+open STDERR,">&",$olderr;
+
+
+exit 0 unless($r == 0);
+
+open $fh,"<",$filename;
+$r=<$fh> || 0;
+close $fh;
+$r =~ s/^\s*(\d+).*$/$1/;
+exit $r;
+
+
+

@@ -1,0 +1,122 @@
+#!/usr/bin/perl -w
+###APPNAME:     htmlconv_filecase
+###APPAUTHOR:   duel
+###APPDATE:	2009-04-17 01:08:39
+###APPVER:	0.1
+###APPDESC:     htmlconv_filecase	
+###APPUSAGE:	[-u] directory
+###APPEXAMPLE:	htmlconv_filecase chm_directory
+###APPOPTION:	-u:Convert to upper case
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+#exit 0 if(help_required($0,@ARGV));
+exit 0 if(help_even_empty($0,@ARGV));
+
+my $UPPER;
+my @FOLDERS;
+
+foreach(@ARGV) {
+    if($_ eq "-u") {
+        $UPPER=1;
+    }
+    elsif(-d $_) {
+        push @FOLDERS,$_;
+    }
+    else {
+        die("\"$_\" isn't a valid option,neither a directory\n");
+    }
+}
+push @FOLDERS,"." unless(@FOLDERS);
+
+sub slurp {
+    my $file = shift;
+    local ($/,*FH);
+    open FH,"<",$file;
+    my $result = <FH>;
+    close FH;
+    return $result;
+}
+
+sub do_case {
+    my $old = shift;
+    my $new = $UPPER ? uc($old) : lc($old);
+    unless($new eq $old) {
+        print STDERR "Converting $old -> $new ... ";
+        rename $old,$new or die("$!\n");
+        print STDERR "\n";
+    }
+    return $new;
+}
+use File::Spec::Functions;
+sub dirtree {
+    my @result;
+    my $dir = &do_case(shift);
+    print STDERR "dirtree(): processing \"$dir\"\n";
+    opendir DIR,$dir or die("$!\n");
+    my @subdir;
+    if($dir eq ".") {
+        foreach(readdir(DIR)) {
+            next if($_ eq '.' or $_ eq '..');
+            $_ = do_case($_);
+            push @result,$_;
+            push @subdir,$_ if(-d $_);
+        }
+    }
+    else {
+        foreach(readdir(DIR)) {
+            next if($_ eq '.' or $_ eq '..');
+            my $path = do_case(catfile($dir,$_));
+            push @result,$path;
+            push @subdir,$path if(-d $path);
+        }
+    }
+    close DIR;
+    push @result,&dirtree($_) foreach(@subdir);
+    return @result;
+}
+
+my $FILE_EXP = '\.\w{1,8}';
+my $EXP = qr/((?:=\s*[^'"\s\n\r]+$FILE_EXP[\s\>\<]|"[^"\n\r]+$FILE_EXP"|'[^'\n\r]+$FILE_EXP'))/i;
+my $REPLACE = $UPPER ? '\U$1\E' : '\L$1\E';
+
+#test exp
+#while(<STDIN>) {
+#    s/$EXP/\L$1\E/g;
+#    print $_;
+#}
+#exit 0;
+
+
+foreach(@FOLDERS) {
+    print STDERR "Processing $_ ...\n";
+    my @tree = dirtree($_);
+    unless(@tree) {
+        print STDERR "\tNothing to do\n";
+        next;
+    }
+#    my @exp = build_exp(\@tree);
+#    use Data::Dumper;die(Dumper(\@tree));
+#    use Data::Dumper;die(Dumper(\@exp));
+    foreach(@tree) {
+        if(/\.(?:html?|css|js)$/ and -f $_) {
+            print STDERR "Processing $_ ...\n";
+            my $text = slurp($_);
+            my $newtext = $text;
+            $UPPER ? $newtext =~ s/$EXP/\U$1\E/go : $newtext =~ s/$EXP/\L$1\E/go;
+            unless($newtext eq $text) {
+                print STDERR "Writing $_ ... ";
+                open FO,">:raw",$_ or die("$!\n");
+                print FO $newtext;
+                close FO;
+                print STDERR "\n";
+            }
+        }
+    }
+}
+1;

@@ -1,0 +1,72 @@
+#!/usr/bin/perl -w
+###APPNAME:     exec_threads
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Wed Mar 26 15:10:05 2008
+###APPVER:	0.1
+###APPDESC:     execute cmds using threads	
+###APPUSAGE:	(Number of threads)
+###APPEXAMPLE:	cat cmd.lst | exec_threads 3
+###APPOPTION:	
+use strict;
+use threads;
+
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $max=shift;
+die("Number must greater than 0\n") unless($max>0);
+
+sub process {
+    my $idx=shift;
+    $idx++;
+    print STDERR "\n[Thread $idx]",@_,"\n";
+    my $r=(system(@_));    
+    threads->exit($r);
+    return $r;
+}
+
+sub waitfor {
+    my @ths=@_;
+    while(1) {
+        my $idx=0;
+        foreach my $t(@ths) {
+            return $idx unless(defined($t));
+            if($t->is_joinable) {
+                $t->join();
+                return $idx;
+            }
+            $idx++;
+        }
+        sleep 1;
+    }
+}
+
+my @ths;
+while(<STDIN>) {
+    chomp;
+    my $cmd=$_;
+    my $idx;
+    next unless($cmd);
+    if(@ths>=$max) {
+        $idx=waitfor(@ths);
+#        print "\n[Thread:",($idx+1),"] End\n";
+        $ths[$idx]=threads->create(\&process,$idx,$cmd);
+    }
+    else {
+        $idx=@ths;
+        my $hnd=threads->create(\&process,$idx,$cmd);
+        push(@ths,$hnd);
+    }
+#   print "\n[Thread:",($idx+1),"] Start: $cmd\n";
+#    print STDERR "\n\n[T",($idx+1),"]:$cmd\n";
+}
+
+for(my $i=0;$i<@ths;$i++) {
+    next unless($ths[$i]);
+    next unless($ths[$i]->is_running() or $ths[$i]->is_joinable());
+    $ths[$i]->join();
+#    print "\n[Thread:",($i+1),"] End\n";
+}
+

@@ -1,0 +1,79 @@
+#!/usr/bin/perl -w
+###APPNAME:     htm2txt_lcyl
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 11 05:03:49 2008
+###APPVER:	0.1
+###APPDESC:     convert html file download from 鹿城娱乐 to text	
+###APPUSAGE:	[htmlfile...] 
+###APPEXAMPLE:	htm2txt_lcyl booksrc/1.shtml
+###APPOPTION:   	
+use strict;
+use HTML::TreeBuilder;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_required/;
+use MyPlace::HTML;
+
+exit 0 if(help_required($0,@ARGV));
+
+
+my @flist;
+
+if(@ARGV) {
+    push @flist,@ARGV;
+}
+else {
+    push @flist,"/dev/stdin";
+}
+
+sub getfilename($$) {
+    my $base=shift;
+    my $ext=shift;
+    my $inc = 0;
+    while(-f "$base$ext") {
+        $inc++;
+        $base = $base . $inc;
+    }
+    return "$base$ext";
+}
+
+my $index=0;
+my $count=@flist;
+foreach my $fn (@flist) {
+    my $title;
+    my @src;
+    my $dst;
+    
+    $index++;
+    open FI,"<",$fn or die("$!\n");
+    while(<FI>) {
+        push @src,$_;
+        $title = get_title($_) unless($title)
+    }
+    close FI;
+    
+    if(!$title) {
+        $title = $fn;
+        $title =~ s/^.*\///g;
+        $title =~ s/\.(html|htm)$//;
+    }
+    else {
+        $title =~ s/\[.*$//g;
+        $title =~ s/5u.*//g;
+    }
+    $dst = getfilename($title,".txt");
+    print STDERR "[$index/$count]$fn -> $dst ...";
+    if(! open FO,">",$dst) {
+        print STDERR ("\n$!\n");
+        next;
+    }
+    print FO $title,"\n","\n";
+    close FO;
+    
+    #my @result = @{text_from_string(\@src,$start,$end,\@rootid,\@filter)};
+    open FO,"|htm2txt -r NewsBody>>'$dst'";
+    print FO @src;
+    close FO;
+    print STDERR "\n";
+}
+
+    

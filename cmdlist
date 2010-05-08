@@ -1,0 +1,23 @@
+#!/usr/bin/perl -w
+use strict;
+use Env qw(PATH);
+use File::Glob;
+###APPNAME:	cmdlist
+###APPAUTHOR:	xiaoranzzz
+###APPDATE:	Mon Sep 17 04:30:20 2007
+###APPVER:	0.1
+###APPDESC:	
+###APPUSAGE:	[Glob Pattern]
+###APPEXAMPLE:	cmdlist "cmd*"
+###APPOPTION:	
+exit 0 unless(system("plhelp",$0,(@ARGV)));
+
+my $pat=$ARGV[0] ? $ARGV[0] : "*";
+
+foreach my $cmdDir(split /:/,$PATH) {
+    foreach (glob("$cmdDir/$pat")) {
+        print "$_\n";
+    }
+}
+
+

@@ -1,0 +1,140 @@
+#!/usr/bin/perl -w
+###APPNAME:     r-doc
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Thu Feb 14 14:30:06 2008
+###APPVER:	0.1
+###APPDESC:     search documents,load viewer for it
+###APPUSAGE:	(package name)
+###APPEXAMPLE:	r-doc gtk
+###APPOPTION:	
+use strict;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_even_empty/;
+exit 0 if(help_even_empty($0,@ARGV));
+
+my @topdir = ( "/usr/share/doc" , "/usr/local/share/doc" );
+my $dirname = $ARGV[0];
+my $docdir;
+my @viewer = (
+    qr/^man:/,\&view_man,
+    qr/^info:/,\&view_info,
+    qr/\.gz$/i,"zless",
+    qr/\.htm[l]$/i,"htmlview",
+    qr/\.pdf$/i,"evince",
+    qr/.*/,"less"
+);
+
+
+sub view_man {
+    my $file = shift;
+    $file =~ s/^man://;
+    if($file =~ /^\s*([^\(\s]+)\s*\((\d+)\)/) {
+        return not system("man",$2,$1);
+    }
+    else {
+        return not system("man",$file);
+    }
+}
+
+sub view_info {
+    my $file = shift;
+    $file =~ s/^info://;
+    if($file =~ /"([^"]+)"\s*--/) {
+        return not system("info",$1);
+    }
+    elsif(-f $file) {
+        return not system("info","-f",$file);
+    }
+    else {
+        return not system("info",$file);
+    }
+}
+
+
+sub listDoc(@) {
+    my $idx=0;
+    print("Documents list:\n");
+    print("------------------------------------------\n");
+    foreach(@_) {
+        $idx++;
+        printf("%4s. %s\n",$idx,$_);
+    }
+    print("__________________________________________\n");
+    print("Your Choice(q to quit):")
+}
+
+
+sub getInput() {
+    my $lines = <STDIN>;
+    chomp($lines);
+    if($lines eq "q" || $lines eq "Q") {
+        return 0;
+    }
+    else {
+        return $lines;
+    }
+}
+
+sub viewdoc($) {
+    my $file = shift;
+    return undef unless($file);
+    my $app;
+    for(my $idx=0;$idx<@viewer;$idx+=2) {
+        if($file =~ $viewer[$idx]) {
+            $app = $viewer[$idx+1];
+            last;
+        }
+    }
+    $app = "less" unless($app);
+    if(ref $app) {
+        return &$app($file);
+    }
+    else {
+        return not system($app,$file);
+    }
+}
+
+my @docs;
+foreach(@topdir) {
+    if(-d "$_/$dirname") {
+        $docdir = "$_/$dirname";
+    }
+}
+if($docdir) {
+    foreach(glob("$docdir/*")) {
+        if(-f "$_") {
+            push(@docs,$_);
+        }
+    }
+}
+open FI,"-|","man","--apropos",$dirname;
+while(<FI>) {
+  chomp;
+  push @docs,"man:$_" if($_);
+}
+close FI;
+
+open FI,"-|","info","--apropos",$dirname;
+while(<FI>) {
+    chomp;
+    push @docs,"info:$_" if($_);
+}
+close FI;
+
+die("No document found for $dirname\n") unless(@docs);
+if(@docs == 1) {
+    exit 0 if(viewdoc($docs[0]));
+    exit 1;
+}
+
+listDoc(@docs);
+while(my $choice = getInput()) {
+    if($choice>0 and $choice<=@docs) {
+        viewdoc($docs[$choice-1]);
+    }
+    listDoc(@docs);
+}
+
+exit 0;
+
+

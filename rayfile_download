@@ -1,0 +1,69 @@
+#!/usr/bin/perl -w
+###APPNAME:     rayfile_download
+###APPAUTHOR:   duel
+###APPDATE:	2009-01-27 04:52:02
+###APPVER:	0.1
+###APPDESC:     rayfile_download	
+###APPUSAGE:	(urls...)
+###APPEXAMPLE:	rayfile_download
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+use LWP::UserAgent;
+use HTTP::Cookies;
+
+my @urls = @ARGV;
+unless(@urls) {
+    while(<STDIN>) {
+        chomp;
+        push @urls,$_;
+    }
+}
+
+die("Error:no urls specified\n") unless(@urls);
+
+my  $ua = LWP::UserAgent->new;
+my $cookie = HTTP::Cookies->new(file => "$ENV{'HOME'}/.lwp_cookies.dat", autosave => 1);
+$ua->cookie_jar($cookie);
+$ua->agent("Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
+foreach my $url (@urls) {
+    $url = "http://$url" unless($url =~ /^http:/i);
+    my $req = HTTP::Request->new(GET => $url);
+    my $res = $ua->request($req);
+    if ($res->is_success) {
+        my @content = split(/\n/,$res->content);
+        my ($fileurl,$filename,$setcookie,$id,$digest);
+        foreach(@content) {
+            $id=$1 if(/var virtual_file_id = \"([^"]+)\";/);
+            $filename=$1 if(/virtual_file = \"([^"]+)\";/);
+            $fileurl=$1 if(/downloads_url = \[\'([^']+)\'\];/);
+            $digest =$1 if(/var digest = \'([^']+)\';/);
+        }
+        if($digest and $fileurl) {
+            $ua->cookie_jar->set_cookie(0,'ROXCDNKEY',$digest,"/zh-cn/download/$id/",".rayfile.com",undef,1,0,86400,0);
+            $filename ||= $fileurl;
+            $filename =~ s/^.*\///g;
+            print STDERR "$fileurl\n";
+            print STDERR "Downloading $filename ...";
+            if(-f $filename) {
+                print STDERR "\tFile exists\n";
+            }
+            else {
+                print STDERR "\n";
+                system("curl","-#","-b","ROXCDNKEY=$digest","-o",$filename,"--url",$fileurl);
+            }
+        }
+    }
+    else {
+        print STDERR $res->status_line, "\n";
+    }
+} 

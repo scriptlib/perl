@@ -1,0 +1,55 @@
+#!/usr/bin/perl -w
+###APPNAME:     r-emerge
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Mon Apr  7 11:17:22 2008
+###APPVER:	0.1
+###APPDESC:     Invoke emerge as sudo if need,with --ask --verbose options added
+###APPUSAGE:	
+###APPEXAMPLE:
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+exit system("emerge") unless(@ARGV);
+
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+
+use MyPlace::Script::Sudo qw/is_root/;
+
+exit system("emerge","-av",@ARGV) if(is_root);
+
+my $needroot=1;
+my $needask=1;
+
+foreach(@ARGV) {
+    if(/^--(pretend|help|search|info|fetchonly|fetch-all-uri)$/) {
+        my $optstr=$1;
+        $needask=0 if($optstr =~ /^(pretend|ask)$/);
+        $needroot=0;
+        next;
+    }
+    elsif(/^-([^-]+)$/) {
+        my $optstr=$1;
+        $needroot=0 if($optstr =~ /[pSsFf]/);
+        $needask=0 if($optstr =~ /[pa]/);
+        next;
+    }
+}
+my @arg;
+push @arg,"--ask" if($needask);
+push @arg,"--verbose";
+
+if($needroot) {
+    print STDERR "Run as superuser...\n";
+    exec("sudo","emerge",@arg,@ARGV);
+}
+else {
+    exec("emerge",@arg,@ARGV);
+}
+

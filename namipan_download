@@ -1,0 +1,72 @@
+#!/usr/bin/perl -w
+###APPNAME:     namipan_download
+###APPAUTHOR:   duel
+###APPDATE:	2009-01-27 04:52:02
+###APPVER:	0.1
+###APPDESC:     namipan_download	
+###APPUSAGE:	(urls...)
+###APPEXAMPLE:	namipan_download
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+use LWP::UserAgent;
+use HTTP::Cookies;
+use URI::Escape;
+
+my @urls = @ARGV;
+unless(@urls) {
+    while(<STDIN>) {
+        chomp;
+        push @urls,$_;
+    }
+}
+
+die("Error:no urls specified\n") unless(@urls);
+
+my  $ua = LWP::UserAgent->new;
+my $cookie = HTTP::Cookies->new(file => "$ENV{'HOME'}/.lwp_cookies.dat", autosave => 1);
+$ua->cookie_jar($cookie);
+$ua->agent("Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
+foreach my $url (@urls) {
+    $url = "http://$url" unless($url =~ /^http:/i);
+    my $req = HTTP::Request->new(GET => $url);
+    my $res = $ua->request($req);
+    if ($res->is_success) {
+		print STDERR "$url\n";
+        my @content = split(/\n/,$res->content);
+        my ($fileurl,$filename);
+        foreach(@content) {
+            $filename=$1 if(/\<H2 class=above\>([^\<\>]+)<\/H2\>/);
+            if(/(namipan\.com\/downfile)\/([^\/]+)\/([^\s'"\/]+)['"]/) {
+                $url = "http://www.$1/$2/$3";
+                $fileurl = "http://img.$1/$3/$2";
+                last;
+            }
+        }
+        next unless($fileurl);
+        $filename ||= $fileurl;
+         $filename =~ s/^.*\///g;
+		 $filename = uri_unescape($filename);
+        print STDERR "$fileurl\n";
+        print STDERR "Downloading $filename ...";
+        if(-f $filename) {
+            print STDERR "\tFile exists\n";
+        }
+        else {
+            print STDERR "\n";
+            system("curl",'-b',$cookie,"-#","-L","-o",$filename,"--url",$fileurl,"--refer",$url);
+        }
+    }
+    else {
+        print STDERR $res->status_line, "\n";
+    }
+} 

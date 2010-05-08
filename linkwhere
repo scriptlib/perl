@@ -1,0 +1,4 @@
+#!/usr/bin/perl -w
+foreach(@ARGV) {
+    print readlink($_),"\n";
+}

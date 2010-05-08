@@ -1,0 +1,221 @@
+#!/usr/bin/perl -w
+###APPNAME:     urlrule_action
+###APPAUTHOR:   duel
+###APPDATE:	Mon Mar 24 06:25:31 2008
+###APPVER:	0.1
+###APPDESC:     apply rule for URL,and perform action	
+###APPUSAGE:	urlrule_action URL [0-5] [action args...]
+###APPEXAMPLE:	urlrule_action http://www.sina.com.cn 0 cat
+use strict;
+use Data::Dumper;
+
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_even_empty($0,@ARGV));
+
+use URI;
+use MyPlace::Script::Message;
+use MyPlace::URLRule;
+use MyPlace::String;
+use MyPlace::ReEnterable;
+use Cwd qw/getcwd/;
+
+
+my $RESUME_FILE = '.urlrule_resume';
+my $phnd = MyPlace::ReEnterable->new('main');
+
+
+
+no warnings;
+
+my %cached_rule;
+my @prompt;
+sub code_message {
+    my $code = shift;
+    print STDERR @_;
+    return $code;
+}
+
+
+sub start_rule {
+
+    my %rule = %{parse_rule(@_)};
+    
+    my $url=$rule{"url"};
+    my $domain = $rule{"domain"};
+    my $source = $rule{"source"};
+    my $level = $rule{"level"};
+    my $action = $rule{"action"};
+    my @args = $rule{"args"} ? @{$rule{"args"}} : ();
+    my $msghd = "";
+    
+    unless(-f $source) {
+        app_error("File not found: $source\n");
+        return;
+    }
+    unless(defined $cached_rule{$source}) {
+        open FI,"<",$source;
+        $cached_rule{$source}=join("",<FI>);
+        close FI;
+    }
+    eval $cached_rule{$source} if($cached_rule{$source});
+    
+    app_error("$@\n") if($@);
+    app_message(@prompt,$msghd,"For \"$url\"\n");
+    app_message(@prompt,$msghd , "Level $level>>","Found rule: \"$source\"\n");
+    app_message(@prompt,$msghd , "Level $level>>","Applying it ...\n");
+    
+    my %result=apply_rule($url,\%rule);
+    
+    #print STDERR "Result:\n",Dumper(\%result),"\n";
+    #$result{base}=$url unless($result{base});
+    #$result{pass_arg}=$result{work_dir} unless($result{pass_arg});
+    
+    if($result{work_dir}) {
+#        push @prompt,"[" . $result{work_dir} . "]";
+        mkdir $result{work_dir} unless(-d $result{work_dir});
+        chdir $result{work_dir} or return code_message(undef,"$!\n");
+    }
+    
+    if($result{data} and @{$result{data}}) {
+        my $count=@{$result{data}};
+        my $file=$result{file};
+        $file =~ s/\s*\w*[\/\\]\w*\s*//g if($file);
+        my $pipeto=$action ? $action : $result{action};
+        $pipeto = $pipeto ? $pipeto : $result{pipeto} ;
+        if($file) {
+            app_message($msghd , "Level $level>>","Get $count Lines,performing action:(FILE:$file)...\n");
+            if (-f $file) {
+                app_warning($msghd , "Level $level>>","Ingored (File exists)...\n");
+            }
+            else {
+                open FO,">",$file or die("$!\n");
+                print FO @{$result{data}};
+                close FO;
+                app_message($msghd , "Level $level>>","Action (FILE:$file) done!\n");
+            }
+        }
+        elsif($pipeto) {
+            $pipeto .= ' "' . join('" "',@args) . '"' if(@args);
+            app_message($msghd , "Level $level>>","Get $count Lines,performing action:($pipeto)...\n");
+            open FO,"|-",$pipeto;
+            foreach my $line (@{$result{data}}) {
+                $line = URI->new_abs($line,$result{base}) if($result{base});
+                print FO $line,"\n";
+            }
+            close FO;
+            &sig_killed if($? eq 2);
+            app_message($msghd , "Level $level>>","Action ($pipeto) done!\n");
+        }
+        elsif($result{hook}) {
+            app_message($msghd , "Level $level>>","Get $count Lines, processing...\n");
+            my $index=0;
+            foreach my $line(@{$result{data}}) {
+                $index ++;
+                my @msg = ref $line ? @{$line} : ($line);
+                app_message($msghd , "Level $level>>[$index/$count] ",join(" ",@msg),"\n");
+                $line = URI->new_abs($line,$result{base}) if($result{base});
+                my $nsg = process_data($line,\%result);
+                &sig_killed if($nsg && $nsg eq 2);
+                if($nsg) {
+                    app_message($msghd , "Level $level>>$nsg") unless($nsg eq "1");
+                }
+                else {
+                    app_message($msghd , "Level $level>>Error when processing,Abort!\n");
+                    last;
+                }
+            }
+        }
+        else {
+            foreach my $line(@{$result{data}}) {
+                $line = URI->new_abs($line,$result{base}) if($result{base});
+                app_message($msghd , "Level $level>>$line\n");
+            }
+        }
+    }
+    
+    if($result{pass_data} and @{$result{pass_data}}) {
+        $result{pass_arg}="" unless($result{pass_arg});
+        my @data;
+        if($result{base}) {
+            push(@data,URI->new_abs($_,$result{base})->as_string) foreach(@{$result{pass_data}});
+        }
+        else {
+            @data=@{$result{pass_data}};
+        }
+        my @subdirs;
+        @subdirs=@{$result{pass_name}} if($result{pass_name});
+        unless($result{no_subdir} and @subdirs) {
+            my $len = length(@data);
+            for(my $i=0;$i<@data;$i++) {
+                push(@subdirs,strnum($i+1,$len));
+            }
+        }
+        $level--;
+        $level = $result{pass_level} if(exists $result{pass_level});
+        my @ACTARG=($level,$action);
+        unshift (@ACTARG,"domain:" . $result{pass_domain}) if($result{pass_domain});
+        my $count=@data;
+        app_message($msghd , "Level $level>>","$count urls pass down to level $level\n");
+    #    open FO,"|-","tasks","-n","urlrule$level-" . localtime(),"-p","urlrule_action",@ACTARG;
+        for(my $i=0;$i<$count;$i++) {
+            unless($result{no_subdir}) {
+                my $dir=$subdirs[$i];
+                mkdir $dir unless(-d $dir);
+                chdir $dir or return code_message(undef,"$!\n");
+            }
+            app_message($msghd , "Level $level>>","[" . ($i + 1) . "/$count] $data[$i]\n");
+            push @prompt,"[" . ($i+1) . "/$count" . "]";
+            if($result{pass_arg}) {
+                $phnd->push(getcwd(),'load_rule',$data[$i],@ACTARG,$result{pass_arg}->[$i]);
+            }
+            else {
+                $phnd->push(getcwd(),'load_rule',$data[$i],@ACTARG);
+            }
+            chdir ".." unless($result{no_subdir});
+            pop @prompt;
+        }
+    #    close FO;
+    }
+}
+
+sub load_rule {
+    my $cwd = getcwd();
+    start_rule(@_);
+    chdir $cwd if($cwd);
+}
+
+$SIG{INT} = \&sig_killed;
+my $cwd = getcwd();
+
+sub sig_killed {
+    app_message("saving remained tasks...\n");
+    if($phnd->{lastStack}) {
+        $phnd->unshift(@{$phnd->{lastStack}});
+    }
+    chdir($cwd) if($cwd);
+    $phnd->saveToFile($RESUME_FILE);
+    app_message($phnd->length," tasks saved to $RESUME_FILE\n");
+    exit 1;
+}
+
+if(@ARGV) {
+    $phnd->push($cwd,'load_rule',@ARGV);
+}
+else {
+    $phnd->loadFromFile($RESUME_FILE);
+}
+while(my $tasks = $phnd->length) {
+    app_error("[$tasks] tasks remained\n");
+    my @this = $phnd->peek();
+    if(@this) {
+        my $wdir = shift @this;
+        my $cmd = shift @this;
+#        app_warning("rule       -  @this\n");
+#        app_warning("directory  -  $wdir\n");
+    }
+    $phnd->run();
+}
+unlink $RESUME_FILE if(-f $RESUME_FILE);
+exit 0;
+#load_rule(@ARGV);

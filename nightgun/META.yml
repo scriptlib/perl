@@ -1,0 +1,90 @@
+---
+name: nightgun
+version: 1.1
+author:
+  - 'xiaoranzzz xiaoranzzz@gmail.com'
+abstract: A text archives reader
+license: perl
+build_requires:
+  File::Path: 0
+  Module::Build: 0.28
+  Test::More: 0
+requires:
+  Encode: 0
+  File::BaseDir: 0.03
+  File::Copy: 0
+  File::DesktopEntry: 0.03
+  File::MimeInfo: 0.12
+  File::Spec: 0
+  Gtk2: 1.040
+  Gtk2::GladeXML: 0
+  Gtk2::MozEmbed: 0
+  IO::File: 0
+  POSIX: 0
+  perl: v5.8.0
+configure_requires:
+  Module::Build: 0.340201
+dynamic_config: 1
+generated_by: Module::Build version 0.340201
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+provides:
+  MyPlace::Archive:
+    file: lib/MyPlace/Archive.pm
+  MyPlace::Archive::7z:
+    file: lib/MyPlace/Archive/7z.pm
+  MyPlace::Archive::7za:
+    file: lib/MyPlace/Archive/7za.pm
+  MyPlace::Archive::7zr:
+    file: lib/MyPlace/Archive/7zr.pm
+  MyPlace::Archive::Bzip2:
+    file: lib/MyPlace/Archive/Bzip2.pm
+  MyPlace::Archive::Gzip:
+    file: lib/MyPlace/Archive/Gzip.pm
+  MyPlace::Archive::Rar:
+    file: lib/MyPlace/Archive/Rar.pm
+  MyPlace::Archive::Tar:
+    file: lib/MyPlace/Archive/Tar.pm
+  MyPlace::Archive::Zip:
+    file: lib/MyPlace/Archive/Zip.pm
+  MyPlace::Encode:
+    file: lib/MyPlace/Encode.pm
+    version: 1
+  MyPlace::Gtk2:
+    file: lib/MyPlace/Gtk2.pm
+    version: 1
+  MyPlace::Gtk2::SCComboBox:
+    file: lib/MyPlace/Gtk2/SCComboBox.pm
+  NightGun:
+    file: lib/NightGun.pm
+  NightGun::App:
+    file: lib/NightGun/App.pm
+  NightGun::Debug:
+    file: lib/NightGun/Debug.pm
+  NightGun::Encode:
+    file: lib/NightGun/Encode.pm
+  NightGun::Gui:
+    file: lib/NightGun/Gui.pm
+  NightGun::Gui::ContentView:
+    file: lib/NightGun/Gui/ContentView.pm
+  NightGun::History:
+    file: lib/NightGun/History.pm
+  NightGun::Store:
+    file: lib/NightGun/Store.pm
+  NightGun::Store::Archive:
+    file: lib/NightGun/Store/Archive.pm
+  NightGun::Store::Base:
+    file: lib/NightGun/Store/Base.pm
+  NightGun::Store::Files:
+    file: lib/NightGun/Store/Files.pm
+  NightGun::Store::WWW:
+    file: lib/NightGun/Store/WWW.pm
+  NightGun::Store::WebSaver:
+    file: lib/NightGun/Store/WebSaver.pm
+  NightGun::Store::Zbook:
+    file: lib/NightGun/Store/Zbook.pm
+  NightGun::StoreLoader:
+    file: lib/NightGun/StoreLoader.pm
+resources:
+  license: http://dev.perl.org/licenses/

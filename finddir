@@ -1,0 +1,74 @@
+#!/usr/bin/perl -w
+###APPNAME:     finddir
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sat Feb 16 00:57:32 2008
+###APPVER:	0.1
+###APPDESC:     Search directory	
+###APPUSAGE:	[base] [names]
+###APPEXAMPLE:	finddir /usr/share/doc mplayer
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV && @ARGV>1);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+sub buildpattern($) {
+    my $keyword=shift;
+    my @result=(
+        $keyword,
+        $keyword . "*",
+        "*" . $keyword,
+        "*" . $keyword . "*"
+    );
+    return @result;
+}
+sub process($$) {
+    my $basedir = shift;
+    my $pattern = shift;
+    chdir($basedir);
+    my @files=glob($pattern);
+    my @result;
+    foreach(@files) {
+        push(@result,$_) if(-d $_);
+    }
+    return @result;
+}
+
+sub unique_merge(\@\@) {
+    my @a=@{$_[0]};
+    my @b=@{$_[1]};
+    my @result;
+    return @a unless(@b);
+    return @b unless(@a);
+    foreach my $B(@b) {
+        my $match=0;
+        foreach my $A(@a) {
+            if($B eq $A) {
+                $match=1;
+                last;
+            }
+        }
+        push(@result,$B) unless($match);
+    }
+    foreach(@result) {
+        push(@a,$_);
+    }
+    return @a;
+}
+
+
+my $basedir=shift;
+my $keyword=shift;
+my @pattern=buildpattern($keyword);
+
+my @all;
+
+foreach(@pattern) {
+    my @result=process($basedir,$_);
+    @all=unique_merge(@all,@result) if(@result)
+}
+
+    print("$basedir/$_\n") foreach(@all);
+
+

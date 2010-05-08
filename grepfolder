@@ -1,0 +1,72 @@
+#!/usr/bin/perl -w
+###APPNAME:     grepfolder
+###APPAUTHOR:   duel
+###APPDATE:	2008-04-27 04:28:33
+###APPVER:	0.1
+###APPDESC:     Test if files in folder contain specified keywords
+###APPUSAGE:	[--move] keyword,[keyword,...] folders...
+###APPEXAMPLE:	grepfolder --move Perl *
+###APPOPTION:	--move:Move folder to directory of keyword if matched
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty format_help/;
+exit 0 if(help_even_empty($0,@ARGV));
+
+#!/usr/bin/perl -w
+use strict;
+
+
+my $move=shift;
+my $keystr;
+unless($move eq "--move") {
+    $keystr=$move;
+    $move=0;
+}
+else {
+    $keystr = shift;
+}
+my @keywords=split(",", $keystr );
+my @folders=@ARGV;
+
+exit(format_help($0)) unless(@folders);
+
+foreach my $folder (@folders) {
+    my $match=0;
+    my @text;
+    my %hits;
+    foreach my $file (glob("$folder/*")) {
+        next unless(-f $file and $file =~ /\d+\.htm$/);
+        open FI,"<",$file;
+        while(my $line=<FI>) {
+            my $linehit;
+            foreach my $key(@keywords) {
+                next if($hits{$key});
+                if($line =~ m/(\S{0,24}$key\S{0,24})/) {
+                    next if($1 =~ m/(?:本以为是|谢绝|并非|不是)$key/);
+                    next if($1 =~ m/$key(?:奶)/);
+                    $linehit .= " $1 |";
+                    $match++;
+                    last if($match == @keywords);
+                    $hits{$key}=1;
+                }
+            }
+            push @text,"$file:|$linehit" if($linehit);
+            last if($match == @keywords);
+        }
+        close FI;
+        last if($match == @keywords);
+    }
+    if($match == @keywords) {
+        print "$folder\n";
+        print STDERR join("\n",@text),"\r\n";
+        if($move) {
+            system("mkdir","-v","--",$keystr) unless(-d $keystr);
+            system("mv","-v","--",,$folder,$keystr);
+        }
+    }
+}

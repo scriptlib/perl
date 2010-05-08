@@ -1,0 +1,7 @@
+#!/usr/bin/perl
+
+use URI::Escape;
+use Encode qw(encode);
+
+print uri_escape("@ARGV"),"\n";
+

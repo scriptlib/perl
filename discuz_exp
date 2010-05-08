@@ -1,0 +1,348 @@
+#!/usr/bin/perl -w
+###APPNAME:     discuz_exp
+###APPAUTHOR:   duel
+###APPDATE:	2009-01-19 01:53:48
+###APPVER:	0.1
+###APPDESC:     discuz_exp	
+###APPUSAGE:	
+###APPEXAMPLE:	discuz_exp
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+use MyPlace::Discuz::Forum;
+no strict 'refs';
+use URI;
+
+my $g_url;
+my $g_page;
+my @g_history;
+
+my $g_url_up;
+my $g_url_prev;
+my $g_url_next;
+
+my %g_cmd_map = (
+    "l"=>"loadurl",
+    "f"=>"forums",
+    "t"=>"threads",
+    "p"=>"pages",
+    "q"=>"quit",
+    "g"=>"goto",
+    "v"=>"view",
+    "d"=>"download",
+    "txt"=>"text",
+    "img"=>"images",
+    "pt"=>"posts",
+);
+
+my %g_type_map = (
+    "f"=>"forum",
+    "t"=>"thread",
+    "p"=>"page",
+    "img"=>"image",
+    "pt"=>"pt",
+    'txt'=>"text",
+);
+
+sub cmd_loadurl {
+    my $new_url=shift;
+    unless($new_url) {
+        print STDERR "Usage:loadurl (url)\n";
+        return undef;
+    }
+    $new_url=URI->new_abs($new_url,$g_url) if($g_url);
+    print STDERR "Loading $new_url...";
+    my @data = `netcat_autologin '$new_url' keyduel absfreedom | gb2utf`;
+    return undef unless(@data);
+    print STDERR "\t[Done]\n";
+    print STDERR "Loading page...";
+    my $page = MyPlace::Discuz::Forum->new(@data);
+    print STDERR "\t[Done]\n";
+    $g_url=$new_url;
+    $g_page=$page;
+    return 1;
+}
+
+sub fix_print {
+    my $max_num=shift;
+    my $num=0;
+    foreach(@_) {
+        $num++;
+        #printf "%3d.%-30s\t",$num,$_;
+        print "$num.$_";
+        unless($num % $max_num) {
+            print "\n";
+        }
+        else {
+            print "\t\t";
+        }
+    }
+    print "\n" if($num % $max_num);
+}
+
+sub cmd_forums {
+    if($g_page->{forums}) {
+        print "Forums:\n";
+        &fix_print(4,map $_->[1],@{$g_page->{forums}});
+    }
+    else {
+        print "No forums\n";
+    }
+}
+
+sub cmd_threads {
+    if($g_page->{threads}) {
+        print "Threads:\n";
+        &fix_print(1,map $_->[1],@{$g_page->{threads}});
+    }
+    else {
+        print "No thread\n";
+    }
+}
+
+sub cmd_pages {
+    if($g_page->{pages}) {
+        print "Pages:",scalar(@{$g_page->{pages}}),"\n";
+    }
+    else {
+        print "No page\n";
+    }
+}
+
+sub cmd_text {
+    if($g_page->{post}) {
+        print $g_page->{post_text};
+        print "\n";
+    }
+    else {
+        print "No text\n";
+    }
+}
+
+sub cmd_images {
+    my $index=shift;
+    if($g_page->{post} and $g_page->{post}->[1]) {
+        my $url = get_select("image",$index) if(defined $index);
+        if($url) {
+            eval {system("feh '$url'&");};
+        }
+        else {
+            print "Images:\n";
+            &fix_print(1,@{$g_page->{post_images}});
+        }
+    }
+    else {
+        print "No images\n";
+    }
+}
+
+sub get_select {
+    my $type=shift;
+    my $idx=shift;
+    return undef unless($type);
+    $idx = 1 unless($idx);
+    $type = $g_type_map{$type} if($g_type_map{$type});
+    my $url;
+    if($type =~ /^forum$/) {
+        $url = $g_page->{forums}->[$idx-1]->[0];
+    }
+    elsif($type =~ /^thread$/) {
+        $url = $g_page->{threads}->[$idx-1]->[0];
+    }
+    elsif($type =~ /^page$/) {
+        $url = $g_page->{pages}->[$idx-1];
+    }
+    elsif($type =~ /^image$/) {
+        $url = $g_page->{post_images}->[$idx-1]; 
+    }
+    else {
+        return undef;
+    }
+    $url = URI->new_abs($url,$g_url) if($url and $g_url);
+    return $url;
+}
+
+sub cmd_goto {
+    my $url = get_select(@_);
+    unless($url) {
+        print STDERR "Usage:goto type index\n";
+        print STDERR "\ttype = forum,page,thread\n";
+    }
+    else {
+        cmd_loadurl($url);
+    }
+}
+
+sub cmd_download {
+    my $type=shift;
+    unless($type) {
+        print STDERR "Usage:download type index\n";
+        print STDERR "\ttype = forum,page,thread,image,text\n";
+        return undef;
+    }
+    if($type =~ /text|txt/) {
+        my $filename=$g_page->{title} . ".txt";
+        $filename =~ s/[\/\\]//g;
+        print "Saving text content to $filename...";
+        if (open FO,">",$filename) {
+            print FO $g_page->{post_text};
+            close FO;
+        }
+        else {
+            print "\t[Failed]\n";
+        }
+    }
+    else {
+        my $url = get_select($type,@_);
+        if($url) {
+            my $filename = $url;
+            $filename =~ s/^.*\///g;
+            $filename =~ s/[\?\/\\]//g;
+            print "Saving url $url to $filename...";
+            system("netcat_autologin '$url'>$filename");
+            print "\t[Done]\n";
+        }
+        else {
+            print "Nothing to download for $type @_\n";
+        }
+    }
+}
+
+sub cmd_view {
+    my $url = get_select(@_);
+    unless($url) {
+        print STDERR "Usage:view type index\n";
+        print STDERR "\ttype = forum,page,thread\n";
+    }
+    else {
+        print "Open $url through firefox\n";
+        system("firefox '$url' 2>&1 1>/dev/null&");
+    }
+}
+
+sub cmd_help {
+    print "I can't hear,louder please!\n";
+}
+
+sub get_data {
+    my $type=shift;
+    return $g_page->{$type} ? $g_page->{$type} : $g_page->{$type . "s"} ? $g_page->{$type . "s"} : undef;
+}
+
+sub get_data_type {
+    my $data = shift;
+    my $index = shift;
+    my $type = shift;
+    return undef unless($data);
+    if(ref $data->[0]) {
+        return $data->[$index][$type];
+    }
+    else {
+        return $data->[$index];
+    }
+}
+
+sub cmd_list {
+    my $type=shift;
+    my $idx=shift;
+    return undef unless($type);
+    if($type =~ /^text$/) {
+        return "text",$g_page->{post_text};
+    }
+    my $array;
+    $array = $g_page->{$type} ? $g_page->{$type} : $g_page->{$type . "s"} ? $g_page->{$type . "s"} : undef;
+    return undef unless($array);
+    my $is_ref = ref $array->[0] ? 1 : 0;
+    my $ubound = @{$array};
+    if(defined $idx) {
+        $idx++;
+        if($idx >$ubound) {
+            return "url",undef;
+        }
+        my $url = $is_ref ? $array->[$idx][0] : $array->[$idx];
+        $url = URI->new_abs($url,$g_url) if($url and $g_url);
+        return "url",$url;
+    }
+    else {
+        my @urls = $is_ref ? map $_->[0],@{$array} : @{$array};
+        map URI->new_abs($_,$g_url),@urls if(@urls and $g_url);
+        return "url",@urls;
+    }
+}
+
+sub convert_cmdline {
+    my $cmd = shift;
+    my $type = shift;
+    my $index = shift;
+    return undef unless($cmd);
+    return $cmd unless($type);
+    if($index and $index=~ /[0-9]+/) {
+    }
+    else {
+        unshift @_,$index if($index);
+        $index = undef;
+    }
+    $cmd = $g_cmd_map{$cmd} if($g_cmd_map{$cmd});
+    $type = $g_type_map{$type} if($g_type_map{$type});
+    my @arg = cmd_list($type,$index);
+    if(@arg) {
+        shift @arg;
+        return $cmd,@arg;
+    }
+    else {
+        return $cmd,$type,@_;
+    }
+}
+sub prompt {
+    print "Discuz> ";
+    while(<>) {
+        chomp;
+        goto next_label unless($_);
+        my @cmd=split(/\s+/,$_);
+        goto next_label unless(@cmd);
+        @cmd = &convert_cmdline(@cmd);
+        my $cmd_name=shift @cmd;
+        if (defined *{"cmd_$cmd_name"}) {
+            *{"cmd_$cmd_name"}->(@cmd);
+        }
+        else {
+#            print "Pass to shell $cmd_name,@cmd\n";
+            eval {system "$cmd_name @cmd";};
+        }
+    next_label:
+        print "Discuz> ";
+    }
+    return 1;
+}
+
+sub cmd_quit {
+    print "Saving...";
+    open FO,">",$ENV{HOME} . "/.discuz_exp";
+    print FO $g_url;
+    close FO;
+    print "\t[Done]\n";
+    exit 0;
+}
+
+my $url=shift;
+unless($url) {
+    if(open FI,"<",$ENV{HOME} . "/.discuz_exp") {
+        $url=<FI>;
+        close FI;
+    }
+}
+&cmd_loadurl($url) if($url);
+push @g_history,$url;
+&prompt;
+
+
+

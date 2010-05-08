@@ -1,0 +1,22 @@
+#!/usr/bin/perl -w
+###APPNAME:     urlrule_get
+###APPAUTHOR:   duel
+###APPDATE:	Mon Mar 24 06:25:31 2008
+###APPVER:	0.1
+###APPDESC:     apply rule for URL,and perform action	
+###APPUSAGE:	urlrule_get URL [0-5] [action args...]
+###APPEXAMPLE:	urlrule_get http://www.sina.com.cn 0 cat
+use strict;
+use Data::Dumper;
+
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_even_empty/;
+exit 0 if(help_even_empty($0,@ARGV));
+
+use MyPlace::URLRule;
+
+
+my %rule = %{parse_rule(@ARGV)};
+
+exec("urlrule_action",@ARGV,"batchget -a -n '$rule{domain}\[$rule{level}\]'");
+

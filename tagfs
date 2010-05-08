@@ -1,0 +1,95 @@
+#!/usr/bin/perl -w
+###APPNAME:     tagfs
+###APPAUTHOR:   duel
+###APPDATE:	Thu Apr 29 17:38:29 2010
+###APPVER:	0.1
+###APPDESC:     tagfs	
+###APPUSAGE:	
+###APPEXAMPLE:	tagfs
+###APPOPTION:	[-r (root_directory)] tag1,tag2,tag3,... files...
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+#exit 0 if(help_required($0,@ARGV));
+exit 0 if(help_even_empty($0,@ARGV));
+
+my $REALTAG='all';
+my $root;
+my $tags;
+my @tags;
+my @files;
+
+$root=shift;
+if($root eq '-r') {
+    $root=shift;
+    $root = "$root/" unless($root =~ /\/$/);
+}
+else {
+    unshift @ARGV,$root;
+    $root="";
+}
+
+($tags,@files)=@ARGV;
+
+die(help_required($0,"-h")) unless(@files);
+
+sub get_basename {
+    my $fullname = shift;
+    return unless($fullname);
+    $fullname =~ s/\/+$//;
+    $fullname =~ s/^.*\///;
+    return $fullname;
+}
+
+
+if($root and (! -d $root)) {
+    mkdir($root) or die("$!\n");
+}
+my $saved_in = "$root$REALTAG";
+if(! -d $saved_in) {
+    mkdir($saved_in) or die("$!\n");
+}
+
+@tags = split(/\s*,\s*/,$tags);
+die("Empty tag list!\n") unless(@tags);
+
+my $log_files=$root . "logs";
+open FO,">>$log_files";
+sub system_execute {
+    print FO scalar(localtime),":",join(" ",@_),"\n";
+    return system(@_) == 0;
+}
+sub tag_files {
+    foreach my $file (@_) {
+       my $basename = get_basename($file);
+       next if($basename eq '.' or $basename eq '..');
+       if(! -e "$saved_in/$basename") {
+            system_execute("mv","-v",$file,$saved_in);
+       }
+       foreach my $tag (@tags) {
+            if(! -d "$root$tag") {
+                mkdir "$root$tag" or die("$!\n");
+            }
+            system_execute("ln","-vfs","-t","$root$tag","../$REALTAG/$basename");
+       }
+    }
+}
+
+use File::Glob qw/bsd_glob/;
+foreach (@files) {
+    if(-f $_) {
+        tag_files($_);
+    }
+    else {
+        tag_files(bsd_glob($_));
+    }
+}
+close FO;
+
+
+

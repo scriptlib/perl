@@ -1,0 +1,23 @@
+#!/usr/bin/perl -w
+###APPNAME:     calc
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Mon Oct 22 11:37:21 2007
+###APPVER:	0.1
+###APPDESC:	
+###APPUSAGE:	
+###APPEXAMPLE:	
+###APPOPTION:	
+use strict;
+$ARGV[0]="-h" unless(@ARGV);
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my $args=join(" ",@ARGV);
+$args =~ s/x/\*/gi;
+$args =~ s/([\+\-\*\/\\])/ $1 /g;
+$args =~ s/\s+/ /gi;
+print("$args = ");
+system("expr",split(/\s+/, $args));
+
+

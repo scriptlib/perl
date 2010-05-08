@@ -1,0 +1,128 @@
+#!/usr/bin/perl -w
+###APPNAME:     lootdoc
+###APPAUTHOR:   duel
+###APPDATE:	Sun Sep 23 13:23:37 2007
+###APPVER:	0.1
+###APPDESC:	look up the document 
+###APPUSAGE:    (Name pattern)
+###APPEXAMPLE:	lootdoc "gaim"
+###APPOPTION:	
+use strict;
+
+$ARGV[0]="--help" unless(@ARGV);
+foreach(@ARGV) { exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" or $_ eq "--help"); }
+
+
+my $propStr=shift;
+my @docDir=qw(/usr/share/doc /usr/local/share/doc /share/doc);
+my @INDEXS=qw(cover index toc default aaa bbb content first);
+my @EXTS=qw(htm html shtml xml);
+
+
+sub globHtml($);
+sub globSubDir($$);
+sub isIndexFile($);
+sub isHtmlFile($);
+sub getIndexHtml(@);
+
+sub isIndexFile($) {
+    my $target=shift;
+    return 0 unless($target);
+    foreach my $indexName(@INDEXS) {
+        return 1 if ($target =~ m/\b${indexName}\b[^\/\\]*$/i);
+    }
+}
+sub isHtmlFile($) {
+    my $target=shift;
+    return 0 unless($target);
+    foreach my $extName(@EXTS) {
+        return 1 if ($target =~ m/\.\b$extName\b$/i);
+    }
+}
+
+sub getIndexHtml(@) {
+    my @htmlFiles;
+    my @indexFiles;
+    foreach(@_) {
+        if (isHtmlFile($_)) {
+            push(@htmlFiles,$_);
+            push(@indexFiles,$_) if(isIndexFile($_));
+        }
+    }
+    return if(@htmlFiles<1);
+    return $htmlFiles[0] if(@htmlFiles==1 or @indexFiles<1);
+    return $indexFiles[0] if(@indexFiles==1);
+    my $result;
+    my $minSlashCount=256;
+    foreach my $filename(@indexFiles) {
+        my $slashCount=$filename =~ tr /\//\//;
+        if($slashCount<$minSlashCount) {
+            $result=$filename;
+            $minSlashCount=$slashCount;
+        }
+        return $result if($minSlashCount==0);
+    }
+    return ($result);
+}
+
+sub globSubDir($$) {
+    return unless($_[0]);
+    chdir($_[0]) or return;
+    my @result;
+    my $lev=$_[1];
+    $lev--;
+    foreach my $subname(glob("*")) {
+        if (-d $_[0] . "/" . $subname) {
+            push(@result,$subname);
+            next if($lev<0);
+            foreach my $subdir(&globSubDir($_[0] . "/" . $subname,$lev)) {
+                push(@result,$subname . "/" . $subdir);
+            }
+        }
+    }
+    return @result;
+}
+
+my @result1;
+my @result2;
+my @result3;
+my @result4;
+
+foreach my $dir(@docDir) {
+    foreach my $subname(globSubDir($dir,2)) {
+        next unless($subname =~ m/.*$propStr.*/i);
+        if ($subname =~ m/^$propStr$/) {
+            $subname = $dir . "/" . $subname;
+            push(@result1,$subname);
+        }
+        elsif ($subname =~ m/^$propStr$/i) {
+            $subname = $dir . "/" . $subname;
+            push(@result2,$subname);
+        }
+        elsif($subname =~ m/$propStr/) {
+            $subname = $dir . "/" . $subname;
+            push(@result3,$subname);
+        }
+        elsif($subname =~ m/$propStr/i) {
+            $subname = $dir . "/" . $subname;
+            push(@result4,$subname);
+        }
+    }
+}
+
+my $index="";
+foreach my $dir(@result1,@result2,@result3,@result4) {
+    print STDERR ("Trying $dir ...");
+    my @files=glob("$dir/*");
+    $index=getIndexHtml(@files);
+    print STDERR ("\n");
+    last if($index);
+}
+
+if($index) {
+    print STDERR ($index,"\n");
+    system("sensible-browser",$index) if($index);
+}
+
+
+

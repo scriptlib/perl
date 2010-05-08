@@ -1,0 +1,72 @@
+#!/usr/bin/perl -w
+###APPNAME:     proxy-test
+###APPAUTHOR:   duel
+###APPDATE:	2009-01-06 17:32:15
+###APPVER:	0.1
+###APPDESC:     netcat a http url with autologin support
+###APPUSAGE:	(url)
+###APPEXAMPLE:	proxy-test www.google.com
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+my ($url,$proxy)=@ARGV;
+
+die("Empty url\n") unless($url);
+die("Empty proxy\n") unless($proxy);
+$url = "http://$url" unless($url =~ /^http:/i);
+my $proxy_type="http";
+
+if($proxy =~ /^(\w+) ([\d\.:]+)$/) {
+    $proxy_type = lc($1);
+    $proxy = $2;
+}
+
+$proxy_type = "http" if($proxy_type eq "proxy");
+unless($proxy =~ /^\w+\:\/\//) {
+    $proxy = $proxy_type . "://" . $proxy
+}
+
+#$proxy = "http://$proxy" unless($proxy =~ /^http:/i);
+#$proxy = "$proxy/" unless($proxy =~ /\/$/);
+
+use LWP::UserAgent;
+use HTTP::Cookies;
+use Term::ANSIColor qw(:constants);
+$Term::ANSIColor::AUTORESET = 1;
+
+my  $ua = LWP::UserAgent->new;
+my $cookie = HTTP::Cookies->new(file => "$ENV{'HOME'}/.lwp_cookies.dat", autosave => 1);
+$ua->cookie_jar($cookie);
+$ua->agent("Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
+$ua->proxy('http',$proxy) if($proxy);
+$ua->timeout('10');
+
+sub test {
+    my $url = shift;
+    my $proxy = shift;
+    my $req = HTTP::Request->new(GET => $url);
+    print STDERR "Testing ",GREEN,$proxy,RESET," with ",YELLOW,$url,RESET,"..."; 
+    my $res = $ua->request($req);
+      if ($res->is_success) {
+        print STDERR "\t",GREEN,"[OK]",RESET,"\n";
+        return 1;
+      }
+      else {
+          print STDERR "\t",RED,"[Failed]",RESET,"\n\t[",$res->status_line, "]\n";
+          return 0;
+      }
+}
+
+if(test($url,$proxy) && test($url,$proxy)) {
+    exit 0;
+}
+else {
+    exit 1;
+}
+

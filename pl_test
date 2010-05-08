@@ -1,0 +1,22 @@
+#!/usr/bin/perl -w
+###APPNAME:     pl_test
+###APPAUTHOR:   duel
+###APPDATE:	Thu Apr  3 05:58:20 2008
+###APPVER:	0.1
+###APPDESC:     pl_test	
+###APPUSAGE:	
+###APPEXAMPLE:	pl_test
+###APPOPTION:	
+use strict;
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required/;
+exit 0 if(help_required($0,@ARGV));
+#use MyPlace::App::Usage qw/help_even_empty/;
+#exit 0 if(help_even_empty($0,@ARGV));
+
+
+use MyPlace::ColorPrint;
+color_print(*STDOUT,'red',"Hello, World!\n");
+color_print(\*STDOUT,'yellow',"Hello, World!\n");
+color_print("green","Hello, World!\n");

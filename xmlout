@@ -1,0 +1,47 @@
+#!/usr/bin/perl
+###APPNAME:     xmlout.pl
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue Mar 11 04:58:02 2008
+###APPVER:	0.1
+###APPDESC:     create simple xml using XML::Simple,\n\tRead data from commandline,standardIn
+###APPUSAGE:    tagname:prop=value,[prop=value,...]:text	
+###APPEXAMPLE:	xmlout book:name=Bash Reference:
+use strict;
+use XML::Simple;
+use Data::Dumper;
+foreach(@ARGV){
+    exit(system("plhelp",$0,@ARGV)) if($_ eq "-h" || $_ eq "--help");
+}
+
+my @DATA;
+if(@ARGV) {
+    @DATA=@ARGV;
+}
+else {
+    while(<STDIN>) {
+        chomp;
+        push(@DATA,$_);
+    }
+}
+print('<?xml version="1.0" encoding="utf-8" standalone="yes"?>',"\n");
+print('<opt>',"\n");
+foreach my $LINE(@DATA) {
+    my @match = $LINE =~ /^([^:]+):([^:]*):(.*)$/;
+    next unless(@match);
+    my $tagname = $match[0];
+    my $proptext = $match[1];
+    my $text = $match[2];
+    print("<$tagname");
+    my @match = $proptext =~ /([^=]+)=([^,]*),?/g;
+    if(@match) {
+        for(my $i=0;$i<@match;$i+=2) {
+            print(" $match[$i]=\'$match[$i+1]\'");
+        }
+    }
+    print($text ? "><![CDATA[$text]]><\/$tagname>" : ' />',"\n");
+
+}
+print('</opt>',"\n");
+
+exit 0;
+
