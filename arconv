@@ -31,6 +31,7 @@ my %compress = (
 my %uncompress = (
     "rar"=>["unrar","x","ARCHIVE","FILES","DIRECTORY"],
     "7z"=>["7z","x","ARCHIVE","-oDIRECTORY","FILES"],
+    "chm"=>["7z","x","ARCHIVE","-oDIRECTORY","FILES"],
     "zip"=>["unzip","ARCHIVE","FILES","-d","DIRECTORY"],
     "tar"=>["tar","-xvf","ARCHIVE","-C","DIRECTORY"],
     "tar.gz"=>["tar","-xzvf","ARCHIVE","-C","DIRECTORY"],

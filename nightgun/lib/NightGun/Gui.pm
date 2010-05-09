@@ -5,6 +5,8 @@ use warnings;
 use NightGun::App;
 use NightGun::Gui::ContentView;
 use NightGun::Encode;
+use Gtk2::Gdk::Keysyms;
+
 
 BEGIN {
     if(NightGun::App::GUI eq 'GNOME') {
@@ -120,10 +122,79 @@ sub init {
 		$self->{content}->{listener}->{progress}=sub {
 			$self->progress(@_);
 		};
+                $self->{content}->{listener}->{content_key_up} = sub {
+                        $self->content_key_up(@_);
+                };
+        $self->{content}->signal_connect("key-release-event",sub { $self->content_key_up(@_);});
         $self->{main_window}->maximize;
         return $self->{glade};
     }
 }
+
+
+sub _check_key_by_name {
+    my $keyval=shift;
+    foreach(@_) {
+        my $value = $Gtk2::Gdk::Keysyms{$_};
+        return $_ if(defined $value and $keyval == $value);
+    }
+    return undef;
+}
+
+sub _is_mask {
+    my $state = shift @_;
+    my $mask = shift @_;
+    my $count = scalar(@{$state});
+    while($mask) {
+        foreach(@{$state}) {
+            if($_ eq $mask) {
+                return $count unless($_[0]);
+                last;
+            }
+        }
+        $mask = shift @_;
+    }
+    return 0;
+}
+
+
+sub content_key_up {
+    my ($self,undef,$key) = @_;
+    my ($keyval, $state,$group) = ($key->keyval,$key->state,$key->group);
+    #print STDERR "content_key_up:",join(", ",$key,$key->keyval,$key->state,$key->group),"\n";
+    if(&_is_mask($state,"control-mask") == 2) {
+    #    print STDERR "Control Pressed\n";
+        if(&_check_key_by_name($keyval,"leftarray","Left")) {
+            return $self->{content}->go_back();
+        }
+        elsif(&_check_key_by_name($keyval,"rightarrow","Right")) {
+            return $self->{content}->go_forward();        
+        }
+        elsif(&_check_key_by_name($keyval,"minus","KP_Subtract")) {
+            my ($r,$font) = $self->{content}->zoom_out();
+            $self->{options}{font}=$font->to_string() if($font);
+#            print "minus\n";
+            return $r;
+        }
+        elsif(&_check_key_by_name($keyval, "plus","KP_Add")) {
+            my ($r,$font) = $self->{content}->zoom_in();
+            $self->{options}{font}=$font->to_string() if($font);
+#            $self->{content}->zoom_in();
+#            print STDERR "plus\n";
+#            print STDERR Dumper($self->{content});
+            return $r;
+        }
+        return undef;
+    }
+    elsif(&_check_key_by_name($keyval,"BackSpace")) {
+        $self->{content}->go_back();
+        return 1;
+    }
+    else {
+        return undef;
+    }
+}
+
 
 sub init_tree {
     my $self=shift;
@@ -519,13 +590,13 @@ sub set_widget {
     else {
         $content->set_wrap_mode("none");
     }
-    $content->modify_font(Gtk2::Pango::FontDescription->from_string($options{font})) if($options{font});
-    $content->modify_text("normal",Gtk2::Gdk::Color->parse($options{forecolor})) if($options{forecolor});
-    $content->modify_base("normal",Gtk2::Gdk::Color->parse($options{backcolor})) if($options{backcolor});
     $self->{left}->modify_text("normal",Gtk2::Gdk::Color->parse($options{forecolor})) if($options{forecolor});
     $self->{left}->modify_base("normal",Gtk2::Gdk::Color->parse($options{backcolor})) if($options{backcolor});
     $self->{hot_list_entry}->modify_base("normal",Gtk2::Gdk::Color->parse($options{forecolor})) if($options{forecolor});
     $self->{hot_list_entry}->modify_text("normal",Gtk2::Gdk::Color->parse($options{backcolor})) if($options{backcolor});
+    $content->modify_font(Gtk2::Pango::FontDescription->from_string($options{font})) if($options{font});
+    $content->modify_text("normal",Gtk2::Gdk::Color->parse($options{forecolor})) if($options{forecolor});
+    $content->modify_base("normal",Gtk2::Gdk::Color->parse($options{backcolor})) if($options{backcolor});
     $content->set_left_margin($options{leftmargin});
     $content->set_right_margin($options{rightmargin});
     $content->set_indent($options{lineindent});
