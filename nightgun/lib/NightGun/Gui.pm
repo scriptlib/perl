@@ -6,7 +6,7 @@ use NightGun::App;
 use NightGun::Gui::ContentView;
 use NightGun::Encode;
 use Gtk2::Gdk::Keysyms;
-
+use Glib qw/TRUE FALSE/;
 
 BEGIN {
     if(NightGun::App::GUI eq 'GNOME') {
@@ -22,7 +22,6 @@ BEGIN {
         ';
     }
 }
-use Gtk2::GladeXML;
 use MyPlace::Gtk2;
 
 use constant WIDGETS_MAP => (
@@ -35,11 +34,12 @@ use constant WIDGETS_MAP => (
     'hp_content_paned',
     'sw_left_window',
     'tv_left',
-    'nb_content_notebook',
-    'sw_content_window',
-    'txt_content_textview',
+#    'nb_content_notebook',
+#    'sw_content_window',
+#    'txt_content_textview',
+    'hbox_status_box',
     'sbar_status_bar',
-    'hb_hotlist_hbox',
+    'hb_hotlist_box',
     
     'dlg_options_window',
     'btn_options_font',
@@ -90,29 +90,46 @@ sub init {
     my ($self,$glade_file) = @_;
     $glade_file = $self->{glade_file} unless($glade_file);
     if(-f $glade_file) {
+#        use Gtk2::Builder;
         $self->{glade_file}=$glade_file;
-        $self->{glade}=Gtk2::GladeXML->new($glade_file);
-        $self->{glade}->signal_autoconnect_from_package($self);
+        $self->{glade}=Gtk2::Builder->new();
+        $self->{glade}->add_from_file($glade_file);
+        $self->{glade}->connect_signals(undef,$self);
 
         foreach(keys %WIDGETS_MAP) {
             $self->{$_} = 
-                $self->{glade}->get_widget($WIDGETS_MAP{$_});
+                $self->{glade}->get_object($WIDGETS_MAP{$_});
         }
+
+        $self->{encoding_list} = Gtk2::ComboBoxEntry->new_text();
+        $self->{encoding_list}->show();
+        Gtk2::Box::pack_end($self->{status_box},$self->{encoding_list},0,0,0);
+        $self->{hot_list} = Gtk2::ComboBoxEntry->new_text();
+        $self->{hot_list}->show();
+        Gtk2::Box::pack_start($self->{hotlist_box},$self->{hot_list},1,1,0);
 
         $self->{encoding_text} = $self->{encoding_list}->get_child();
         $self->{encoding_text}->signal_connect("activate",sub {$self->encoding_list_changed});
+        $self->{encoding_list}->signal_connect("changed",sub {$self->encoding_list_changed});
         $self->{hot_list_entry} = $self->{hot_list}->get_child();
         $self->{hot_list_entry}->signal_connect("activate",sub {$self->hot_list_changed});
+#        $self->{hot_list}->signal_connect("changed",sub {$self->hot_list_changed});
 
-        #foreach(keys %WIDGETS_MAP) {
-        #    NightGun::App::dump($self->{$_});
-        #}
+#        foreach(keys %WIDGETS_MAP) {
+#            NightGun::App::dump("Gui",[$self->{$_}],[$_]);
+#        }
 
         $self->{encoding_list}->append_text($_) foreach(qw/auto utf8 gb2312 big5/);
         $self->init_tree;
         NightGun::App::fill_about_dialog($self->{about_window});
-        my $contentView = NightGun::Gui::ContentView->new(NightGun::App::VIEW);
-        $contentView->attatch($self->{content_notebook},$self->{content_textview});
+        my $contentView = NightGun::Gui::ContentView->new();
+#        use NightGun::Gui::TextView;
+#        my $contentView = NightGun::Gui::TextView->new();
+        $self->{content_paned}->add($contentView->{widget});
+        $contentView->show();
+#        $contentView->
+        #NightGun::App::VIEW);
+        #$contentView->attatch($self->{content_notebook},$self->{content_textview});
         $self->{content}=$contentView;
         $self->{content}->{listener}->{status_changed}=sub {$self->statusbar_set(_to_gtk_a(@_));};
         $self->{content}->{listener}->{location}=sub {$self->location_changed(@_);};
@@ -122,79 +139,99 @@ sub init {
 		$self->{content}->{listener}->{progress}=sub {
 			$self->progress(@_);
 		};
-                $self->{content}->{listener}->{content_key_up} = sub {
-                        $self->content_key_up(@_);
-                };
-        $self->{content}->signal_connect("key-release-event",sub { $self->content_key_up(@_);});
+#                $self->{content}->{listener}->{notebook_key_released} = sub {
+#                        $self->content_key_up(@_);
+#                };
+#        $self->{content_notebook}->signal_connect("key-release-event",sub { $self->content_key_up(@_);});
         $self->{main_window}->maximize;
         return $self->{glade};
     }
 }
 
-
-sub _check_key_by_name {
-    my $keyval=shift;
-    foreach(@_) {
-        my $value = $Gtk2::Gdk::Keysyms{$_};
-        return $_ if(defined $value and $keyval == $value);
-    }
-    return undef;
+sub zoom_in {
+    my $self=shift;
+    my($r,$font)=$self->{content}->zoom_in();
+    $self->{options}{font}=$font->to_string() if($font);
+    return $r;
+}
+sub zoom_out {
+    my $self=shift;
+    my($r,$font)=$self->{content}->zoom_out();
+    $self->{options}{font}=$font->to_string() if($font);
+    return $r;
 }
 
-sub _is_mask {
-    my $state = shift @_;
-    my $mask = shift @_;
-    my $count = scalar(@{$state});
-    while($mask) {
-        foreach(@{$state}) {
-            if($_ eq $mask) {
-                return $count unless($_[0]);
-                last;
+sub _select_path {
+    my($self,$tree,$model,$sel,$iter,$path) = @_;
+    $sel->select_iter($iter);
+    $tree->scroll_to_cell($path,,undef,0,0,0);
+    my $filename = $model->get_value($iter,1);
+    $self->{events}->{file_list_selected}($filename) if($filename);
+    return 1;
+}
+
+sub go_back {
+    my $self=shift;
+    unless($self->{content}->go_back()) {
+    }
+}
+sub go_forward {
+    my $self=shift;
+    unless($self->{content}->go_forward()) {
+    }
+}
+sub go_next {
+    my $self = shift;
+    my $list = $self->{left};
+    my $model = $list->get_model;
+    my $sel = $list->get_selection;
+    my (undef,$iter) = $sel->get_selected;
+    my $path;
+    if($iter) {
+        $path = $model->get_path($iter);
+        my $saved_path = $path->to_string;
+        $path->next;
+        if(!($path->to_string eq $saved_path)) {
+            $iter = $model->get_iter($path);
+            if($iter) {
+                return $self->_select_path($list,$model,$sel,$iter,$path);
             }
         }
-        $mask = shift @_;
     }
-    return 0;
+    my $first = Gtk2::TreeModel::get_iter_first($model);
+    return unless($first);
+    $first = Gtk2::TreeModel::iter_next($model,$first); #Ingored first item, the parent node
+    return unless($first);
+    $iter = $first;
+    $path = $model->get_path($iter);
+    return $self->_select_path($list,$model,$sel,$iter,$path);
 }
-
-
-sub content_key_up {
-    my ($self,undef,$key) = @_;
-    my ($keyval, $state,$group) = ($key->keyval,$key->state,$key->group);
-    #print STDERR "content_key_up:",join(", ",$key,$key->keyval,$key->state,$key->group),"\n";
-    if(&_is_mask($state,"control-mask") == 2) {
-    #    print STDERR "Control Pressed\n";
-        if(&_check_key_by_name($keyval,"leftarray","Left")) {
-            return $self->{content}->go_back();
+sub go_previous {
+    my $self = shift;
+    my $list = $self->{left};
+    my $model = $list->get_model;
+    my $sel = $list->get_selection;
+    my (undef,$iter) = $sel->get_selected;
+    my $first = Gtk2::TreeModel::get_iter_first($model);
+    return unless($first);
+    my $path;
+    if($iter) {
+        $path = $model->get_path($iter);
+        my $first_path = $model->get_path($first)->to_string;
+        if($path->prev and !($path->to_string eq $first_path) ) {
+            $iter = $model->get_iter($path);
+            if($iter) {
+                return $self->_select_path($list,$model,$sel,$iter,$path);
+            }
         }
-        elsif(&_check_key_by_name($keyval,"rightarrow","Right")) {
-            return $self->{content}->go_forward();        
-        }
-        elsif(&_check_key_by_name($keyval,"minus","KP_Subtract")) {
-            my ($r,$font) = $self->{content}->zoom_out();
-            $self->{options}{font}=$font->to_string() if($font);
-#            print "minus\n";
-            return $r;
-        }
-        elsif(&_check_key_by_name($keyval, "plus","KP_Add")) {
-            my ($r,$font) = $self->{content}->zoom_in();
-            $self->{options}{font}=$font->to_string() if($font);
-#            $self->{content}->zoom_in();
-#            print STDERR "plus\n";
-#            print STDERR Dumper($self->{content});
-            return $r;
-        }
-        return undef;
     }
-    elsif(&_check_key_by_name($keyval,"BackSpace")) {
-        $self->{content}->go_back();
-        return 1;
+    $iter = $first;
+    while(my $next = Gtk2::TreeModel::iter_next($model,$iter)) {
+        $iter = $next;
     }
-    else {
-        return undef;
-    }
+    $path = $model->get_path($iter);
+    return $self->_select_path($list,$model,$sel,$iter,$path);
 }
-
 
 sub init_tree {
     my $self=shift;
@@ -233,6 +270,7 @@ sub file_list_select_item {
     while($iter) {
         my $item = Gtk2::TreeModel::get_value($tree_model,$iter,1);
         if($item and $item eq $data) {
+#            print STDERR "TREE PATH: " . $tree_model->get_path($iter)->to_string;
             my $sel = $tree->get_selection;
             $sel->select_iter($iter);
             $tree->scroll_to_cell($tree_model->get_path($iter),undef,0,0,0);
@@ -612,10 +650,10 @@ sub hot_list_show {
     my $self=shift;
     $self->{options}{showlist}=$self->{show_list}->get_active;
     if($self->{options}{showlist}) {
-        $self->{hotlist_hbox}->show;
+        $self->{hotlist_box}->show;
     }
     else {
-        $self->{hotlist_hbox}->hide;
+        $self->{hotlist_box}->hide;
     }
 }
 sub file_list_show {

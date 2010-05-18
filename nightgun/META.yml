@@ -1,6 +1,6 @@
 ---
 name: nightgun
-version: 1.1
+version: 1.15
 author:
   - 'xiaoranzzz xiaoranzzz@gmail.com'
 abstract: A text archives reader
@@ -60,6 +60,7 @@ provides:
     file: lib/NightGun.pm
   NightGun::App:
     file: lib/NightGun/App.pm
+    version: 1.15
   NightGun::Debug:
     file: lib/NightGun/Debug.pm
   NightGun::Encode:
@@ -68,8 +69,16 @@ provides:
     file: lib/NightGun/Gui.pm
   NightGun::Gui::ContentView:
     file: lib/NightGun/Gui/ContentView.pm
+  NightGun::Gui::HTMLView:
+    file: lib/NightGun/Gui/HTMLView.pm
+  NightGun::Gui::TextView:
+    file: lib/NightGun/Gui/TextView.pm
+  NightGun::Gui::View:
+    file: lib/NightGun/Gui/View.pm
   NightGun::History:
-    file: lib/NightGun/History.pm
+    file: lib/NightGun.pm
+  NightGun::Recents:
+    file: lib/NightGun.pm
   NightGun::Store:
     file: lib/NightGun/Store.pm
   NightGun::Store::Archive:
@@ -78,6 +87,8 @@ provides:
     file: lib/NightGun/Store/Base.pm
   NightGun::Store::Files:
     file: lib/NightGun/Store/Files.pm
+  NightGun::Store::LocalMedia:
+    file: lib/NightGun/Store/LocalMedia.pm
   NightGun::Store::WWW:
     file: lib/NightGun/Store/WWW.pm
   NightGun::Store::WebSaver:

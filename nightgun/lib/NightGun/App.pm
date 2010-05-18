@@ -3,18 +3,19 @@ package NightGun::App;
 use Exporter;
 use Term::ANSIColor;
 use Data::Dumper;
+my $VERSION = 1.15;
 use constant {
     NAME => 'NightGun',
-    VERSION => '1.0',
+    VERSION => '1.15',
     AUTHORS => 'xiaoranzzz@myplace.hell',
     COPYRIGHT => 'xiaoranzzz@myplace.hell 2008',
     COMMENTS => 'text reader suitable for night reading',
-    DATE => '2008-12-31',
+    DATE => '2010-05-18',
     GUI => 'GTK2',
-    VIEW => 'MozEmbed',
+#    VIEW => 'MozEmbed',
     LOGING => 0,
 #    VIEW => 'Normal',
-    DEBUG => 0,
+    DEBUG => 1,
 };
 use constant {
     WARN_COLOR=>color('yellow'),
@@ -52,6 +53,11 @@ sub say {
 sub dump {
     my $hd=shift;$hd = _build_hd($hd);
     print STDERR HD_COLOR,$hd,NO_COLOR,Data::Dumper->Dump(@_),NO_COLOR,"\n";  
+}
+sub debug {
+    return unless(NightGun::App::DEBUG);
+    my $hd=shift;$hd = _build_hd($hd);
+    print STDERR HD_COLOR,$hd,ERR_COLOR,@_,NO_COLOR,"\n";
 }
 sub fill_about_dialog {
     my $about_window = shift;

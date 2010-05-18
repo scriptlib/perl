@@ -314,7 +314,7 @@ EOC
 # Define the build parameters
 my $build = $class->new(
 	dist_name => 'nightgun',
-	dist_version_from => 'bin/nightgun',
+	dist_version_from => 'lib/NightGun/App.pm',
 	dist_abstract => 'A text archives reader',
 	dist_author => 'xiaoranzzz xiaoranzzz@gmail.com',
 	license => 'perl',

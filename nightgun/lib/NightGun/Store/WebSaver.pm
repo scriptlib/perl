@@ -11,7 +11,7 @@ sub new {
 }
 
 sub load {
-	my($self,$path,$data)=@_;
+	my($self,$path)=@_;
 	my ($source,$entry,@data);
 	if($path =~ $location_exp) {
 		$source = $1;
@@ -20,11 +20,8 @@ sub load {
 	else {
 		$source = $path;
 	}
-
-	if($data) {
-		@data = ($data);
-	}
-	elsif(-f $source) {
+        return unless($source =~ m/\.xml$/i);
+	if(-f $source) {
 		open FI,"<:",$source or return undef;
 		@data=<FI>;
 		close FI;

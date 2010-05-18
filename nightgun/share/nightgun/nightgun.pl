@@ -24,12 +24,11 @@ BEGIN {
 #	print STDERR $libdir,"\n";
 	unshift @INC, $libdir if -d $libdir;
 		require NightGun;import NightGun;#  qw/NDEBUG/;
-		require NightGun::App;import NightGun::App; 
-		require NightGun::StoreLoader;import NightGun::StoreLoader; 
-		require NightGun::Gui;import NightGun::Gui; 
-		require NightGun::History;import NightGun::History; 
 		require NightGun::Encode;
 		import NightGun::Encode qw/_to_gtk _to_gtk_a _from_gtk _from_gtk_a/;
+		require NightGun::App;import NightGun::App; 
+		require NightGun::Gui;import NightGun::Gui; 
+		require NightGun::StoreLoader;import NightGun::StoreLoader; 
 #	print STDERR join("\n",@INC);
 }
 my $config_dir = $ENV{HOME} . "/.nightgun";
@@ -37,12 +36,14 @@ mkdir $config_dir unless(-d $config_dir);
 my $cmdline_file = shift;
 
 NightGun::init($appdir,$config_dir);
-$NightGun::Config->{History}={} unless($NightGun::Config->{History});
+#$NightGun::Config->{Recents}={} unless($NightGun::Config->{Recents});
+#$NightGun::Config->{History}={} unless($NightGun::Config->{History});
 $NightGun::Config->{GUI}={} unless($NightGun::Config->{GUI});
 $NightGun::Config->{APP}={} unless($NightGun::Config->{APP});
 
 my $Worker = NightGun::StoreLoader->new();
 my $History = NightGun::History->new($NightGun::Config);
+my $Recents = NightGun::Recents->new($NightGun::Config);
 my $GUI = NightGun::Gui->new(File::Spec->catfile($appdir, "main.glade"));
 foreach(keys %{$GUI->{events}}) {
     $GUI->{events}{$_}=\&print_arg;
@@ -62,6 +63,7 @@ $NightGun::nightgun_global->{ConfigDirectory}=$config_dir;
 $NightGun::nightgun_global->{State}=\%state;
 $NightGun::nightgun_global->{StoreLoader}=*load_store;
 
+&update_ui();
 &load_config;
 $GUI->run;
 

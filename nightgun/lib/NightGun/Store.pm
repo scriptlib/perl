@@ -37,7 +37,6 @@ sub new {
 	my $class = shift;
 	my $self = fields::new($class) unless(ref $class);
 	$self->{name}=$class unless(ref $class);
-#	NightGun::dump([$self],["self"]);
 	return $self;
 }
 

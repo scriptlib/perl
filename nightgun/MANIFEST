@@ -22,11 +22,14 @@ lib/NightGun/Encode.pm
 lib/NightGun/Format.pm
 lib/NightGun/Gui.pm
 lib/NightGun/Gui/ContentView.pm
-lib/NightGun/History.pm
+lib/NightGun/Gui/HTMLView.pm
+lib/NightGun/Gui/TextView.pm
+lib/NightGun/Gui/View.pm
 lib/NightGun/Store.pm
 lib/NightGun/Store/Archive.pm
 lib/NightGun/Store/Base.pm
 lib/NightGun/Store/Files.pm
+lib/NightGun/Store/LocalMedia.pm
 lib/NightGun/Store/WebSaver.pm
 lib/NightGun/Store/WWW.pm
 lib/NightGun/Store/Zbook.pm
@@ -41,5 +44,6 @@ share/nightgun/default.pm
 share/nightgun/main.glade
 share/nightgun/nightgun.pl
 share/nightgun/nightgun.png
+'share/nightgun/Unsaved 2.glade'
 share/pixmaps/nightgun.png
 tags
