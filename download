@@ -89,6 +89,7 @@ my $refer= $OPT{"r"} ? $OPT{"r"} : "";
 my $cookie= $OPT{b} ? $OPT{b} : "";
 my $logging= $OPT{l} ? $OPT{l} : "";
 my $autorename = $OPT{a} ? $OPT{a} : "";
+#my $downloader = $OPT{p} ? $OPT{p} : "wget";
 my $downloader = $OPT{p} ? $OPT{p} : "curl";
 my $FAILLOG="download.failed";
 my $DOWNLOADLOG="download.log";

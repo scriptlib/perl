@@ -22,15 +22,17 @@ my ($key,$from,$to) = @ARGV;
 $from = 1 unless($from);
 $to = 1 unless($to);
 $key = uri_escape($key);
+$key =~ s/%2B/+/i;
 
 
 foreach my $page ($from .. $to) {
-    my $start = ($page -1) * 20;
-    my $url = 'http://images.google.com/images?safe=off&um=1&newwindow=1&sa=1&aq=f&oq=&imgsz=l' . "&q=$key&start=$start";
+    my $start = ($page -1) * 18;
+    my $url = 'http://www.google.com/images?hl=en&safe=off&' . "&q=$key&start=$start" . "&gbv=2&as_st=y&tbs=isch:1,isz:lt,islt:qsvga&sa=N&ndsp=18";
 
-    open FI,"-|","wget",qw{-O - -e robots=off -U Mozilla/5.0},$url or die("$!\n");
+    open FI,"-|","wget",qw{-q -O - -e robots=off -U Mozilla/5.0},$url or die("$!\n");
     while(<FI>) {
-        my @match = $_ =~ m/imgurl\\x3d(.*?)\\x26/g;
+#        print $_;
+        my @match = $_ =~ m/imgurl\\x3d([^\\]+)\\x26/g;
         print $_,"\n" foreach(@match);
     }
     close FI;

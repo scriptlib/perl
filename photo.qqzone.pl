@@ -83,7 +83,8 @@ foreach my $album_exp (keys %url_map) {
     chdir $name or die("$!\n");
     foreach my $album (@{$albums}) {
         my $album_name = $album->{"name"};
-        $album_name =~ s/^[\s　]*(.+)[\s　]*$/$1/;
+        $album_name =~ s/^[\s　]+//;
+        $album_name =~ s/[\s　]+$//;
         $album_name = "_noname" unless($album_name);
         mkdir $album_name unless(-d $album_name);
         chdir $album_name or die("$!\n");

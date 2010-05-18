@@ -8,7 +8,7 @@ BEGIN {
     our ($VERSION,@ISA,@EXPORT,@EXPORT_OK,%EXPORT_TAGS);
     $VERSION        = 1.00;
     @ISA            = qw(Exporter);
-    @EXPORT         = qw(&para_init &para_queue &para_cleanup);
+    @EXPORT         = qw(&para_isfree &para_init &para_queue &para_cleanup);
     @EXPORT_OK      = qw();
 }
 
@@ -57,6 +57,10 @@ sub para_init {
     $verbose = shift;
     $limit = $default_limit unless($limit>=0);
     return 1;
+}
+
+sub para_isfree {
+    return $running<$limit;
 }
 
 sub para_queue {

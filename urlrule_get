@@ -16,5 +16,5 @@ exit 0 if(help_even_empty($0,@ARGV));
 use MyPlace::URLRule;
 
 my %rule = %{parse_rule(@ARGV)};
-exec("perl","-S","urlrule_action",@ARGV,"batchget -a -n '$rule{domain}\[$rule{level}\]'");
+exec("perl","-S","urlrule_action",@ARGV,"batchget -n '$rule{domain}\[$rule{level}\]'");
 

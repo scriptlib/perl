@@ -75,30 +75,31 @@ sub combox_add_unique_text {
     return unless($combox);
     return unless($text);
     my $model = $combox->get_model;
-    my $iter = Gtk2::TreeModel::get_iter_first($model);
+    my $iter = $model->get_iter_first;#($model);
     my $match=0;
     my $count=0;
     if($iter) {
         while($iter) {
             $count++;
-            my $value=Gtk2::TreeModel::get_value($model,$iter); 
+            my $value=$model->get_value($iter); 
             if($value eq $text) {
                 $match=1;
-                $combox->set_active_iter($iter);
+                #$combox->set_active_iter($iter);
                 last;
             }
             $iter=Gtk2::TreeModel::iter_next($model,$iter);
         }
 	}
     	unless($match) {
-#			print STDERR "Adding $text\n";
         	if($append) {
-	            $combox->append_text($text);
-    	        $combox->set_active($count);
+                    my $iter = Gtk2::ListStore::append($model);#->prepend(undef);
+                    Gtk2::ListStore::set_value($model,$iter,0,$text);
+                    $combox->set_active_iter($iter);
         	}
 	        else {
-    	       $combox->prepend_text($text);
-        	   $combox->set_active(0);
+                    my $iter = Gtk2::ListStore::prepend($model);#->prepend(undef);
+                    Gtk2::ListStore::set_value($model,$iter,0,$text);
+                    $combox->set_active_iter($iter);
 	        }
     	}
         
