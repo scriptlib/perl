@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -w 
 ###APPNAME:     renameext
 ###APPAUTHOR:   duel
 ###APPDATE:	Sun Mar 30 12:46:15 2008
@@ -14,17 +14,19 @@ use MyPlace::Script::Usage qw/help_even_empty format_help/;
 
 exit 0 if(help_even_empty($0,@ARGV));
 
+
+use utf8;
+use Encode;
+my $utf8 = find_encoding("utf8");
+@ARGV = map $utf8->decode($_),@ARGV;
+binmode STDERR,'utf8';
+binmode STDERR,'utf8';
+binmode STDIN,'utf8';
+
 my $exp=shift;
 my $test;
 $exp=shift,$test="true" if($exp eq "-t");
 exit(format_help($0)) unless(@ARGV);
-
-use utf8;
-#my $exp_opt="";
-#if($exp =~ /^\/(.*)\/([gisxm]*)$/) {
-#    $exp = $1;
-#    $exp_opt = $2;
-#}
 
 if($exp =~ /\/.*\//) {
     eval("sub s_code {my \$r = shift;\$r =~ $exp if(\$r);return \$r}");
@@ -45,9 +47,21 @@ sub my_rename {
     return 1;
 }
 
+my @files;
+if(@ARGV) {
+    @files = @ARGV;
+}
+else {
+    print STDERR "Please input filenames";
+    while(<STDIN>) {
+        chomp;
+        push @files,$_;
+    }
+}
+
 
 my $dfile=0;
-foreach my $old(grep !/^\.\.?$/,@ARGV) {
+foreach my $old(grep !/^\.\.?$/,@files) {
     my $new = &s_code($old);
     if($new eq $old) {
         next;

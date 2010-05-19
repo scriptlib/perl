@@ -26,8 +26,6 @@ binmode STDERR,"utf8";
 my $body_id = shift;
 my $user = shift;
 my $pass = shift;
-$user ||= "keyduel";
-$pass ||= "absfreedom";
 my @files = @ARGV;
 unless(@files) {while(<>){chomp;push @files,$_;}}
 

@@ -20,8 +20,6 @@ exit 0 if(help_required($0,@ARGV));
 
 use MyPlace::Discuz;
 my ($url,$user,$pass,$what) = @ARGV;
-$user ||= "keyduel";
-$pass ||= "absfreedom";
 my $index = MyPlace::Discuz->new(user=>$user,pass=>$pass);
 $index->init_with_url($url);
 binmode STDERR,"utf8";

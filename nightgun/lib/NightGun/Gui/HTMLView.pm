@@ -22,7 +22,7 @@ sub new {
 }
 sub stop {
     my $self=shift;
-    $self->{viewer}->load_uri("about:blank");
+    $self->{viewer}->load_url("about:blank");
 }
 sub _zoom {
     my $self=shift;

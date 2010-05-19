@@ -34,8 +34,6 @@ my $CWD = getcwd();
 my $HND = MyPlace::ReEnterable->new('main');
 my ($url,$TYPE,$USER,$PASS) = @ARGV;
 $TYPE ||= "text";
-$USER ||= "keyduel";
-$PASS ||= "absfreedom";
 
 sub build_dir {
     my $f =shift;
@@ -239,6 +237,7 @@ if($url) {
     if($url eq '-') {
         print STDERR "Input URLs:\n";
         while(<STDIN>) {
+            chomp;
             push @urls,$_;
         }
         print STDERR scalar(@urls)," URLs read.\n";
@@ -269,10 +268,24 @@ else {
     print STDERR "Loading resuming data...";
     $HND->loadFromFile(RESULE_DATA_FILE);
     $TYPE = $HND->getState("type") || "text";
-    $USER = $HND->getState("user") || "keyduel";
-    $PASS = $HND->getState("pass") || "absfreedom";
+    $USER = $HND->getState("user"); 
+    $PASS = $HND->getState("pass"); 
     print STDERR "\tGet " . $HND->length . " tasks\n";
 }
+
+unless($USER) {
+    print STDERR "Input user name,please:";
+    $USER = readline(*STDIN);
+    chomp $USER;
+    $HND->setState("user",$USER);
+}
+unless($PASS) {
+    print STDERR "Input password,please:";
+    $PASS = readline(*STDIN);
+    chomp $PASS;
+    $HND->setState("pass",$PASS);
+}
+
 die("Usage:$0 (URL) [text/images] [username] [password]\n") unless($HND->length);
 
 while(my $tasks = $HND->length) {

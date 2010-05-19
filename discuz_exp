@@ -61,7 +61,7 @@ sub cmd_loadurl {
     }
     $new_url=URI->new_abs($new_url,$g_url) if($g_url);
     print STDERR "Loading $new_url...";
-    my @data = `netcat_autologin '$new_url' keyduel absfreedom | gb2utf`;
+    my @data = `netcat_autologin '$new_url' $user $password | gb2utf`;
     return undef unless(@data);
     print STDERR "\t[Done]\n";
     print STDERR "Loading page...";

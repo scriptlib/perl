@@ -41,9 +41,6 @@ sub cache_save {
 
 }
 
-unless($user) {$user = "120,114,108,102,117,110,";$user =~ s/([^,]+),/chr($1)/ge;};
-unless($pass) {$pass = "97,98,115,102,114,101,101,100,111,109,";$pass =~ s/([^,]+),/chr($1)/ge;};
-
 die("Password is empty\n") unless($pass);
 
 use LWP::UserAgent;
