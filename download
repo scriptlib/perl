@@ -165,10 +165,12 @@ if($r==0 and -f $saveas_temp) {
     exit 0;
 }
 elsif($r==2) {
+    unlink $saveas_temp if(-f $saveas_temp);
     app_warning "$name$url\t[killed]\n";
     exit 2;
 }
 else {
+    unlink $saveas_temp if(-f $saveas_temp);
     app_error "$name$url\t[failed]\n";
     &log("$url->$saveas\n","$FAILLOG") if($logging);;
     exit 0;

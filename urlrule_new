@@ -55,17 +55,32 @@ print VIMED <<'USAGE';
 USAGE
 
 print VIMED <<'FUNC';
-sub apply_rule {
-    my $rule_base= shift(@_);
-    my %rule = %{shift(@_)};
-    my %r;
-    $r{base}=$rule_base;
-    open FI,"-|","netcat \'$rule_base\'";
-    while(<FI>) {
-    }
-    close FI;
-    return %r;
+
+use MyPlace::HTTPGet;
+#use MyPlace::HTML;
+
+sub _process {
+    my ($url,$rule,$html) = @_;
+    my @data;
+    my @pass_data;
+
+    #my @html = split(/\n/,$html);
+
+
+    return (data=>[@data],pass_data=>[@pass_data],base=>$url,no_subdir=>1,work_dir=>undef);
 }
+
+sub apply_rule {
+    my $url = shift(@_);
+    my %rule = %{shift(@_)};
+    my $http = MyPlace::HTTPGet->new();
+    my (undef,$html) = $http->get($url);
+    return &_process($url,\%rule,$html);
+}
+
+
+
+#       vim:filetype=perl
 FUNC
 
 close VIMED;

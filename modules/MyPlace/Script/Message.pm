@@ -69,7 +69,13 @@ sub AUTOLOAD {
     }
     elsif($AUTOLOAD =~ /::app_([\w\d_]+)$/) {
         my $channel = $CHANNEL{$1} || 'reset';
-        print STDERR $prefix,color($channel),@_,color('reset');
+        my $flag = shift(@_);
+        if($flag eq '--no-prefix') {
+            print STDERR color($channel),@_,color('reset');
+        }
+        else {
+            print STDERR $prefix,color($channel),$flag,@_,color('reset');
+        }
         return 1;
     }
     return undef;

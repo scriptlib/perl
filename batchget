@@ -6,17 +6,18 @@
 ###APPDESC:     Download URLS,using simdo	
 ###APPUSAGE:	[OPTIONS...] [Task Name]
 ###APPEXAMPLE:	cat url.lst | batchget
-###APPOPTION:	-m:Max number of simultanous tasks|-n:Task name|-a:Auto rename|-d:Create directories|-e:extension name for autorename|-w:Working directory|-r:Refer URL|-h:Display this text|-b:cookie|-L:Logging programe|-i:Auto rename by index
+###APPOPTION:	-m:Max number of simultanous tasks|-n:Task name|-a:Auto rename|-d:Create directories|-e:extension name for autorename|-w:Working directory|-r:Refer URL|-h:Display this text|-b:cookie|-L:Logging programe|-f:Full name|-i:Auto rename by index
 
 use strict;
 use lib $ENV{XR_PERL_MODULE_DIR};
 use MyPlace::ParallelRun;
 use Getopt::Std;
+use URI::Escape;
 
 #BEGIN {srand(time());}
 
 my %opts;
-getopts('hm:n:ade:w:r:L:b:i',\%opts);
+getopts('hm:n:fade:w:r:L:b:i',\%opts);
 exit(system("formathelp",$0,"-n")) if($opts{"h"});
 
 my $def_mul=3;
@@ -30,6 +31,8 @@ my $refer     = $opts{"r"} ? $opts{"r"} : "";
 my $logger    = $opts{"L"} ? $opts{"L"} : "";
 my $cookie    = $opts{"b"} ? $opts{"b"} : "";
 my $number    = $opts{"i"} ? $opts{"i"} : "";
+my $fullname  = $opts{"f"} ? 1 : 0;
+
 $autoname="true" if($number);
 unless($taskname) {
     $taskname = shift(@ARGV)  if(@ARGV);
@@ -55,6 +58,14 @@ sub Uniqname($) {
     } until (! -f $result);
     return $result;
 }
+sub GetFilename_Fullname {
+    my $result=shift;
+    $result =~ s/^.*:\/\///;
+    $result =~ s/[\/\?\:\\\*\&]/_/g;
+    $result =~ s/&//g;
+    return $result;
+}
+
 sub GetFilename_Auto {
     my $URL=shift;
     my $num=shift;
@@ -103,7 +114,7 @@ sub inqueue {
     my ($URL,$index,$count,$prefix)=@_;
     my $curname= "[$prefix$index/$count]";
     my $stridx = "0" x (length($count)-length($index)+1) . $index if($number);
-    my $filename= $autoname ? GetFilename_Auto($URL,$stridx) : GetFilename_NoAuto($URL);
+    my $filename= $fullname ? GetFilename_Fullname(uri_unescape($URL)) : ($autoname ? GetFilename_Auto(uri_unescape($URL),$stridx) : GetFilename_NoAuto($URL));
     my $thisrefer= $refer ? $refer : $URL;
     if($logger) {system($logger,$filename,$URL);}
     my @DARG;

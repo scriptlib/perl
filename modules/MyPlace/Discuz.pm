@@ -218,14 +218,20 @@ sub init {
         $title = $title->as_text; $title =~ s/^\s+//; $title =~ s/\s+$//;
     }
     $self->{title}=$title ? $title : "";
-    my @forums = $tree->look_down("class",qr/^mainbox forumlist$/i);
-    foreach(@forums) {
-        my @links = $_->look_down("_tag","a","href",qr/forum/);
-        foreach(@links) {
-            push @{$self->{forums}},[$_->attr("href"),$_->as_text];
+    my @forum_exp = (
+        ["class",qr/^mainbox forumlist$/i],
+        ["id",qr/^subforum$/i],
+    );
+    my @forums;
+    foreach my $exp (@forum_exp) { 
+        @forums= $tree->look_down(@{$exp});
+        foreach(@forums) {
+            my @links = $_->look_down("_tag","a","href",qr/forum/);
+            foreach(@links) {
+                push @{$self->{forums}},[$_->attr("href"),$_->as_text];
+            }
         }
     }
-#    my @threads = $tree->look_down("id",qr/^thread/i);
     my @threads = $tree->look_down("_tag","a","href",qr/(:?viewthread\.php\?|thread-\d+-1)/i);
     foreach my $thread (@threads) {
         my $text = $thread->as_text;
@@ -233,9 +239,7 @@ sub init {
         my $href = $thread->attr("href");
         push @{$self->{threads}},[$href,$text];
     }
-#    my ($pages) = $tree->look_down("class","pages_btns");
     my $pages = $tree;
-    #->look_down("class","pages_btns");
     if($pages) {
         my $min=1;#10000;
         my $max=1;

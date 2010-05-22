@@ -18,16 +18,18 @@ exit 0 if(help_even_empty($0,@ARGV));
 use utf8;
 use Encode;
 my $utf8 = find_encoding("utf8");
-@ARGV = map $utf8->decode($_),@ARGV;
+my @OLDARGV = @ARGV;
+@ARGV = ();
+foreach(@OLDARGV) {
+    push @ARGV,$utf8->decode($_);
+}
 binmode STDERR,'utf8';
-binmode STDERR,'utf8';
+binmode STDOUT,'utf8';
 binmode STDIN,'utf8';
 
 my $exp=shift;
 my $test;
 $exp=shift,$test="true" if($exp eq "-t");
-exit(format_help($0)) unless(@ARGV);
-
 if($exp =~ /\/.*\//) {
     eval("sub s_code {my \$r = shift;\$r =~ $exp if(\$r);return \$r}");
 }
@@ -52,7 +54,7 @@ if(@ARGV) {
     @files = @ARGV;
 }
 else {
-    print STDERR "Please input filenames";
+    print STDERR "Please input filenames:\n";
     while(<STDIN>) {
         chomp;
         push @files,$_;

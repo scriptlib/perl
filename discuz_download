@@ -20,9 +20,10 @@ exit 0 if(help_required($0,@ARGV));
 
 use MyPlace::Discuz;
 use MyPlace::ReEnterable;
+use MyPlace::Script::Message;
 use Cwd qw/getcwd/;
 use constant {
-    RESULE_DATA_FILE=>".discuz_download.resume",
+    RESUME_DATA_FILE=>".discuz_download.resume",
     THREAD_DBASE_FILE=>".threads",
 };
 use utf8;
@@ -34,6 +35,8 @@ my $CWD = getcwd();
 my $HND = MyPlace::ReEnterable->new('main');
 my ($url,$TYPE,$USER,$PASS) = @ARGV;
 $TYPE ||= "text";
+
+my $AUTORENAME=0;
 
 sub build_dir {
     my $f =shift;
@@ -48,15 +51,15 @@ sub build_dir {
 }
 sub loadpage {
     my ($url,$USER,$PASS) = @_;
-    print STDERR "> $url...";
+    app_message "loading $url...";
     sleep 2;
     my $page = MyPlace::Discuz->new(user=>$USER,pass=>$PASS);
     if($page->init_with_url($url)) {
-        print STDERR "\t[OK]\n";
+        app_message "--no-prefix","\t[OK]\n";
         return $page;
     }
     else {
-        print STDERR "\t[Failed]\n";
+        app_warning "--no-prefix","\t[Failed]\n";
         return undef;
     }
 }
@@ -65,29 +68,35 @@ sub save_post {
     my ($dir,$filename,$url,$prompt) = @_;
     $prompt = $prompt ? "[$prompt]" : "";
     my $subpage = loadpage($url,$USER,$PASS);
-    print STDERR "$prompt $url ...";
+#    app_message "$prompt $url ...";
     unless($subpage and $subpage->{post}) {
-        print STDERR "\tEmpty post...\n";
+        app_warning "Empty post...\n";
         return undef;
     }
+    app_message "Saving...";
     mkdir $dir unless(-d $dir);
     if($TYPE eq "images") {
-        print STDERR "\nSaving Images...";
         save_images($dir,$filename,$subpage);
-        print STDERR "\n";
     }
     elsif($TYPE eq "all") {
-        print STDERR "\nSaving Images...";
         save_images($dir,$filename,$subpage);
-        print STDERR "\nSaving Text";
         save_text($dir,$filename,$subpage);
     }
     else {
-        print STDERR "\nSaving Text ";
         save_text($dir,$filename,$subpage);
     }
-    $THREAD_DBASE{$url}=1;
+    &log_item($url);
 }
+
+sub log_item {
+    my $str = shift;
+    return undef if($THREAD_DBASE{$str});
+    $str =~ s/^[a-zA-Z]+:\/+[^\/]+//;
+    return undef if($THREAD_DBASE{$str});
+    $THREAD_DBASE{$str}=1;
+    return 1;
+}
+
 
 sub save_images {
     my $dir = shift;
@@ -96,16 +105,16 @@ sub save_images {
 #    my $prompt = shift;
     my @images = $subpage->get_post_images($subpage->{post});
     unless(@images) {
-        print STDERR "\tNO IMAGES";
+        app_warning "--no-prefix","\tNO IMAGES\n";
         return undef;
     }
     my $dst = build_dir($dir,$filename);
     mkdir $dst unless(-d $dst);
     foreach my $idx (0 .. $#images) {  
-        print STDERR "\n[" . ($idx+1)  . "/$#images]" if(@images > 1);
-        print STDERR "$images[$idx]\n-->$dst/$idx.jpg ...";
+        app_message "\n[" . ($idx+1)  . "/$#images]" if(@images > 1);
+        app_message "--no-prefix","$images[$idx]\n-->$dst/$idx.jpg ...\n";
         if(-f "$dst/$idx.jpg") {
-            print STDERR "\t[Skipped] File exists\n";
+            app_message "\t[Skipped] File exists\n";
             next;
         }
         print "\n";
@@ -116,7 +125,7 @@ sub save_images {
             next;
         }
         unless(open FO,">","$dst/$idx.jpg") {
-            print STDERR "\nError:$!\n";
+            app_error "Error:$!\n";
             close FI;
             next;
         }
@@ -126,21 +135,34 @@ sub save_images {
     }
 }
 
+sub get_filename {
+    my ($fst,$sec)=@_;
+    $sec ="" unless($sec);
+    my $idx=0;
+    while (-e "$fst$sec") {
+        $idx++;
+        $fst="$fst\_$idx";
+    }
+    return "$fst$sec";
+}
+
 sub save_text {
     my $dir = shift;
     my $filename = shift;
     my $subpage = shift;
 #    my $prompt = shift;
+    if($AUTORENAME) {
+        $filename = &autorename($filename);
+    }
     my $dst = build_dir($dir,$filename);
-    $dst .= ".txt";
-    print STDERR "==>$dst ...";
+    $dst = &get_filename($dst,".txt");
+    app_message "==>$dst ...";
     mkdir $dir unless(-d $dir);
-    return (print STDERR "\t[Failed:]$dir not exists!\n") unless(-d $dir);
+    return (app_error "--no-prefix","\t[Failed:]$dir not exists!\n") unless(-d $dir);
     if(-f $dst) { 
-        print STDERR "\t[Skipped] File exists\n";
+        app_warning "--no-prefix","\t[Skipped] File exists\n";
         return undef;
     }
-    print STDERR "\n";
     my $text;
     if($subpage) {
         $text = $subpage->get_post_text($subpage->{post});
@@ -149,13 +171,13 @@ sub save_text {
         $text = shift;
     }
     unless($text) {
-        print STDERR "\tNo text to save [Failed]\n";
+        app_message "--no-prefix","\tNo text to save [Failed]\n";
         return undef;
     }
-    open FO,">:utf8",$dst or return (print STDERR "\t[Failed:]$!\n");
+    open FO,">:utf8",$dst or return (app_message "--no-prefix","\t[Failed:]$!\n");
     print FO @{$text};
     close FO;
-#    print STDERR "\t[Done]\n";
+    app_message "--no-prefix","\t[Done]\n";
     return 1;
 }
 
@@ -199,8 +221,8 @@ sub process_url {
     else {
         foreach my $idx (0 .. $#{$page->{threads}}) {
             my $suburl = $page->build_url($page->{threads}->[$idx]->[0],$url);
-            if($THREAD_DBASE{$suburl}) {
-                print STDERR "$suburl in THREAD_DBASE, ignored it\n";
+            if(!&log_item($suburl)) {
+                app_message "$suburl:\n\t in THREAD_DBASE, ignored it\n";
                 next;
             }
             my $subfile = $page->{threads}->[$idx]->[1];
@@ -214,20 +236,20 @@ my $killingme=0;
 sub sig_killed {
     return if($killingme);
     $killingme=1;
-    print STDERR "I AM KILLED!!!\n";
+    app_warning "I AM KILLED!!!\n";
     if($HND->{lastStack}) {
         $HND->push(@{$HND->{lastStack}});
     }
     chdir($CWD);
-    print STDERR "saving remained tasks...\n";
-    $HND->saveToFile(RESULE_DATA_FILE);
-    print STDERR "saving thread dbase...\n";
+    app_message "saving remained tasks...\n";
+    $HND->saveToFile(RESUME_DATA_FILE);
+    app_message "saving thread dbase...\n";
     open FO,">",THREAD_DBASE_FILE;
     foreach(keys %THREAD_DBASE) {
         print FO "$_\n";
     }
     close FO;
-    print STDERR $HND->length," tasks saved to ",RESULE_DATA_FILE,"\n";
+    app_message $HND->length," tasks saved to ",RESUME_DATA_FILE,"\n";
     exit 2;
 }
 $SIG{INT}=\&sig_killed;
@@ -235,12 +257,12 @@ $SIG{INT}=\&sig_killed;
 my @urls;
 if($url) {
     if($url eq '-') {
-        print STDERR "Input URLs:\n";
+        app_message "Input URLs:\n";
         while(<STDIN>) {
             chomp;
             push @urls,$_;
         }
-        print STDERR scalar(@urls)," URLs read.\n";
+        app_message scalar(@urls)," URLs read.\n";
     }
     else {
         push @urls,$url;
@@ -254,33 +276,25 @@ if(@urls) {
     $HND->setState("urls",[@urls]);
     $HND->setState("pass",$PASS);
     $HND->push(undef,"process_url",".",$_,0,"") foreach(@urls);
-    $HND->saveToFile(RESULE_DATA_FILE);
+    $HND->saveToFile(RESUME_DATA_FILE);
 }
 else {
-    if(-f THREAD_DBASE_FILE) {
-        open FI,"<",THREAD_DBASE_FILE;
-        while(<FI>) {
-            chomp;
-            $THREAD_DBASE{$_}=1;
-        }
-        close FI;
-    }
-    print STDERR "Loading resuming data...";
-    $HND->loadFromFile(RESULE_DATA_FILE);
+    app_message "Loading resuming data...";
+    $HND->loadFromFile(RESUME_DATA_FILE);
     $TYPE = $HND->getState("type") || "text";
     $USER = $HND->getState("user"); 
     $PASS = $HND->getState("pass"); 
-    print STDERR "\tGet " . $HND->length . " tasks\n";
+    app_message "--no-prefix","\tGet " . $HND->length . " tasks\n";
 }
 
 unless($USER) {
-    print STDERR "Input user name,please:";
+    app_message "Input user name,please:";
     $USER = readline(*STDIN);
     chomp $USER;
     $HND->setState("user",$USER);
 }
 unless($PASS) {
-    print STDERR "Input password,please:";
+    app_message "Input password,please:";
     $PASS = readline(*STDIN);
     chomp $PASS;
     $HND->setState("pass",$PASS);
@@ -288,12 +302,34 @@ unless($PASS) {
 
 die("Usage:$0 (URL) [text/images] [username] [password]\n") unless($HND->length);
 
-while(my $tasks = $HND->length) {
-    print STDERR "[$tasks] tasks remained\n";
-    $HND->run();
+if(-f THREAD_DBASE_FILE) {
+    open FI,"<",THREAD_DBASE_FILE;
+    while(<FI>) {
+        chomp;
+        $THREAD_DBASE{$_}=1;
+    }
+    close FI;
+}
+
+if( -f "autorename.pl") {
+    $AUTORENAME=1;
+    do "autorename.pl";
+    #import "autorename.pl";
 }
 
 
+while(my $tasks = $HND->length) {
+    app_message "[$tasks] tasks remained\n";
+    $HND->run();
+}
+chdir($CWD);
+unlink RESUME_DATA_FILE if(-f RESUME_DATA_FILE);
+app_message "saving thread dbase...\n";
+open FO,">",THREAD_DBASE_FILE;
+foreach(keys %THREAD_DBASE) {
+    print FO "$_\n";
+}
+close FO;
 
 
 

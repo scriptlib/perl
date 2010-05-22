@@ -219,6 +219,7 @@ while(my $tasks = $phnd->length) {
     }
     $phnd->run();
 }
+app_message "All tasks completed.\n";
 unlink $RESUME_FILE if(-f $RESUME_FILE);
 exit 0;
 #load_rule(@ARGV);

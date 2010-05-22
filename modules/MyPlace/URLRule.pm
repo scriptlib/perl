@@ -71,12 +71,21 @@ sub parse_rule(@) {
     $r{action} = "" unless($r{action});
     @{$r{args}} = @_;
     my $rule_dir = $RULE_DIRECTORY . "/" . $r{level};
-    $r{source} = "$rule_dir/$r{domain}";
     for my $fn ($r{domain},"$r{domain}.pl","www.$r{domain}","www.$r{domain}.pl") {
         if( -f "$rule_dir/$fn" ) {
             $r{source}="$rule_dir/$fn";
         }
     }
+    unless($r{source}) {
+        my $domain = $r{domain};
+        while($domain =~ /[^\.]+\.[^\.]+\./) {
+            $domain =~ s/^[^\.]*\.//;
+            for my $fn ($domain, $domain . ".pl", "www.$domain", "www.$domain" . ".pl") {
+                $r{source}="$rule_dir/$fn" if(-f "$rule_dir/$fn");
+            }
+        } 
+    }
+    $r{source} = "$rule_dir/$r{domain}" unless($r{source});
     return \%r;
 }
 

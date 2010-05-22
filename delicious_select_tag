@@ -1,0 +1,68 @@
+#!/usr/bin/perl -w
+###APPNAME:     delicious_select_tag
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Fri May 21 02:37:57 2010
+###APPVER:	0.1
+###APPDESC:     delicious_select_tag	
+###APPUSAGE:    (tags...)	
+###APPEXAMPLE:	delicious_select_tag
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+print <<'HEAD'
+<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<!-- This is an automatically generated file.
+It will be read and overwritten.
+Do Not Edit! -->
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+<DL><p>
+HEAD
+;
+
+my @tags;
+foreach(@ARGV) {
+    push @tags,split(/\s*,\s*/,$_);
+}
+
+my @rtags;
+foreach(@tags) {
+    push @rtags,qr/TAGS="[^"]*$_[^"]*"/i;
+}
+my $status=0;
+while(<STDIN>) {
+    s/<DL><p>//;
+#    print STDOUT "########\t$_";
+    if(/<DD>/) {
+        if($status eq "delete") {
+            $status="clean";
+            next;
+        }
+        print $_;
+    }
+    else {
+        $status="delete";
+        foreach my $tag(@rtags) {
+            if($_ =~ $tag) {
+                print $_;
+                $status="print";
+                last;
+            }
+        }
+    }
+}
+
+print <<'FOOT'
+</DL><p><!-- fe02.secure.del.ac4.yahoo.net uncompressed/chunked Thu May 20 11:28:06 PDT 2010 -->
+FOOT
+;

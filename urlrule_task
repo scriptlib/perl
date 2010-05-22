@@ -1,0 +1,228 @@
+#!/usr/bin/perl -w 
+use Cwd qw/getcwd/;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::ReEnterable;
+use MyPlace::Script::Message;
+
+#my %MAPS= (
+#    'HOSTS'=> {
+#        'moko.cc'           => {'url'=>'http://www.moko.cc/post/###ID###/','level'=>2},
+#        'vlike.com'         => {'url'=>'http://www.vlike.com/pic/###ID###/','level'=>1},
+#        'skins.be'          => {'url'=>'http://www.skins.be/###ID###/','level'=>2},
+#        'celebscentral.net' => {'url'=>'http://###ID###.celebscentral.net/',level=>2},
+#    },
+#    'NAMES'=> {
+#       'Megan Fox'             => {'megan-fox'=>[qw/skins.be celebscentral.net/]},
+#    },
+#);
+
+use constant {
+    FILENAME_RESUME => '.urlrule_task_resume',
+    ACTION_URL      => 'urlrule_get',
+    FILENAME_LOG    => 'urlrule_task.log',
+};
+my $FILENAME_DATA   = "URLRule_Database.pl";
+
+die("No DATA_FILE(" . $FILENAME_DATA . ") found\n") unless(-r $FILENAME_DATA);
+do $FILENAME_DATA;
+
+my %HOSTS = %{$MAPS{hosts}};
+my @HOSTS = keys %HOSTS;
+my %NAMES = %{$MAPS{names}};
+my @NAMES = keys %NAMES;
+my %IDS;
+foreach my $name(@NAMES) {
+    my @keys = keys %{$NAMES{$name}};
+    foreach(@keys) {
+        $IDS{$_} = [] unless($IDS{$_});
+        push @{$IDS{$_}},@{$NAMES{$name}->{$_}};
+    }
+}
+my @IDS = keys %IDS;
+
+
+my $WORKDIR = getcwd();
+open FILEHANDLE_LOG,">>",FILENAME_LOG;
+
+
+
+sub info {
+    require Data::Dumper;
+    return Data::Dumper->Dump([\%HOSTS,\@HOSTS,\%NAMES,\@NAMES,\%IDS,\@IDS],[qw/%HOSTS @HOSTS %NAMES @NAMES %IDS @IDS/]);
+}
+
+sub get_task {
+    my ($name,$id,$host)=@_;
+    my $dst = "$name/$host";
+    my $url = $HOSTS{$host}->{url};
+    my $level = $HOSTS{$host}->{level};
+    $url =~ s/###ID###/$id/g;
+    return {URL=>$url,LEVEL=>$level,DEST=>$dst};
+}
+
+sub select_by_name {
+    my $name  = shift;
+    app_message "select_by_name: $name\n";
+    my @result;
+    foreach my $id (keys %{$NAMES{$name}}) {
+        foreach my $host (@{$IDS{$id}}) {
+            push @result,&get_task($name,$id,$host);
+        }
+    }
+    return @result;
+}
+
+sub select_by_id {
+    my $id = shift;
+    my @result;
+    app_message "select_by_id: $id\n";
+    foreach my $name (@NAMES) {
+        if($NAMES{$name}->{$id}) {
+            foreach my $host(@{$NAMES{$name}->{$id}}) {
+                push @result,&get_task($name,$id,$host);    
+            }
+        }
+    }
+    return @result;
+}
+
+sub select_by_host {
+    my $host = shift;
+    my @result;
+    foreach my $name (@NAMES) {
+        foreach my $id (keys %{$NAMES{$name}}) {
+            foreach (@{$NAMES{$name}->{$id}}) {
+                if($_ eq $host) {
+                    push @result,&get_task($name,$id,$host);    
+                }
+            }
+        }
+    }
+    return @result;
+}
+
+sub select {
+    my $key =shift;
+    my @result;
+    my $tested=0;
+    foreach(@NAMES) {
+        if($_ eq $key) {
+            return select_by_name($_);
+	}
+    }
+    foreach(@IDS) {
+        if($_ eq $key) {
+            return select_by_id($_);
+	}
+    }
+    foreach(@HOSTS) {
+        if($_ eq $key) {
+            return select_by_host($_);
+	}
+    }
+    foreach(@NAMES) {
+        if($_ =~ /$key/) {
+            $tested=1;
+            push @result,select_by_name($_);
+	}
+    }
+    return @result if($tested);
+    foreach(@IDS) {
+        if($_ =~ /$key/) {
+            $tested=1;
+            push @result,select_by_id($_);
+	}
+    }
+    return @result if($tested);
+    foreach(@HOSTS) {
+        if($_ =~ /$key/) {
+            push @result,select_by_host($_);
+	}
+    }
+    return @result;;
+}
+
+sub log {
+    print FILEHANDLE_LOG scalar(localtime),": ",@_,"\n" if(@_);
+}
+
+sub run {
+    my ($dest,$url,$level) = @_;
+    my $WORKDIR = getcwd;
+    system("mkdir","-vp",$dest) unless(-d $dest);
+    if(chdir $dest) {
+        &log("Task start: " . ACTION_URL  . " $url $level");
+        system(ACTION_URL,$url,$level);
+        &log("Task completed: " . ACTION_URL . " $url $level");
+    }
+    else {
+        &log("Task error: Can't not access \"$dest\"");
+        app_error "Can't not access \"$dest\"\n";
+    }
+    chdir $WORKDIR;
+}
+
+sub start {
+    my $hnd = shift @_;
+    unshift @_,$hnd unless($hnd and ref $hnd);
+    my @tasks;
+    my %tasks;
+    @_=(".+") unless(@_);
+    foreach(@_) {
+        push @tasks,&select($_);
+    }
+    foreach(@tasks) {
+        $tasks{$_->{URL}}=$_ if($_);
+    }
+    foreach my $task(values %tasks) {
+        next unless($task);
+        if(ref $hnd) {
+            $hnd->push(undef,"run",$task->{DEST},$task->{URL},$task->{LEVEL});
+        }
+        else {
+            &run($task->{DEST},$task->{URL},$task->{LEVEL});
+        }
+    }
+}
+
+sub sig_killed {
+    app_message("saving remained tasks...\n");
+    if($phnd->{lastStack}) {
+        $phnd->unshift(@{$phnd->{lastStack}});
+    }
+    chdir($WORKDIR) if($WORKDIR);
+    $phnd->saveToFile(FILENAME_RESUME);
+    app_message($phnd->length," tasks saved to FILENAME_RESUME\n");
+    &log("Updating aborted!");
+    close FILEHANDLE_LOG;
+    exit 1;
+}
+
+
+
+$SIG{INT} = \&sig_killed;
+my $phnd = MyPlace::ReEnterable->new('main');
+
+if(@ARGV) {
+    &log("Updating start: ",join(" ",@ARGV));
+    &start($phnd,@ARGV);
+}
+else {
+    $phnd->loadFromFile(FILENAME_RESUME);
+    if($phnd->length) {
+        &log("Updating resumed");
+    }
+    else {
+        &log("Updating start: [All]");
+        &start($phnd);
+    }
+}
+while(my $tasks = $phnd->length) {
+    app_error("[$tasks] tasks remained\n");
+    $phnd->run();
+}
+app_message "All tasks completed.\n";
+unlink FILENAME_RESUME if(-f FILENAME_RESUME);
+&log("Updating completed.");
+close FILEHANDLE_LOG;
+exit 0;

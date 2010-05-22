@@ -17,7 +17,6 @@ use lib $ENV{XR_PERL_MODULE_DIR};
 use MyPlace::Script::Usage qw/help_required help_even_empty/;
 #exit 0 if(help_required($0,@ARGV));
 exit 0 if(help_even_empty($0,@ARGV));
-
 my $REALTAG='all';
 my $root;
 my $tags;
@@ -35,7 +34,6 @@ else {
 }
 
 ($tags,@files)=@ARGV;
-
 die(help_required($0,"-h")) unless(@files);
 
 sub get_basename {
@@ -66,6 +64,7 @@ sub system_execute {
 }
 sub tag_files {
     foreach my $file (@_) {
+       print STDERR $file,"...\n";
        my $basename = get_basename($file);
        next if($basename eq '.' or $basename eq '..');
        if(! -e "$saved_in/$basename") {
@@ -82,7 +81,7 @@ sub tag_files {
 
 use File::Glob qw/bsd_glob/;
 foreach (@files) {
-    if(-f $_) {
+    if(-e $_) {
         tag_files($_);
     }
     else {
