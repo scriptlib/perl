@@ -3,33 +3,32 @@ use Cwd qw/getcwd/;
 use lib $ENV{XR_PERL_MODULE_DIR};
 use MyPlace::ReEnterable;
 use MyPlace::Script::Message;
+use MyPlace::URLRule::HostMap qw/%HOST_MAP get_task valid_hostname add_host get_hosts/;
 
-our %MAP= (
-    'hosts'=> {
-        'moko.cc'           => {'url'=>'http://www.moko.cc/post/###ID###/','level'=>2},
-        'vlike.com'         => {'url'=>'http://www.vlike.com/pic/###ID###/','level'=>1},
-        'skins.be'          => {'url'=>'http://www.skins.be/###ID###/','level'=>2},
-        'celebscentral.net' => {'url'=>'http://###ID###.celebscentral.net/',level=>2},
-    },
+our %NAMES= (
     'names'=> {
        'Megan Fox'             => {'megan-fox'=>[qw/skins.be celebscentral.net/]},
     },
 );
 
 use constant {
-    FILENAME_RESUME => '.urlrule_task_resume',
-    ACTION_URL      => 'urlrule_get',
-    FILENAME_LOG    => 'urlrule_task.log',
+    TASK_FILE_RESUME => '.urlrule_task_resume',
+    TASK_FILE_LOG    => 'urlrule_task.log',
 };
-my $FILENAME_DATA   = "URLRule_Database.pl";
 
-die("No DATA_FILE(" . $FILENAME_DATA . ") found\n") unless(-r $FILENAME_DATA);
-do $FILENAME_DATA;
+my $TASK_LOGGING    = 1;
+my $TASK_ACTION     = 'urlrule_get';
+my $TASK_DATABASE   = "URLRule_Database.pl";
+die("No DATA_FILE(" . $TASK_DATABASE . ") found\n") unless(-r $TASK_DATABASE);
+do $TASK_DATABASE;
+my $TASK_WORKDIR;
+my $TASK_FILEHANDLE_LOG;
 
-my %HOSTS = %{$MAP{hosts}};
+
+my %HOSTS = %MyPlace::URLRule::HostMap::HOST_MAP;
 my @HOSTS = keys %HOSTS;
-my %NAMES = %{$MAP{names}};
 my @NAMES = keys %NAMES;
+
 my %IDS;
 foreach my $name(@NAMES) {
     my @keys = keys %{$NAMES{$name}};
@@ -38,11 +37,11 @@ foreach my $name(@NAMES) {
         push @{$IDS{$_}},@{$NAMES{$name}->{$_}};
     }
 }
+
+
 my @IDS = keys %IDS;
 
 
-my $WORKDIR = getcwd();
-open FILEHANDLE_LOG,">>",FILENAME_LOG;
 
 
 
@@ -51,13 +50,11 @@ sub info {
     return Data::Dumper->Dump([\%HOSTS,\@HOSTS,\%NAMES,\@NAMES,\%IDS,\@IDS],[qw/%HOSTS @HOSTS %NAMES @NAMES %IDS @IDS/]);
 }
 
-sub get_task {
+sub build_task {
     my ($name,$id,$host)=@_;
     my $dst = "$name/$host";
-    my $url = $HOSTS{$host}->{url};
-    my $level = $HOSTS{$host}->{level};
-    $url =~ s/###ID###/$id/g;
-    return {URL=>$url,LEVEL=>$level,DEST=>$dst};
+    my ($url,$level) = &get_task($host,$id);
+    return {NAME=>$name,HOST=>$host,URL=>$url,LEVEL=>$level,DEST=>$dst};
 }
 
 sub select_by_name {
@@ -66,7 +63,7 @@ sub select_by_name {
     my @result;
     foreach my $id (keys %{$NAMES{$name}}) {
         foreach my $host (@{$IDS{$id}}) {
-            push @result,&get_task($name,$id,$host);
+            push @result,&build_task($name,$id,$host);
         }
     }
     return @result;
@@ -79,7 +76,7 @@ sub select_by_id {
     foreach my $name (@NAMES) {
         if($NAMES{$name}->{$id}) {
             foreach my $host(@{$NAMES{$name}->{$id}}) {
-                push @result,&get_task($name,$id,$host);    
+                push @result,&build_task($name,$id,$host);    
             }
         }
     }
@@ -93,7 +90,7 @@ sub select_by_host {
         foreach my $id (keys %{$NAMES{$name}}) {
             foreach (@{$NAMES{$name}->{$id}}) {
                 if($_ eq $host) {
-                    push @result,&get_task($name,$id,$host);    
+                    push @result,&build_task($name,$id,$host);    
                 }
             }
         }
@@ -105,6 +102,12 @@ sub select {
     my $key =shift;
     my @result;
     my $tested=0;
+    unless($key) {
+        foreach(@NAMES) {
+            push @result,select_by_name($_);
+        }
+        return @result;
+    }
     foreach(@NAMES) {
         if($_ eq $key) {
             return select_by_name($_);
@@ -143,33 +146,38 @@ sub select {
 }
 
 sub log {
-    print FILEHANDLE_LOG scalar(localtime),": ",@_,"\n" if(@_);
+    return unless($TASK_FILEHANDLE_LOG);
+    print $TASK_FILEHANDLE_LOG scalar(localtime),": ",@_,"\n" if(@_);
 }
 
 sub run {
     my ($dest,$url,$level) = @_;
-    my $WORKDIR = getcwd;
+    my $TASK_WORKDIR = getcwd;
     system("mkdir","-vp",$dest) unless(-d $dest);
     if(chdir $dest) {
-        &log("Task start: " . ACTION_URL  . " $url $level");
-        system(ACTION_URL,$url,$level);
-        &log("Task completed: " . ACTION_URL . " $url $level");
+        &log("Task start: " . $TASK_ACTION  . " $url $level");
+        system($TASK_ACTION,$url,$level);
+        &log("Task completed: " . $TASK_ACTION . " $url $level");
     }
     else {
         &log("Task error: Can't not access \"$dest\"");
         app_error "Can't not access \"$dest\"\n";
     }
-    chdir $WORKDIR;
+    chdir $TASK_WORKDIR;
 }
 
 sub start {
     my $hnd = shift @_;
-    unshift @_,$hnd unless($hnd and ref $hnd);
+    unshift @_,$hnd if($hnd and (!ref $hnd));
     my @tasks;
     my %tasks;
-    @_=(".+") unless(@_);
-    foreach(@_) {
-        push @tasks,&select($_);
+    if(!@_) {
+        push @tasks,&select();
+    }
+    else {
+        foreach(@_) {
+            push @tasks,&select($_);
+        }
     }
     foreach(@tasks) {
         $tasks{$_->{URL}}=$_ if($_);
@@ -190,25 +198,45 @@ sub sig_killed {
     if($phnd->{lastStack}) {
         $phnd->unshift(@{$phnd->{lastStack}});
     }
-    chdir($WORKDIR) if($WORKDIR);
-    $phnd->saveToFile(FILENAME_RESUME);
-    app_message($phnd->length," tasks saved to FILENAME_RESUME\n");
+    chdir($TASK_WORKDIR) if($TASK_WORKDIR);
+    $phnd->saveToFile(TASK_FILE_RESUME);
+    app_message($phnd->length," tasks saved to TASK_FILE_RESUME\n");
     &log("Updating aborted!");
-    close FILEHANDLE_LOG;
+    close TASK_FILEHANDLE_LOG;
     exit 1;
 }
 
 
 
 $SIG{INT} = \&sig_killed;
-my $phnd = MyPlace::ReEnterable->new('main');
+my $phnd;
+
+sub init {
+        open $TASK_FILEHANDLE_LOG,">>",TASK_FILE_LOG;
+        $phnd= MyPlace::ReEnterable->new('main');
+};
+
+
+$TASK_WORKDIR = getcwd();
+
 
 if(@ARGV) {
-    &log("Updating start: ",join(" ",@ARGV));
-    &start($phnd,@ARGV);
+    my $first = shift @ARGV;
+    if($first eq 'TEST') {
+        $TASK_ACTION='echo';
+        &start(@ARGV); 
+        exit 0;
+    }
+    else {
+        unshift @ARGV,$first;
+        &init;
+        &log("Updating start: ",join(" ",@ARGV));
+        &start($phnd,@ARGV);
+    }
 }
 else {
-    $phnd->loadFromFile(FILENAME_RESUME);
+    &init;
+    $phnd->loadFromFile(TASK_FILE_RESUME);
     if($phnd->length) {
         &log("Updating resumed");
     }
@@ -222,7 +250,7 @@ while(my $tasks = $phnd->length) {
     $phnd->run();
 }
 app_message "All tasks completed.\n";
-unlink FILENAME_RESUME if(-f FILENAME_RESUME);
+unlink TASK_FILE_RESUME if(-f TASK_FILE_RESUME);
 &log("Updating completed.");
-close FILEHANDLE_LOG;
+close TASK_FILEHANDLE_LOG;
 exit 0;

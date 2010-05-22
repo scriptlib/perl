@@ -1,0 +1,20 @@
+#!/usr/bin/perl -w
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::URLRule::HostMap qw/%HOST_MAP get_task valid_hostname add_host get_hosts/;
+
+use Data::Dumper;print STDERR Dumper(\%HOST_MAP);
+
+my ($host,@ids)=@ARGV;
+die("Usage:$0 (hostname) (id) [id...]\n") unless(@ids);
+
+die("Invalid hostname, not in the map.\n") unless(valid_hostname($host));
+
+foreach(@ids) {
+    print STDERR join(' ',get_task($host,$_)),"\n";
+}

@@ -1,0 +1,81 @@
+#!/usr/bin/perl -w
+###APPNAME:     svn-resolver
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sun May 23 00:40:42 2010
+###APPVER:	0.1
+###APPDESC:     svn-resolver	
+###APPUSAGE:    [ "STATUE_MARK ACTION" ...]
+###APPEXAMPLE:	svn status | svn-resolver '?add'\n\t svn status | svn-resolver '?delete'\n\t svn status | svn-resolver '?ignore'
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+sub process {
+    my $arg=shift @_;
+    my @args = split(/\s+/,$arg);
+    print STDERR join(" ","svn",@args,@_),"\n";
+    system("svn",@args,@_) == 0;
+}
+
+
+sub ignore {
+    open FO,"|-","svn","propset","svn:ignore","-F","-",".";
+    foreach(@_) {
+        print $_,"\n";
+    }
+    close FO;
+}
+
+sub action {
+    my ($action_exp,$item)=@_;
+    my $action;
+    my $arg;
+    if($action_exp =~ /([^\s]+)\s+(.+)/) {
+        $action = $1;
+        $arg = $2;
+    }
+    else {
+        $action = $action_exp;
+        $arg = "";
+    }
+    if($action eq 'ignore') {
+        &ignore($arg,$item);
+    }
+    else {
+        &process("$action $arg",$item);
+    }
+}
+
+my %ACTION = (
+);
+
+foreach(@ARGV) {
+    if(/\s*([\?M!])\s*(.+)\s*$/) {
+        $ACTION{$1}=$2;
+    }
+   else {
+        die("Unkonw usage!\n");
+   }
+}
+
+while(<STDIN>) {
+    print STDERR $_;
+    chomp;
+    if(/\s*([AD\?M!])\s*(.+)\s*$/) {
+        if($ACTION{$1}) {
+            &action($ACTION{$1},$2);
+        }
+    }
+   else {
+        die("Unkonw usage!\n");
+   }
+}
+exit 0;
