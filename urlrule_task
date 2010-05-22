@@ -4,17 +4,17 @@ use lib $ENV{XR_PERL_MODULE_DIR};
 use MyPlace::ReEnterable;
 use MyPlace::Script::Message;
 
-#my %MAPS= (
-#    'HOSTS'=> {
-#        'moko.cc'           => {'url'=>'http://www.moko.cc/post/###ID###/','level'=>2},
-#        'vlike.com'         => {'url'=>'http://www.vlike.com/pic/###ID###/','level'=>1},
-#        'skins.be'          => {'url'=>'http://www.skins.be/###ID###/','level'=>2},
-#        'celebscentral.net' => {'url'=>'http://###ID###.celebscentral.net/',level=>2},
-#    },
-#    'NAMES'=> {
-#       'Megan Fox'             => {'megan-fox'=>[qw/skins.be celebscentral.net/]},
-#    },
-#);
+our %MAP= (
+    'hosts'=> {
+        'moko.cc'           => {'url'=>'http://www.moko.cc/post/###ID###/','level'=>2},
+        'vlike.com'         => {'url'=>'http://www.vlike.com/pic/###ID###/','level'=>1},
+        'skins.be'          => {'url'=>'http://www.skins.be/###ID###/','level'=>2},
+        'celebscentral.net' => {'url'=>'http://###ID###.celebscentral.net/',level=>2},
+    },
+    'names'=> {
+       'Megan Fox'             => {'megan-fox'=>[qw/skins.be celebscentral.net/]},
+    },
+);
 
 use constant {
     FILENAME_RESUME => '.urlrule_task_resume',
@@ -26,9 +26,9 @@ my $FILENAME_DATA   = "URLRule_Database.pl";
 die("No DATA_FILE(" . $FILENAME_DATA . ") found\n") unless(-r $FILENAME_DATA);
 do $FILENAME_DATA;
 
-my %HOSTS = %{$MAPS{hosts}};
+my %HOSTS = %{$MAP{hosts}};
 my @HOSTS = keys %HOSTS;
-my %NAMES = %{$MAPS{names}};
+my %NAMES = %{$MAP{names}};
 my @NAMES = keys %NAMES;
 my %IDS;
 foreach my $name(@NAMES) {
