@@ -16,5 +16,7 @@ die("Usage:$0 (hostname) (id) [id...]\n") unless(@ids);
 die("Invalid hostname, not in the map.\n") unless(valid_hostname($host));
 
 foreach(@ids) {
-    print STDERR join(' ',get_task($host,$_)),"\n";
+    my ($url,$level) = get_task($host,$_);
+    print STDERR "$url $level\n";
+    system("urlrule_get",$url,$level) == 0;
 }

@@ -11,5 +11,9 @@ our %HOST_MAP = (
         'CopperminePhotoGallery'    => {url=>'http://###ID###/###TEXT1###/index.php?###TEXT2###',level=>1},
         'snarkerati.com'            => {url=>'http://snarkerati.com/galleries/index.php/###ID###',level=>1},
         'hqpics.org'                => {url=>'http://www.hqpics.org/index.php?spgmGal=###ID###',level=>1},
+        'hq-celebrity.com'          => {url=>'http://hq-celebrity.com/###ID###/',level=>2},
+        'digicelebs.com'            => {url=>'http://www.digicelebs.com/cpg/thumbnails-###TEXT1###.html',level=>1},
+        'hollywoodtuna.com'         => {url=>'http://www.hollywoodtuna.com/?cat=###TEXT1###',level=>0},
+        'celebrity-pictures.ca'     => {url=>'http://www.celebrity-pictures.ca/###ID###',level=>1},
 );
 1;
