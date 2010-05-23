@@ -1,0 +1,93 @@
+#!/usr/bin/perl -w
+###APPNAME:     google.search.image
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sun May 23 18:49:37 2010
+###APPVER:	0.1
+###APPDESC:     google.search.image	
+###APPUSAGE:	(keyword) [options...]
+###APPEXAMPLE:	google.search.image 
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_even_empty($0,@ARGV));
+use MyPlace::Google;
+#my %std_arg = (
+#    q=>'',
+#    v=>'1.0',
+#    lh=>'en',
+#    start=>'0',
+#    rsz=>'large',
+#);
+#my %std_opt_arg = (
+#    userip=>'',
+#    key=>'',
+#    callback=>'',
+#    context=>'',
+#);
+#my %img_arg = (
+#    soft=>'off',
+#    imgsz=>'xlarge',
+#);
+#my %img_opt_arg = (
+#    'as_filetype'=>'',
+#    'as_sitesearch'=>'',
+#    'imgc'=>'',
+#    'imgcolor'=>'',
+#    'imgtype'=>'',
+#    'as_rights'=>'',
+#);
+#
+my %args = (
+    v=>'1.0',
+    ln=>'en',
+    start=>'0',
+    rsz=>'large',
+    safe=>'off',
+    imgsz=>'xlarge',
+);
+my $keyword = shift;
+$args{q}=$keyword;
+my $pages;
+my $start;
+foreach(@ARGV) {
+    if(/^\s*pages\s*=\s*(\d+)\s*/) {
+        $pages=$1;
+    }
+    elsif(/^\s*start\s*=\s*(\d+)\s*/) {
+        $start=$1;
+    }
+    elsif(/^\s*([^=]+)=(.+)/) {
+        $args{$1}=$2;
+    }
+}
+die("Give me a keyword!\n") unless($args{q});
+$pages = 1 unless($pages and $pages>1);
+$start = 0 unless($start and $start>0);
+$| = 1;
+my @result;
+foreach my $page (1 .. $pages) {
+    my $pp = $args{rsz} eq 'large' ? MyPlace::Google::LARGE_RESULT : MyPlace::Google::SMALL_RESULT;
+    $args{start} = $start + ($page - 1) * $pp;
+    print STDERR "Searching \"" . $args{q} . "\", start at " . $args{start} . " ...";
+    my ($data,$results) = MyPlace::Google::search_images(%args);
+    if(ref $data) {
+        print STDERR " [OK] Get " , scalar(@{$results}), " results.\n";
+        print $_->{unescapedUrl},"\n" for(@{$results});
+        sleep 1;
+    }
+    else {
+        print STDERR " [Error] $results:$data\n"
+    }
+}
+
+
+
+
+
+

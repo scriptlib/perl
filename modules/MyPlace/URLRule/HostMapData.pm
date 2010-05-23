@@ -15,5 +15,7 @@ our %HOST_MAP = (
         'digicelebs.com'            => {url=>'http://www.digicelebs.com/cpg/thumbnails-###TEXT1###.html',level=>1},
         'hollywoodtuna.com'         => {url=>'http://www.hollywoodtuna.com/?cat=###TEXT1###',level=>0},
         'celebrity-pictures.ca'     => {url=>'http://www.celebrity-pictures.ca/###ID###',level=>1},
+        'google.search.image'       => {url=>'google.search.image/###ID###',level=>3}, # Fake url, use script "google.search.image" instead.
+        'yahoo.search.image'       => {url=>'yahoo.search.image/###ID###',level=>3}, # Fake url, use script "yahoo.search.image" instead.
 );
 1;

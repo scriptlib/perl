@@ -2,7 +2,7 @@
 package MyPlace::ParallelRun;
 use strict;
 use warnings;
-#use POSIX ":sys_wait_h";
+use POSIX ":sys_wait_h";
 BEGIN {
     use Exporter ();
     our ($VERSION,@ISA,@EXPORT,@EXPORT_OK,%EXPORT_TAGS);
@@ -14,42 +14,51 @@ BEGIN {
 
 my $default_limit = 3;
 my $limit;
-my @psid;
+my %psid;
 my $running=0;
 my $verbose;
 
 sub reinit_process() {$running=0;return 0;}
 sub new_process {
-    my $idx = shift;
+#    my $idx = shift;
     my $id = fork();die "Unable to fork" unless(defined $id);
     if($id) {
-        $psid[$idx]=$id;
+        $psid{$id}=1;
         $running++;
-        print STDERR "\n>>>[/",$idx+1,"/$running/$limit]PSID:$id>>>Start\n" if($verbose);
+        print STDERR "\n>>>[Runing:$running/Limit:$limit]PSID:$id>>>Start\n" if($verbose);
         return $running;
     }
     else {
         exit system(@_);
     }
 }
+
+sub para_isfree {
+    if($running<$limit) {
+        return 1;
+    }
+    &para_wait;
+    return $running<$limit;
+}
+
+sub para_wait {
+    my $pid = waitpid(-1,WNOHANG);
+    if($pid>0) {
+        $running--;
+        print STDERR "\n>>>[Runing:$running/Limit:$limit]PSID:$pid>>>End\n" if($verbose);
+    }
+    return $pid;
+}
+
+
 sub wait_process {
-    return &reinit_process() unless(@psid);
-    my $id = wait();
-    if($id) {
-#   do {
-#        $id = waitpid(-1,WNOHANG);
-#        sleep 1 unless($id>0);
-#        return &reinit_process() if($id == 0);
-#    } until $id>0;
-    for(my $idx=0;$idx<@psid;$idx++) {
-        if($id == $psid[$idx]) {
-            print STDERR "\n<<<[/",$idx+1,"/$running/$limit]PSID:$id<<<End\n" if($verbose);
-            $running--;
-            return $idx;
-        }
-    }
-    }
-    return &reinit_process(); 
+    return &reinit_process() unless($running>0 and %psid);
+    my $id=-1;
+    until($id>0){
+        $id = &para_wait;
+#        sleep 1;
+    };
+    return 1;
 }
 
 sub para_init {
@@ -59,14 +68,13 @@ sub para_init {
     return 1;
 }
 
-sub para_isfree {
-    return $running<$limit;
-}
 
 sub para_queue {
     return system(@_) if $limit<2;
-    my $idx = ( $running>=$limit ? wait_process() : $running);
-    return new_process($idx,@_);
+    if($running>=$limit) {
+        wait_process();
+    }
+    return new_process(@_);
 }
 
 sub para_cleanup() {
