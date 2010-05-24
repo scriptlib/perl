@@ -16,43 +16,35 @@ use lib $ENV{XR_PERL_MODULE_DIR};
 
 use MyPlace::Script::Usage qw/help_required help_even_empty/;
 exit 0 if(help_even_empty($0,@ARGV));
-use MyPlace::Google;
-#my %std_arg = (
-#    q=>'',
-#    v=>'1.0',
-#    lh=>'en',
-#    start=>'0',
-#    rsz=>'large',
-#);
-#my %std_opt_arg = (
-#    userip=>'',
-#    key=>'',
-#    callback=>'',
-#    context=>'',
-#);
-#my %img_arg = (
-#    soft=>'off',
-#    imgsz=>'xlarge',
-#);
-#my %img_opt_arg = (
-#    'as_filetype'=>'',
-#    'as_sitesearch'=>'',
-#    'imgc'=>'',
-#    'imgcolor'=>'',
-#    'imgtype'=>'',
-#    'as_rights'=>'',
-#);
-#
+use MyPlace::Google::Search::HTML;
 my %args = (
-    v=>'1.0',
-    ln=>'en',
-    start=>'0',
-    rsz=>'large',
-    safe=>'off',
-    imgsz=>'xlarge',
+    style=>'raw',
+    filter=>'no',
+    count=>'18',
+    dimensions=>'xga',
 );
+        #valid size is
+        #icon
+        #medium
+        #large
+        #xlarge
+        #xxlarge
+        #valid dimensions is
+        #qsvga  >400x300
+        #vga    >640x480
+        #svga   >800x600
+        #xga    >1024x768 
+        #2mp    >1600x1200
+        #4mp    >2272x1704
+        #6mp    >2816x2112
+        #8mp    >3264x2448
+        #10mp   >3648x2736
+        #12mp   >4096x3072
+        #15mp   >4480x3360
+        #20mp   >5120x3840
+        #40mp   >7216x5412
+        #70mp   >9600x7200
 my $keyword = shift;
-$args{q}=$keyword;
 my $pages;
 my $start;
 foreach(@ARGV) {
@@ -63,26 +55,32 @@ foreach(@ARGV) {
         $start=$1;
     }
     elsif(/^\s*([^=]+)=(.+)/) {
+        if($1 eq 'size') {
+            $args{dimensions}=undef; 
+        }
+        elsif($1 eq 'dimensions') {
+            $args{size}=undef;
+        }
         $args{$1}=$2;
     }
 }
-die("Give me a keyword!\n") unless($args{q});
+die("Give me a keyword!\n") unless($keyword);
 $pages = 1 unless($pages and $pages>1);
 $start = 0 unless($start and $start>0);
-$| = 1;
+local $| = 1;
 my @result;
+my $pp = MyPlace::Google::Search::HTML::get_count(%args);
 foreach my $page (1 .. $pages) {
-    my $pp = $args{rsz} eq 'large' ? MyPlace::Google::LARGE_RESULT : MyPlace::Google::SMALL_RESULT;
     $args{start} = $start + ($page - 1) * $pp;
-    print STDERR "Searching \"" . $args{q} . "\", start at " . $args{start} . " ...";
-    my ($data,$results) = MyPlace::Google::search_images(%args);
-    if(ref $data) {
+    print STDERR "Searching \"" . $keyword . "\", start at " . $args{start} . "\n";
+    my ($code,$results,$data) = MyPlace::Google::Search::HTML::search_images($keyword,%args);
+    if(ref $results) {
         print STDERR " [OK] Get " , scalar(@{$results}), " results.\n";
-        print $_->{unescapedUrl},"\n" for(@{$results});
+        print MyPlace::Google::Search::HTML::extract_url($_),"\n" for(@{$results});
         sleep 1;
     }
     else {
-        print STDERR " [Error] $results:$data\n"
+        print STDERR " [Error] $results:$code\n"
     }
 }
 

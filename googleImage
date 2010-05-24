@@ -27,7 +27,7 @@ $key =~ s/%2B/+/i;
 
 foreach my $page ($from .. $to) {
     my $start = ($page -1) * 18;
-    my $url = 'http://www.google.com/images?hl=en&safe=off&' . "&q=$key&start=$start" . "&gbv=2&as_st=y&tbs=isch:1,isz:lt,islt:qsvga&sa=N&ndsp=18";
+    my $url = 'http://www.google.com/images?hl=en&safe=off&' . "&q=$key&start=$start" . "&gbv=2&as_st=y&tbs=isch:1,isz:lt,islt:xvga&sa=N&ndsp=18";
 
     open FI,"-|","wget",qw{-q -O - -e robots=off -U Mozilla/5.0},$url or die("$!\n");
     while(<FI>) {
