@@ -58,24 +58,21 @@ my %ACTION = (
 );
 
 foreach(@ARGV) {
-    if(/\s*([\?M!])\s*(.+)\s*$/) {
+    if(/\s*(.)\s*(.+)\s*$/) {
         $ACTION{$1}=$2;
-    }
-   else {
-        die("Unkonw usage!\n");
+#    }
+#   else {
+#        die("Unkonw usage!\n");
    }
 }
 
 while(<STDIN>) {
     print STDERR $_;
     chomp;
-    if(/\s*([AD\?M!])\s*(.+)\s*$/) {
+    if(/^\s*(.)\s*(.+)\s*$/) {
         if($ACTION{$1}) {
             &action($ACTION{$1},$2);
         }
-    }
-   else {
-        die("Unkonw usage!\n");
    }
 }
 exit 0;

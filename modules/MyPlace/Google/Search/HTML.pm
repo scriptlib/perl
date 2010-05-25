@@ -12,18 +12,36 @@ use constant {
     MAX_COUNT=>18,
     DATA_ID=>'results',
 };
-
+my @GOOGLE_IP = (
+#    'www.google.com',
+    '72.14.204.95',
+    '72.14.204.96',
+    '72.14.204.98',
+    '72.14.204.99',
+    '72.14.204.103',
+    '72.14.204.104',
+    '72.14.204.147',
+    '72.14.204.148',
+    '72.14.213.103',
+    '74.125.71.106',
+    '209.85.229.99',
+    '209.85.225.105',
+    '209.85.227.147',
+    '209.85.227.100',
+    '209.85.227.104',
+    '209.85.227.103',
+    '216.239.59.147',
+);
 #http://images.google.com/images?hl=en&newwindow=1&safe=off&as_st=y&tbs=isch%3A1%2Cisz%3Alt%2Cislt%3Axga&sa=1&q=%22Michelle+Marsh%22+nude&aq=f&aqi=&aql=&oq=&gs_rfai=
 #http://www.google.com/images?q=Jordan+Carver&um=1&hl=en&newwindow=1&safe=off&tbs=isch:1,isz:lt,islt:2mp
-my @VALID_PARAMS = qw/
-    start
-            safe
-            hl  
-            um
-    source
-    imgsz
-/;
-
+my @VALID_PARAMS =(
+    'start',
+    'safe',
+    'hl',
+    'um',
+    'source',
+    'imgsz',
+);
         #valid size is
         #icon
         #medium
@@ -45,8 +63,12 @@ my @VALID_PARAMS = qw/
         #20mp   >5120x3840
         #40mp   >7216x5412
         #70mp   >9600x7200
+
 my $HTTP;
 
+sub get_google_ip {
+   return $GOOGLE_IP[int(rand(@GOOGLE_IP))]; 
+}
 
 sub get_api_url {
     my ($vertical,$query,%params) = @_;
@@ -72,7 +94,9 @@ sub get_api_url {
 
     #my $params = join("&",map ("$_=" . uri_escape($valid_params{$_}),keys %valid_params));
     my $params = join("&",map ("$_=" . $valid_params{$_},keys %valid_params));
-    return "http://images.google.com/images?q=$query&$params";
+#    return IMAGE_SEARCH . "?q=$query&$params";
+    return 'http://' . &get_google_ip()  . "/images?q=$query&$params";
+#    return "http://images.google.com/imghp",('q'=>$query,%valid_params);
 }
 
 sub new {
@@ -147,13 +171,15 @@ sub search {
     else {
         $args{count}=DEFAULT_COUNT;
     }
-    my $URL = &get_api_url($ajax,$keyword,%args);
+    my ($URL,%params) = &get_api_url($ajax,$keyword,%args);
     print STDERR "Retriving $URL...\n";
     if(!$HTTP) {
         $HTTP = LWP::UserAgent->new();
         $HTTP->agent("Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
     }
+   # my $res = $HTTP->post($URL,[%params]);#get($URL,"referer"=>$refer);
     my $res = $HTTP->get($URL,"referer"=>$refer);
+#    use Data::Dumper;print STDERR Dumper($res);
     my $data;
     my $result;
     if($res->is_success) {
@@ -168,7 +194,7 @@ sub search {
         }
         elsif(ref $data) {
             $data = _make_data($data,$data_id);
-        use Data::Dumper;print STDERR Dumper($data);
+#        use Data::Dumper;print STDERR Dumper($data);
             $result=[200,grep_size($args{match_size},$data->{$data_id}),$data],
         }
         else {
