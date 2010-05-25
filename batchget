@@ -6,7 +6,7 @@
 ###APPDESC:     Download URLS,using simdo	
 ###APPUSAGE:	[OPTIONS...] [Task Name]
 ###APPEXAMPLE:	cat url.lst | batchget
-###APPOPTION:	-m:Max number of simultanous tasks|-n:Task name|-a:Auto rename|-d:Create directories|-e:extension name for autorename|-w:Working directory|-r:Refer URL|-h:Display this text|-b:cookie|-L:Logging programe|-f:Full name|-i:Auto rename by index
+###APPOPTION:	-m:Max number of simultanous tasks|-n:Task name|-a:Auto rename|-d:Create directories|-e:extension name for autorename|-w:Working directory|-r:Refer URL|-h:Display this text|-b:cookie|-L:Logging programe|-f:Full name|-i:Auto rename by index|-M:Max time for a download
 
 use strict;
 use lib $ENV{XR_PERL_MODULE_DIR};
@@ -17,11 +17,12 @@ use URI::Escape;
 #BEGIN {srand(time());}
 
 my %opts;
-getopts('hm:n:fade:w:r:L:b:i',\%opts);
+getopts('M:hm:n:fade:w:r:L:b:i',\%opts);
 exit(system("formathelp",$0,"-n")) if($opts{"h"});
 
 my $def_mul=3;
 my $createdir = $opts{"d"} ? $opts{"d"} : 0;
+my $maxtime = $opts{"M"} ? $opts{"M"} : undef;
 my $muldown   = $opts{"m"} ? $opts{"m"} : $def_mul;
 my $taskname  = $opts{"n"} ? $opts{"n"} : "";
 my $autoname  = $opts{"a"} ? $opts{"a"} : 0;
@@ -123,6 +124,7 @@ sub inqueue {
     pushArgPair(@DARG,"-n",$curname);
     pushArgPair(@DARG,"-r",$thisrefer);
     pushArgPair(@DARG,"-b",$cookie);
+    pushArgPair(@DARG,"-m",$maxtime);
     push(@DARG,"-d");
     para_queue "download",@DARG;
 }

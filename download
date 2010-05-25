@@ -6,7 +6,7 @@
 ###APPDESC:	A downloader,nothing else.
 ###APPUSAGE:	[options] URL
 ###APPEXAMPLE:	download www.google.com/index.html
-###APPOPTION:	-v:Verbose Output|-u:URL to download|-s:Filename for output|-d:Create directories|-n:Task name|-r:Referer URL|-b:cookie file|-l:Enable Logging|-a:Auto rename if file exists|-p:Downloader - wget or curl
+###APPOPTION:	-v:Verbose Output|-u:URL to download|-s:Filename for output|-d:Create directories|-n:Task name|-r:Referer URL|-b:cookie file|-l:Enable Logging|-a:Auto rename if file exists|-p:Downloader - wget or curl-m:Max time for downloading
 use strict;
 use lib $ENV{XR_PERL_MODULE_DIR};
 
@@ -27,7 +27,7 @@ sub log($$) {
 }
 
 sub build_cmdline {
-    my($name,$url,$saveas,$refer,$cookie,$verbose) = @_;
+    my($name,$url,$saveas,$refer,$cookie,$verbose,$maxtime) = @_;
     return undef unless($url);
     my @result;
     if($name =~ /^wget$/i) {
@@ -52,6 +52,7 @@ sub build_cmdline {
         push @result,"--output",$saveas if($saveas);
         push @result,"--cookie",$cookie if(-f $cookie);
         push @result,"--cookie-jar",$cookie if($cookie);
+        push @result,"--max-time",$maxtime if($maxtime);
     }
     return @result;
 }
@@ -76,7 +77,7 @@ sub process {
 }
 
 
-my $OptFlag='lvu:s:dn:r:b:ap:';
+my $OptFlag='m:lvu:s:dn:r:b:ap:';
 my %OPT;
 getopts($OptFlag,\%OPT);
 
@@ -89,6 +90,7 @@ my $refer= $OPT{"r"} ? $OPT{"r"} : "";
 my $cookie= $OPT{b} ? $OPT{b} : "";
 my $logging= $OPT{l} ? $OPT{l} : "";
 my $autorename = $OPT{a} ? $OPT{a} : "";
+my $maxtime = $OPT{m} ? $OPT{m} : undef;
 #my $downloader = $OPT{p} ? $OPT{p} : "wget";
 my $downloader = $OPT{p} ? $OPT{p} : "curl";
 my $FAILLOG="download.failed";
