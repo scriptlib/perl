@@ -4,8 +4,8 @@
 ###APPDATE:	Sun May 23 18:49:37 2010
 ###APPVER:	0.1
 ###APPDESC:     google.search.image	
-###APPUSAGE:	(keyword) [options...]
-###APPEXAMPLE:	google.search.image 
+###APPUSAGE:	(keyword) [(start|startpage|pages|size|dimensions)=VALUE ...]
+###APPEXAMPLE:	google.search.image beauty startpage=10 pages=5 size=xxlarge
 ###APPOPTION:	
 use strict;
 
@@ -47,12 +47,16 @@ my %args = (
 my $keyword = shift;
 my $pages;
 my $start;
+my $startpage;
 foreach(@ARGV) {
     if(/^\s*pages\s*=\s*(\d+)\s*/) {
         $pages=$1;
     }
     elsif(/^\s*start\s*=\s*(\d+)\s*/) {
         $start=$1;
+    }
+    elsif(/^\s*startpage\s*=\s*(\d+)\s*/) {
+        $startpage=$1;
     }
     elsif(/^\s*([^=]+)=(.+)/) {
         if($1 eq 'size') {
@@ -70,6 +74,9 @@ $start = 0 unless($start and $start>0);
 local $| = 1;
 my @result;
 my $pp = MyPlace::Google::Search::HTML::get_count(%args);
+if($startpage and $startpage>0) {
+    $start = $start + ($startpage - 1) * $pp;
+}
 foreach my $page (1 .. $pages) {
     $args{start} = $start + ($page - 1) * $pp;
     print STDERR "Searching \"" . $keyword . "\", start at " . $args{start} . "\n";

@@ -37,41 +37,35 @@ sub code_message {
     return $code;
 }
 
+sub callback_process_data {
+    my($from,$rule,$result) = @_;
+    app_message("callback:$from\n");
+    &process_data($rule,$result);
+}
+sub callback_process_passdown {
+    my($from,$rule,$result) = @_;
+    app_message("callback:$from\n");
+    &process_passdown($rule,$result);
+}
 
-sub start_rule {
+sub process_data {
+    my $rule_ref = shift;
+    return unless(ref $rule_ref);
+    return unless(%{$rule_ref});
+    my $result_ref = shift;
+    return unless(ref $result_ref);
+    return unless(%{$result_ref});
 
-    my %rule = %{parse_rule(@_)};
-    
+    my %rule = %{$rule_ref};
+    my %result = %{$result_ref};
+
     my $url=$rule{"url"};
-    my $domain = $rule{"domain"};
-    my $source = $rule{"source"};
     my $level = $rule{"level"};
     my $action = $rule{"action"};
     my @args = $rule{"args"} ? @{$rule{"args"}} : ();
     my $msghd = "";
-    
-    unless(-f $source) {
-        app_error("File not found: $source\n");
-        return;
-    }
-    unless(defined $cached_rule{$source}) {
-        open FI,"<",$source;
-        $cached_rule{$source}=join("",<FI>);
-        close FI;
-    }
-    eval $cached_rule{$source} if($cached_rule{$source});
-    
-    app_error("$@\n") if($@);
-    app_message(@prompt,$msghd,"For \"$url\"\n");
-    app_message(@prompt,$msghd , "Level $level>>","Found rule: \"$source\"\n");
-    app_message(@prompt,$msghd , "Level $level>>","Applying it ...\n");
-    
-    my %result=apply_rule($url,\%rule);
-    
-    #print STDERR "Result:\n",Dumper(\%result),"\n";
-    #$result{base}=$url unless($result{base});
-    #$result{pass_arg}=$result{work_dir} unless($result{pass_arg});
-    
+
+
     if($result{work_dir}) {
 #        push @prompt,"[" . $result{work_dir} . "]";
         mkdir $result{work_dir} unless(-d $result{work_dir});
@@ -134,7 +128,27 @@ sub start_rule {
             }
         }
     }
-    
+
+}
+
+
+sub process_passdown {
+    my $rule_ref = shift;
+    return unless(ref $rule_ref);
+    return unless(%{$rule_ref});
+    my $result_ref = shift;
+    return unless(ref $result_ref);
+    return unless(%{$result_ref});
+
+    my %rule = %{$rule_ref};
+    my %result = %{$result_ref};
+
+    my $url=$rule{"url"};
+    my $level = $rule{"level"};
+    my $action = $rule{"action"};
+    my @args = $rule{"args"} ? @{$rule{"args"}} : ();
+    my $msghd = "";
+
     if($result{pass_data} and @{$result{pass_data}}) {
         $result{pass_arg}="" unless($result{pass_arg});
         my @data;
@@ -178,6 +192,41 @@ sub start_rule {
         }
     #    close FO;
     }
+}
+sub start_rule {
+
+    my %rule = %{parse_rule(@_)};
+    
+    my $url=$rule{"url"};
+    my $domain = $rule{"domain"};
+    my $source = $rule{"source"};
+    my $level = $rule{"level"};
+    my $action = $rule{"action"};
+    my @args = $rule{"args"} ? @{$rule{"args"}} : ();
+    my $msghd = "";
+    
+    unless(-f $source) {
+        app_error("File not found: $source\n");
+        return;
+    }
+    unless(defined $cached_rule{$source}) {
+        open FI,"<",$source;
+        $cached_rule{$source}=join("",<FI>);
+        close FI;
+    }
+    eval $cached_rule{$source} if($cached_rule{$source});
+    
+    app_error("$@\n") if($@);
+    app_message(@prompt,$msghd,"For \"$url\"\n");
+    app_message(@prompt,$msghd , "Level $level>>","Found rule: \"$source\"\n");
+    app_message(@prompt,$msghd , "Level $level>>","Applying it ...\n");
+    
+    my %result=apply_rule($url,\%rule);
+    #print STDERR "Result:\n",Dumper(\%result),"\n";
+    #$result{base}=$url unless($result{base});
+    #$result{pass_arg}=$result{work_dir} unless($result{pass_arg});
+    process_data(\%rule,\%result);
+    process_passdown(\%rule,\%result);
 }
 
 sub load_rule {

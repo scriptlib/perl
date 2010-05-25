@@ -27,6 +27,7 @@ my $TASK_FILEHANDLE_LOG;
 
 my %HOSTS = %MyPlace::URLRule::HostMap::HOST_MAP;
 my @HOSTS = keys %HOSTS;
+
 my @NAMES = keys %NAMES;
 
 my %IDS;
