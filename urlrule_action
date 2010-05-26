@@ -64,71 +64,17 @@ sub process_data {
     my $action = $rule{"action"};
     my @args = $rule{"args"} ? @{$rule{"args"}} : ();
     my $msghd = "";
-
-
-    if($result{work_dir}) {
-#        push @prompt,"[" . $result{work_dir} . "]";
-        mkdir $result{work_dir} unless(-d $result{work_dir});
-        chdir $result{work_dir} or return code_message(undef,"$!\n");
+    my $count = @{$result{data}};
+    app_message($msghd , "Level $level>>","Get $count Lines,performing action $action..\n");
+    my ($status,@message) = do_action($result_ref,$action,@args);
+    if($status) {
+        app_message($msghd,"Level $level>>",@message,"\n");
+        return 1;
     }
-    
-    if($result{data} and @{$result{data}}) {
-        my $count=@{$result{data}};
-        my $file=$result{file};
-        $file =~ s/\s*\w*[\/\\]\w*\s*//g if($file);
-        my $pipeto=$action ? $action : $result{action};
-        $pipeto = $pipeto ? $pipeto : $result{pipeto} ;
-        if($file) {
-            app_message($msghd , "Level $level>>","Get $count Lines,performing action:(FILE:$file)...\n");
-            if (-f $file) {
-                app_warning($msghd , "Level $level>>","Ingored (File exists)...\n");
-            }
-            else {
-                open FO,">",$file or die("$!\n");
-                print FO @{$result{data}};
-                close FO;
-                app_message($msghd , "Level $level>>","Action (FILE:$file) done!\n");
-            }
-        }
-        elsif($pipeto) {
-            $pipeto .= ' "' . join('" "',@args) . '"' if(@args);
-            app_message($msghd , "Level $level>>","Get $count Lines,performing action:($pipeto)...\n");
-            open FO,"|-",$pipeto;
-            foreach my $line (@{$result{data}}) {
-                $line = URI->new_abs($line,$result{base}) if($result{base});
-                print FO $line,"\n";
-            }
-            close FO;
-            &sig_killed if($? eq 2);
-            app_message($msghd , "Level $level>>","Action ($pipeto) done!\n");
-        }
-        elsif($result{hook}) {
-            app_message($msghd , "Level $level>>","Get $count Lines, processing...\n");
-            my $index=0;
-            foreach my $line(@{$result{data}}) {
-                $index ++;
-                my @msg = ref $line ? @{$line} : ($line);
-                app_message($msghd , "Level $level>>[$index/$count] ",join(" ",@msg),"\n");
-                $line = URI->new_abs($line,$result{base}) if($result{base});
-                my $nsg = process_data($line,\%result);
-                &sig_killed if($nsg && $nsg eq 2);
-                if($nsg) {
-                    app_message($msghd , "Level $level>>$nsg") unless($nsg eq "1");
-                }
-                else {
-                    app_message($msghd , "Level $level>>Error when processing,Abort!\n");
-                    last;
-                }
-            }
-        }
-        else {
-            foreach my $line(@{$result{data}}) {
-                $line = URI->new_abs($line,$result{base}) if($result{base});
-                app_message($msghd , "Level $level>>$line\n");
-            }
-        }
+    else {
+        app_warn($msghd,"Level $level>>",@message,"\n");
+        return undef;
     }
-
 }
 
 
@@ -139,60 +85,34 @@ sub process_passdown {
     my $result_ref = shift;
     return unless(ref $result_ref);
     return unless(%{$result_ref});
-
-    my %rule = %{$rule_ref};
-    my %result = %{$result_ref};
-
-    my $url=$rule{"url"};
-    my $level = $rule{"level"};
-    my $action = $rule{"action"};
-    my @args = $rule{"args"} ? @{$rule{"args"}} : ();
-    my $msghd = "";
-
-    if($result{pass_data} and @{$result{pass_data}}) {
-        $result{pass_arg}="" unless($result{pass_arg});
-        my @data;
-        if($result{base}) {
-            push(@data,URI->new_abs($_,$result{base})->as_string) foreach(@{$result{pass_data}});
-        }
-        else {
-            @data=@{$result{pass_data}};
-        }
-        my @subdirs;
-        @subdirs=@{$result{pass_name}} if($result{pass_name});
-        unless($result{no_subdir} and @subdirs) {
-            my $len = length(@data);
-            for(my $i=0;$i<@data;$i++) {
-                push(@subdirs,strnum($i+1,$len));
-            }
-        }
-        $level--;
-        $level = $result{pass_level} if(exists $result{pass_level});
-        my @ACTARG=($level,$action);
-        unshift (@ACTARG,"domain:" . $result{pass_domain}) if($result{pass_domain});
-        my $count=@data;
-        app_message($msghd , "Level $level>>","$count urls pass down to level $level\n");
-    #    open FO,"|-","tasks","-n","urlrule$level-" . localtime(),"-p","urlrule_action",@ACTARG;
-        for(my $i=0;$i<$count;$i++) {
-            unless($result{no_subdir}) {
-                my $dir=$subdirs[$i];
-                mkdir $dir unless(-d $dir);
-                chdir $dir or return code_message(undef,"$!\n");
-            }
-            app_message($msghd , "Level $level>>","[" . ($i + 1) . "/$count] $data[$i]\n");
-            push @prompt,"[" . ($i+1) . "/$count" . "]";
-            if($result{pass_arg}) {
-                $phnd->push(getcwd(),'load_rule',$data[$i],@ACTARG,$result{pass_arg}->[$i]);
-            }
-            else {
-                $phnd->push(getcwd(),'load_rule',$data[$i],@ACTARG);
-            }
-            chdir ".." unless($result{no_subdir});
-            pop @prompt;
-        }
-    #    close FO;
+    my $msghd="";
+    my ($level,$count,@passdown) = make_passdown($rule_ref,$result_ref);
+    my $tlevel = $rule_ref->{level};
+    if($count) {
+        app_message($msghd,"Level $tlevel>>","Get $count rules to pass down to level $tlevel.\n");
     }
+    else {
+        return undef;
+#        app_message($msghd,"Level $level>>","Get nothing to pass.\n");
+        return 1;
+    }
+    for(my $i=0;$i<$count;$i++) {
+        my ($dir,@args) = @{$passdown[$i]};
+        my $cwd = getcwd();
+        if($dir) {
+            mkdir $dir unless(-d $dir);
+            if(!chdir $dir) {
+                app_error($msghd,"Level $tlevel>>","$!\n");
+                next;
+            }
+        }
+        app_message($msghd , "Level $tlevel>>","[" . ($i + 1) . "/$count] $args[0]\n");
+        $phnd->push(getcwd(),'load_rule',@args);
+        chdir $cwd;
+    }
+    return 1;
 }
+
 sub start_rule {
 
     my %rule = %{parse_rule(@_)};
@@ -205,28 +125,19 @@ sub start_rule {
     my @args = $rule{"args"} ? @{$rule{"args"}} : ();
     my $msghd = "";
     
-    unless(-f $source) {
-        app_error("File not found: $source\n");
-        return;
-    }
-    unless(defined $cached_rule{$source}) {
-        open FI,"<",$source;
-        $cached_rule{$source}=join("",<FI>);
-        close FI;
-    }
-    eval $cached_rule{$source} if($cached_rule{$source});
-    
-    app_error("$@\n") if($@);
     app_message(@prompt,$msghd,"For \"$url\"\n");
     app_message(@prompt,$msghd , "Level $level>>","Found rule: \"$source\"\n");
     app_message(@prompt,$msghd , "Level $level>>","Applying it ...\n");
-    
-    my %result=apply_rule($url,\%rule);
-    #print STDERR "Result:\n",Dumper(\%result),"\n";
-    #$result{base}=$url unless($result{base});
-    #$result{pass_arg}=$result{work_dir} unless($result{pass_arg});
-    process_data(\%rule,\%result);
-    process_passdown(\%rule,\%result);
+    my ($status,$result)= execute(%rule);
+    if($status) {
+        process_data(\%rule,$result);
+        process_passdown(\%rule,$result);
+        return 1;
+    }
+    else {
+        app_error(@prompt,$msghd, "Error:",$result,"\n");
+        return undef;
+    }
 }
 
 sub load_rule {

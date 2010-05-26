@@ -6,7 +6,7 @@ BEGIN {
     our ($VERSION,@ISA,@EXPORT,@EXPORT_OK,%EXPORT_TAGS);
     $VERSION        = 1.00;
     @ISA            = qw(Exporter);
-    @EXPORT         = qw(&get_domain &get_rule_dir &build_url &parse_rule);
+    @EXPORT         = qw(&get_domain &get_rule_dir &build_url &parse_rule &do_action &execute_rule &make_passdown);
 }
 
 my $RULE_DIRECTORY = "$ENV{XR_PERL_SOURCE_DIR}/urlrule";
@@ -93,6 +93,127 @@ sub build_url($$) {
     my ($base,$url) = @_;
     $url = URI->new_abs($url,$base) if($base);
     return $url;
+}
+
+sub execute_rule {
+    my %rule = @_;
+    my $url = $rule{url};
+    my $source = $rule{"source"};
+    my @args = $rule{"args"} ? @{$rule{"args"}} : ();
+    unless(-f $source) {
+        return undef,"File not found: $source";
+    }
+    $! = undef;
+    do $source; 
+    return undef,$! if($!);
+    my %result = apply_rule($url,\%rule);
+    return 1,\%result;
+}
+
+
+sub do_action {
+    my ($result_ref,$action,@args) = @_;
+    return undef,"No results" unless(ref $result_ref);
+    return undef,"No results" unless(%{$result_ref});
+    my %result = %{$result_ref};
+    return undef,"No results" unless($result{data});
+    if($result{work_dir}) {
+        mkdir $result{work_dir} unless(-d $result{work_dir});
+        chdir $result{work_dir} or return code_message(undef,"$!\n");
+    }
+    if(ref $result{data} eq 'SCALAR') {
+        $result{data} = [$result{data}];
+    }
+    my $file=$result{file};
+    $file =~ s/\s*\w*[\/\\]\w*\s*//g if($file);
+    my $pipeto=$action ? $action : $result{action};
+    $pipeto = $pipeto ? $pipeto : $result{pipeto} ;
+    if($file) {
+        if (-f $file) {
+            return undef,"Ingored (File exists)...";
+        }
+        else {
+            open FO,">",$file or die("$!\n");
+            print FO @{$result{data}};
+            close FO;
+            return 1,"Action File ($file) OK.";
+        }
+    }
+    elsif($pipeto) {
+        $pipeto .= ' "' . join('" "',@args) . '"' if(@args);
+        open FO,"|-",$pipeto;
+        foreach my $line (@{$result{data}}) {
+            $line = URI->new_abs($line,$result{base}) if($result{base});
+            print FO $line,"\n";
+        }
+        close FO;
+        return 1,"Action Pipeto ($pipeto) OK.";
+    }
+    elsif($result{hook}) {
+        my $index=0;
+        foreach my $line(@{$result{data}}) {
+            $index ++;
+            my @msg = ref $line ? @{$line} : ($line);
+            $line = URI->new_abs($line,$result{base}) if($result{base});
+            process_data($line,\%result);
+        }
+        return 1,"Action Hook OK.";
+    }
+    else {
+        foreach my $line(@{$result{data}}) {
+            $line = URI->new_abs($line,$result{base}) if($result{base});
+            print $line,"\n";
+        }
+        return 1;"OK.";
+    }
+}
+
+sub make_passdown {
+    my $rule_ref = shift;
+    return unless(ref $rule_ref);
+    return unless(%{$rule_ref});
+    my $result_ref = shift;
+    return unless(ref $result_ref);
+    return unless(%{$result_ref});
+    return unless($result_ref->{pass_data});
+    my %rule = %{$rule_ref};
+    my %result = %{$result_ref};
+    my $level = $rule{"level"} - 1;
+    my $action = $rule{"action"};
+    my @args = $rule{"args"} ? @{$rule{"args"}} : ();
+    if(ref $result{pass_data} eq 'SCALAR') {
+        $result{pass_data} = [$result{pass_data}];
+    }
+    $result{pass_arg}="" unless($result{pass_arg});
+    my @data;
+    if($result{base}) {
+        @data= map URI->new_abs($_,$result{base})->as_string,@{$result{pass_data}};
+    }
+    else {
+        @data=@{$result{pass_data}};
+    }
+    my @subdirs;
+    @subdirs=@{$result{pass_name}} if($result{pass_name});
+    unless($result{no_subdir} and @subdirs) {
+        my $len = length(@data);
+        for(my $i=0;$i<@data;$i++) {
+            push(@subdirs,strnum($i+1,$len));
+        }
+    }
+    $level = $result{pass_level} if(exists $result{pass_level});
+    my @ACTARG=($level,$action);
+    unshift (@ACTARG,"domain:" . $result{pass_domain}) if($result{pass_domain});
+    push @ARTARG,@args if(@args);
+    my @actions;
+    my $count=@data;
+    for(my $i=0;$i<$count;$i++) {
+        my @current;
+        push @current, $result{no_subdir} ? undef : $subdirs[$i];
+        push @current, $data[$i],@ACTARG;
+        push @current, $result{pass_arg}->[$i] if($result{pass_arg});
+        push @actions,\@current;
+    }
+    return $level,$count,@actions;
 }
 
 return 1;

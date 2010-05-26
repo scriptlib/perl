@@ -1,0 +1,140 @@
+#!/usr/bin/perl -w
+###APPNAME:     r-config
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Tue May 25 22:26:26 2010
+###APPVER:	0.1
+###APPDESC:     a basic config system
+###APPUSAGE:	(action) key
+###APPEXAMPLE:	r-config read 'names,/jordan/,id,jordan,1'
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+use MyPlace::Config;
+use Term::ANSIColor;
+
+sub print1 {
+    print STDERR color('green'),@_,color('reset');
+}
+sub print2 {
+    print STDERR color('yellow'),@_,color('reset');
+}
+sub print3 {
+    print STDERR color('red'),@_,color('reset');
+}
+
+sub print_path {
+    my ($pre,$path,$suf) = @_;
+    if(@{$path}) {
+        $pre = "" unless($pre);
+        $suf = "" unless($suf);
+        print1 $pre,join("->",@{$path}),$suf;
+    }
+}
+
+sub print_status {
+    if(@_) {
+        print1 "\t[OK]\n";
+    }
+    else {
+        print3 "\t[Failed]\n";
+    }
+}
+
+sub print_target {
+    my $pre=shift;
+    my $suf=shift;
+    my $CONFIG=shift;
+    my @r=$CONFIG->list(@_);
+    $pre="" unless($pre);
+    $suf="\n" unless(defined $suf);
+    foreach(sort @r) {
+        print1 $pre,$_,$suf;
+    }
+}
+
+
+my $database;
+my $opt = shift @ARGV;
+if($opt and $opt eq '-f') {
+    $database = shift @ARGV; 
+}
+else {
+    unshift @ARGV,$opt;
+}
+my ($action,$query,$userdata) = @ARGV;
+
+
+my $CONFIG = MyPlace::Config->new();
+#$CONFIG->load($database);
+$CONFIG->read_plainfile($database);
+#use Data::Dumper;print Dumper($CONFIG);
+#$CONFIG->write_plainfile("/dev/stdout");
+#exit 0;
+
+#print STDERR "for $query \n";
+$action = 'list' unless($action);
+if($action eq 'list') {
+    $query = '/.+/' unless($query);
+}
+my @target = $CONFIG->query($query);
+
+if(!@target) {
+    print3 "query match nothing\n";
+    exit 2;
+}
+
+
+$!=undef;
+if($action eq 'list') {
+    print_target("","\n",$CONFIG,@target);
+    exit 0;
+}
+
+#print2 "Selected:\n";
+#print_target("\t",$CONFIG,@target);
+#print2 "For Action:$action ...";
+
+
+if($action eq 'read') {
+    my @r=$CONFIG->read(@target);
+#    print_status(@r);
+    foreach(@r) {
+        my($path,$values) = @{$_};
+        print_path("",$path," = ");
+        print2 join(", ",@{$values}),"\n";
+    }
+}
+elsif($action eq 'write') {
+    print_target("write "," = $userdata\n",$CONFIG,@target);
+    print_status($CONFIG->write($userdata,@target));
+}
+elsif($action eq 'add') {
+    print_target($userdata ? "add $userdata" : "add ","\n",$CONFIG,@target);
+    print_status($CONFIG->add($userdata,@target));
+}
+elsif($action eq 'delete') {
+    print_target("delete ",($userdata ? "->$userdata\n" : "\n"),$CONFIG,@target);
+    print_status($CONFIG->delete($userdata,@target));
+}
+
+if($!) {
+    print3 $!,"\n";
+    exit 1;
+}
+if($CONFIG->{dirty}) {
+    print2 "Saving configs to $database";
+    print_status($CONFIG->write_plainfile($database));
+}
+exit 0;
+
+
+
+
