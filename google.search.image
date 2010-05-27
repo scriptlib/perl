@@ -79,7 +79,7 @@ if($startpage and $startpage>0) {
 }
 foreach my $page (1 .. $pages) {
     $args{start} = $start + ($page - 1) * $pp;
-    print STDERR "Searching \"" . $keyword . "\", start at " . $args{start} . "\n";
+    print STDERR "Searching \"" . $keyword . "\", start at " . $args{start} . "...";
     my ($code,$results,$data) = MyPlace::Google::Search::HTML::search_images($keyword,%args);
     if(ref $results) {
         print STDERR " [OK] Get " , scalar(@{$results}), " results.\n";

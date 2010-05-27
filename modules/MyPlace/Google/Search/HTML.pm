@@ -172,7 +172,7 @@ sub search {
         $args{count}=DEFAULT_COUNT;
     }
     my ($URL,%params) = &get_api_url($ajax,$keyword,%args);
-    print STDERR "Retriving $URL...\n";
+#    print STDERR "Retriving $URL...\n";
     if(!$HTTP) {
         $HTTP = LWP::UserAgent->new();
         $HTTP->agent("Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");

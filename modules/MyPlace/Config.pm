@@ -48,16 +48,15 @@ sub read {
 }
 
 sub add {
-    my ($self,$userdata,@target) = @_;
-    return 1 unless($userdata);
-    my $status;
-    foreach(@target) {
-        next if(defined $_->[1]->{$_->[2]}->{$userdata});
-        $_->[1]->{$_->[2]}->{$userdata} = {};
-        $self->{dirty}=1;
-        $status = 1;
+    my($self,@keys) = @_;
+    my $p=$self->{data};
+    foreach(@keys) {
+        $p ->{$_} = {} unless($p->{$_});
+        $p = $p->{$_};
     }
-    return $status;
+#    $p->{$value}={};
+    $self->{dirty}=1;
+    return $p;
 }
 
 sub _deep_search {
@@ -85,6 +84,7 @@ sub get_records {
     my ($self,@target) = @_;
     my $root = $self->{data};
     my @records;
+#    use Data::Dumper;print Dumper(\@target);
     foreach(@target) {
         my ($path,$entry,$key) = @{$_};
         my @subpath = _deep_search($entry->{$key});
@@ -112,14 +112,19 @@ sub propget {
 }
 sub propset {
     my($self,$value,@keys) = @_;
-    my $r=$self->{data};
+    my $p=$self->{data};
+    my $r;
+    my $last;
     foreach(@keys) {
-        return unless($r->{$_});
-        $r = $r->{$_};
+        $last=$_;
+        $p ->{$_} = {} unless($p->{$_});
+        $r = $p;
+        $p = $p->{$_};
     }
-    return unless($r and %{$r});
-    $r->{$value}={};
-    return $r;
+    return unless($r);
+    $r->{$last} = {$value=>{}};
+    $self->{dirty}=1;
+    return $p;
 }
 sub delete {
     my ($self,$userdata,@target) = @_;
@@ -210,14 +215,14 @@ sub _make_query {
                 }
             }
             if(!$match) {
-                $self->{dirty} = 1;
-                $data->{$exp} = {};
                 if(@query) {
+                    $data->{$exp} = {};
+                    $self->{dirty} = 1;
                     my @r = $self->_make_query([@{$path},$exp],$data->{$exp},@query);
                     push @results,@r if(@r);
                 }
                 else {
-                    push @results,[[@{$path},$exp],$data,$exp];
+                    #push @results,[[@{$path},$exp],$data,$exp];
                 }
             }
         }

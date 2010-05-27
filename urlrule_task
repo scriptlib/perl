@@ -26,6 +26,9 @@ my $TASK_DATABASE   = "DATABASE.URL";
 my $HOST_DATABASE = get_rule_dir() . "/HOSTS.URL";
 my $TASK_WORKDIR = getcwd();;
 my $TASK_FILEHANDLE_LOG;
+use MyPlace::Config;
+my $Names = MyPlace::Config->new();
+$Names->read_plainfile($TASK_DATABASE);
 
 
 sub MyPlace::URLRule::callback_process_data {
@@ -47,9 +50,10 @@ sub process_data {
     return unless(ref $result_ref);
     return unless(%{$result_ref});
 
+    return unless($result_ref->{data});
     my %rule = %{$rule_ref};
     my %result = %{$result_ref};
-
+    
     my $url=$rule{"url"};
     my $level = $rule{"level"};
     my $action = $rule{"action"};
@@ -98,38 +102,10 @@ sub process_passdown {
             }
         }
         app_message($msghd , "Level $tlevel>>","[" . ($i + 1) . "/$count] $args[0]\n");
-        $phnd->push(getcwd(),'load_rule',@args);
+        $phnd->push(getcwd(),'process_rule',@args);
         chdir $cwd;
     }
     return 1;
-}
-
-sub start_rule {
-
-    my %rule = %{parse_rule(@_)};
-    
-    my $url=$rule{"url"};
-    my $domain = $rule{"domain"};
-    my $source = $rule{"source"};
-    my $level = $rule{"level"};
-    my $action = $rule{"action"};
-    my @args = $rule{"args"} ? @{$rule{"args"}} : ();
-    my $msghd = "";
-    
-    app_message($msghd,"For \"$url\"\n");
-    app_message($msghd , "Level $level>>","Found rule: \"$source\"\n");
-    app_message($msghd , "Level $level>>","Applying it ...\n");
-    my ($status,@result)= execute(%rule);
-    if($status) {
-        my %result = @result;
-        process_data(\%rule,\%result);
-        process_passdown(\%rule,\%result);
-        return 1;
-    }
-    else {
-        app_error($msghd, "Error:",@result,"\n");
-        return undef;
-    }
 }
 
 sub convert_records {
@@ -151,7 +127,7 @@ sub convert_records {
                     $index++;
                     $url =~ s/###TEXT$index###/$_/g;
                 }
-                push @r,[$name,$host,$url,$level];
+                push @r,[$name,$id,$host,$url,$level];
             }
             else {
                 app_error("HOST $host isn't valid, or not defined in :\n\t$HOST_DATABASE\n");
@@ -163,7 +139,7 @@ sub convert_records {
 
 sub action_ECHO {
     my $task = shift;
-    my($name,$host,$url,$level) = @{$task};
+    my($name,$id,$host,$url,$level) = @{$task};
     $level=0 unless($level);
     app_message("$name/$host [$level]$url\n");
     return;
@@ -171,15 +147,11 @@ sub action_ECHO {
 
 
 sub do_apply_rule {
-    my ($task,@act) = @_;
-    my($name,$host,$url,$level) = @{$task};
-    $level=0 unless($level);
-    my %rule = %{parse_rule($url,$level,@act)};
-#    use Data::Dumper;die(Dumper([\@act,\%rule]));
-    $url=$rule{"url"};
+    my %rule = %{parse_rule(@_)};
+    my $url = $rule{"url"};
     my $domain = $rule{"domain"};
     my $source = $rule{"source"};
-    $level = $rule{"level"};
+    my $level = $rule{"level"};
     my $action = $rule{"action"};
     my @args = $rule{"args"} ? @{$rule{"args"}} : ();
     app_message("For \"$url\"\n");
@@ -190,7 +162,9 @@ sub do_apply_rule {
 }
 
 sub action_DUMP {
-    my($status,$rule,$result,@msg) = do_apply_rule(@_);
+    my $task = shift;
+    my($name,$id,$host,$url,$level) = @{$task};
+    my($status,$rule,$result,@msg) = do_apply_rule($url,$level);
     if($status) {
         use Data::Dumper;
         print STDERR Data::Dumper->Dump([$result],['*result']);
@@ -203,7 +177,7 @@ sub action_DUMP {
 }
 sub action_DOWNLOAD {
     my $task = shift;
-    my($name,$host) = @{$task};
+    my($name,$id,$host,$url,$level) = @{$task};
     my $cwd = getcwd();
     if(! -d "$name") {
         app_message("Create directory: $name\n");
@@ -217,16 +191,25 @@ sub action_DOWNLOAD {
         app_error("$!\n");
         return undef;
     }
-    my($status,$rule,$result,@msg) = do_apply_rule($task,'batchget -M 300 -f');
+    if(&process_rule($url,$level,'batchget -M 300 -f')) {
+        my $Names = MyPlace::Config->new();
+        $Names->read_plainfile($TASK_DATABASE);
+        $Names->propset(scalar(localtime),$name,$id,$host,"last");
+        print STDERR "Saving $TASK_DATABASE...\n";
+        $Names->write_plainfile($TASK_DATABASE);
+    }
+    chdir $cwd;
+    return 1;
+}
+sub process_rule {
+    my($status,$rule,$result,@msg) = do_apply_rule(@_);
     if($status) {
         process_data($rule,$result);
         process_passdown($rule,$result);
-        chdir $cwd;
         return 1;
     }
     else {
         app_error("Error:",$rule,$result,@msg,"\n");
-        chdir $cwd;
         return undef;
     }
 }
@@ -245,7 +228,7 @@ sub sig_killed {
     $phnd->saveToFile(TASK_FILE_RESUME);
     app_message($phnd->length," tasks saved to TASK_FILE_RESUME\n");
     &log("Updating aborted!");
-    close TASK_FILEHANDLE_LOG;
+    clean_up();
     exit 1;
 }
 
@@ -255,6 +238,11 @@ sub init {
         open $TASK_FILEHANDLE_LOG,">>",TASK_FILE_LOG;
         $phnd= MyPlace::ReEnterable->new('main');
 };
+sub clean_up {
+    close TASK_FILEHANDLE_LOG;
+    if($Names->{dirty}) {
+    }
+}
 
 if(@ARGV) {
     my ($action,$query) = @ARGV;
@@ -269,9 +257,6 @@ if(@ARGV) {
         $action = 'DOWNLOAD';
     }
     die("No DATA_FILE(" . $TASK_DATABASE . ") found\n") unless(-r $TASK_DATABASE);
-    use MyPlace::Config;
-    my $Names = MyPlace::Config->new();
-    $Names->read_plainfile($TASK_DATABASE);
     my $Hosts = MyPlace::Config->new();
     $Hosts->read_plainfile($HOST_DATABASE);
     my @targets =  $Names->query($query);

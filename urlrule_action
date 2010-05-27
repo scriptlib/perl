@@ -17,7 +17,6 @@ exit 0 if(help_required($0,@ARGV));
 use URI;
 use MyPlace::Script::Message;
 use MyPlace::URLRule;
-use MyPlace::String;
 use MyPlace::ReEnterable;
 use Cwd qw/getcwd/;
 

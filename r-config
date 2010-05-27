@@ -60,7 +60,7 @@ sub print_target {
     }
 }
 
-
+my $CONFIG;
 my $database;
 my $opt = shift @ARGV;
 if($opt and $opt eq '-f') {
@@ -69,65 +69,65 @@ if($opt and $opt eq '-f') {
 else {
     unshift @ARGV,$opt;
 }
-my ($action,$query,$userdata) = @ARGV;
-
-
-my $CONFIG = MyPlace::Config->new();
-#$CONFIG->load($database);
-$CONFIG->read_plainfile($database);
-#use Data::Dumper;print Dumper($CONFIG);
-#$CONFIG->write_plainfile("/dev/stdout");
-#exit 0;
-
-#print STDERR "for $query \n";
+my $action = shift @ARGV;
+my $query = shift @ARGV;
+my $userdata = shift @ARGV;
 $action = 'list' unless($action);
+
+
+
+if($action eq 'add' and !$query) {
+    print3 "Invalid usage\n";
+    print2 "Usage:\n\tr-config add keys...|values...\n";
+    exit 1;
+}
+$CONFIG = MyPlace::Config->new();
+$CONFIG->read_plainfile($database);
+
+
 if($action eq 'list') {
     $query = '/.+/' unless($query);
 }
-my @target = $CONFIG->query($query);
 
-if(!@target) {
-    print3 "query match nothing\n";
-    exit 2;
+if($action eq 'add') {
+    my @keys;
+    push @keys,$query if($query);
+    push @keys,$userdata if($userdata);
+    push @keys,@ARGV if(@ARGV);
+    print1 "add ", join(' -> ',@keys);
+    print_status($CONFIG->add(@keys));
 }
-
-
-$!=undef;
-if($action eq 'list') {
-    print_target("","\n",$CONFIG,@target);
-    exit 0;
-}
-
-#print2 "Selected:\n";
-#print_target("\t",$CONFIG,@target);
-#print2 "For Action:$action ...";
-
-
-if($action eq 'read') {
-    my @r=$CONFIG->read(@target);
-#    print_status(@r);
-    foreach(@r) {
-        my($path,$values) = @{$_};
-        print_path("",$path," = ");
-        print2 join(", ",@{$values}),"\n";
+else {
+    my @target = $CONFIG->query($query);
+    if(!@target) {
+        print3 "query match nothing\n";
+        exit 2;
     }
-}
-elsif($action eq 'write') {
-    print_target("write "," = $userdata\n",$CONFIG,@target);
-    print_status($CONFIG->write($userdata,@target));
-}
-elsif($action eq 'add') {
-    print_target($userdata ? "add $userdata" : "add ","\n",$CONFIG,@target);
-    print_status($CONFIG->add($userdata,@target));
-}
-elsif($action eq 'delete') {
-    print_target("delete ",($userdata ? "->$userdata\n" : "\n"),$CONFIG,@target);
-    print_status($CONFIG->delete($userdata,@target));
-}
-
-if($!) {
-    print3 $!,"\n";
-    exit 1;
+    $!=undef;
+    if($action eq 'list') {
+        print_target("","\n",$CONFIG,@target);
+        exit 0;
+    }
+    elsif($action eq 'read') {
+        my @r=$CONFIG->read(@target);
+        foreach(@r) {
+            my($path,$values) = @{$_};
+            print_path("",$path," = ");
+            print2 join(", ",@{$values}),"\n";
+        }
+    }
+    elsif($action eq 'write') {
+        print_target("write \"","\"  = \"$userdata\"\n",$CONFIG,@target);
+        print_status($CONFIG->write($userdata,@target));
+    }
+    elsif($action eq 'delete') {
+        print_target("delete \"",($userdata ? "->$userdata\n" : "\"\n"),$CONFIG,@target);
+        print_status($CONFIG->delete($userdata,@target));
+    }
+    if($!) {
+        print3 $!,"\n";
+        exit 1;
+    }
 }
 if($CONFIG->{dirty}) {
     print2 "Saving configs to $database";

@@ -1,5 +1,6 @@
 #!/usr/bin/perl -w
 package MyPlace::URLRule;
+use URI;
 
 BEGIN {
     use Exporter ();
@@ -10,6 +11,17 @@ BEGIN {
 }
 
 my $RULE_DIRECTORY = "$ENV{XR_PERL_SOURCE_DIR}/urlrule";
+sub strnum($$) {
+    my $num=shift;
+    my $len=shift;
+    my $o_len = length($num);
+    if(!$len or $len<=0 or $len<=$o_len) {
+        return $num;
+    }
+    else {
+        return "0" x ($len-$o_len) . $num;
+    }
+}
 sub get_rule_dir() {
     return $RULE_DIRECTORY;
 }
