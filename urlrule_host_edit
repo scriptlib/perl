@@ -1,4 +1,4 @@
 #!/usr/bin/perl -w
-exec 'editor',$ENV{XR_PERL_MODULE_DIR} . '/MyPlace/URLRule/HostMapData.pm';
+exec 'editor',$ENV{XR_PERL_SOURCE_DIR} . '/urlrule/HOSTS.URL';
 
 

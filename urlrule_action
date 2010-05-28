@@ -112,6 +112,20 @@ sub process_passdown {
     return 1;
 }
 
+sub execute_rule {
+    my %rule = @_;
+    my $url = $rule{url};
+    my $source = $rule{"source"};
+    my @args = $rule{"args"} ? @{$rule{"args"}} : ();
+    unless(-f $source) {
+        return undef,"File not found: $source";
+    }
+    $! = undef;
+    do $source; 
+    return undef,$! if($!);
+    my %result = &apply_rule($url,\%rule);
+    return 1,\%result;
+}
 sub start_rule {
 
     my %rule = %{parse_rule(@_)};
@@ -127,7 +141,7 @@ sub start_rule {
     app_message(@prompt,$msghd,"For \"$url\"\n");
     app_message(@prompt,$msghd , "Level $level>>","Found rule: \"$source\"\n");
     app_message(@prompt,$msghd , "Level $level>>","Applying it ...\n");
-    my ($status,$result)= execute(%rule);
+    my ($status,$result)= execute_rule(%rule);
     if($status) {
         process_data(\%rule,$result);
         process_passdown(\%rule,$result);

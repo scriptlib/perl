@@ -14,14 +14,7 @@ use constant {
     TASK_FILE_LOG    => 'urlrule_task.log',
 };
 
-
-my %TASK_ACTION_MAP= (
-    'download'=>'urlrule_get',
-    'dump'=>'urlrule_dump',
-    'test'=>'urlrule_test',
-);
 my $TASK_LOGGING    = 1;
-my $TASK_ACTION     = 'urlrule_get';
 my $TASK_DATABASE   = "DATABASE.URL";
 my $HOST_DATABASE = get_rule_dir() . "/HOSTS.URL";
 my $TASK_WORKDIR = getcwd();;
@@ -58,7 +51,7 @@ sub process_data {
     my $level = $rule{"level"};
     my $action = $rule{"action"};
     my @args = $rule{"args"} ? @{$rule{"args"}} : ();
-    my $msghd = "";
+    my $msghd = $result{work_dir} ? "[". $result{work_dir} . "]" : "";
     my $count = @{$result{data}};
     app_message($msghd , "Level $level>>","Get $count Lines,performing action $action..\n");
     my ($status,@message) = do_action($result_ref,$action,@args);
@@ -67,7 +60,7 @@ sub process_data {
         return 1;
     }
     else {
-        app_warn($msghd,"Level $level>>",@message,"\n");
+        app_warning($msghd,"Level $level>>",@message,"\n");
         return undef;
     }
 }
@@ -187,16 +180,21 @@ sub action_DOWNLOAD {
         app_message("Create directory: $name/$host\n");
         mkdir "$name/$host";
     }
+    if(! -d "$name/$host") {
+        app_error("Can't access $name/$host!\n");
+        return undef;
+    }
+    my $Names = MyPlace::Config->new();
+    $Names->read_plainfile($TASK_DATABASE);
+    $Names->propset(scalar(localtime),$name,$id,$host,"last");
+    print STDERR "Saving $TASK_DATABASE...\n";
+    $Names->write_plainfile($TASK_DATABASE);
     if(!chdir("$name/$host")) {
         app_error("$!\n");
         return undef;
     }
-    if(&process_rule($url,$level,'batchget -M 300 -f')) {
-        my $Names = MyPlace::Config->new();
-        $Names->read_plainfile($TASK_DATABASE);
-        $Names->propset(scalar(localtime),$name,$id,$host,"last");
-        print STDERR "Saving $TASK_DATABASE...\n";
-        $Names->write_plainfile($TASK_DATABASE);
+    app_message("Processing $name/$host\n");
+    if(&process_rule($url,$level,'batchget -U -M 300 -f')) {
     }
     chdir $cwd;
     return 1;
@@ -245,18 +243,16 @@ sub clean_up {
 }
 
 if(@ARGV) {
+    die("No DATA_FILE(" . $TASK_DATABASE . ") found\n") unless(-r $TASK_DATABASE);
     my ($action,$query) = @ARGV;
     if($action eq 'DUMP') {
-    }
-    elsif($action eq 'ECHO') {
     }
     elsif($action eq 'DOWNLOAD') {
     }
     else {
         $query = $action;
-        $action = 'DOWNLOAD';
+        $action = 'ECHO';
     }
-    die("No DATA_FILE(" . $TASK_DATABASE . ") found\n") unless(-r $TASK_DATABASE);
     my $Hosts = MyPlace::Config->new();
     $Hosts->read_plainfile($HOST_DATABASE);
     my @targets =  $Names->query($query);
@@ -265,10 +261,18 @@ if(@ARGV) {
         exit 1;
     }
     my @records = $Names->get_records(@targets);
-    &init;
     my @tasks = convert_records($Hosts,\@records);
-    foreach(@tasks) {
-        $phnd->push($TASK_WORKDIR,"action_$action",$_);
+    if($action eq 'DOWNLOAD') {
+        &init;
+        foreach(@tasks) {
+            $phnd->push($TASK_WORKDIR,"action_$action",$_);
+        }
+    }
+    else {
+        foreach(@tasks) {
+            eval("action_$action(\$_)");
+        }
+        exit 0;
     }
 }
 else {

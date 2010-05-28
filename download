@@ -38,6 +38,7 @@ sub build_cmdline {
         push @result,"--output-document",$saveas if($saveas);
         push @result,"--load-cookie",$cookie if(-f $cookie);
         push @result,"--save-cookie",$cookie if($cookie);
+        push @result,'--read-timeout',$maxtime if($maxtime);
         #$verbose ? push @result,"--verbose" : push @result,"--no-verbose";
         push @result,"-q";
         push @result,"--progress","bar";
@@ -157,7 +158,7 @@ if($cookie) {
 }
 
 my $saveas_temp = "$saveas.downloading";
-my @cmdline = build_cmdline($downloader,$url,$saveas_temp,$refer,$cookie,$verbose);
+my @cmdline = build_cmdline($downloader,$url,$saveas_temp,$refer,$cookie,$verbose,$maxtime);
 my $r=process("$name$url",\@cmdline,2);
 
 if($r==0 and -f $saveas_temp) {

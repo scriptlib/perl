@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 package MyPlace::URLRule;
 use URI;
+use URI::Escape;
 
 BEGIN {
     use Exporter ();
@@ -118,10 +119,54 @@ sub execute_rule {
     $! = undef;
     do $source; 
     return undef,$! if($!);
-    my %result = apply_rule($url,\%rule);
+    my %result = &apply_rule($url,\%rule);
+    if($result{work_dir}) {
+        $result{work_dir} = &unescape_text($result{work_dir});
+    }
     return 1,\%result;
 }
 
+
+sub unescape_text {
+    my %ESCAPE_MAP = (
+        "&lt;","<" ,"&gt;",">",
+        "&amp;","&" ,"&quot;","\"",
+        "&agrave;","à" ,"&Agrave;","À",
+        "&acirc;","â" ,"&auml;","ä",
+        "&Auml;","Ä" ,"&Acirc;","Â",
+        "&aring;","å" ,"&Aring;","Å",
+        "&aelig;","æ" ,"&AElig;","Æ" ,
+        "&ccedil;","ç" ,"&Ccedil;","Ç",
+        "&eacute;","é" ,"&Eacute;","É" ,
+        "&egrave;","è" ,"&Egrave;","È",
+        "&ecirc;","ê" ,"&Ecirc;","Ê",
+        "&euml;","ë" ,"&Euml;","Ë",
+        "&iuml;","ï" ,"&Iuml;","Ï",
+        "&ocirc;","ô" ,"&Ocirc;","Ô",
+        "&ouml;","ö" ,"&Ouml;","Ö",
+        "&oslash;","ø" ,"&Oslash;","Ø",
+        "&szlig;","ß" ,"&ugrave;","ù",
+        "&Ugrave;","Ù" ,"&ucirc;","û",
+        "&Ucirc;","Û" ,"&uuml;","ü",
+        "&Uuml;","Ü" ,"&nbsp;"," ",
+        "&copy;","\x{00a9}",
+        "&reg;","\x{00ae}",
+        "&euro;","\x{20a0}",
+    );
+    my $text = shift;
+    return unless($text);
+    foreach (keys %ESCAPE_MAP) {
+        $text =~ s/$_/$ESCAPE_MAP{$_}/g;
+    }
+    $text =~ s/&#(\d+);/chr($1)/eg;
+    $text = uri_unescape($text);
+    $text =~ s/[_-]+/ /g;
+    $text =~ s/[\:]+/, /g;
+    $text =~ s/[\\\<\>"\^\&\*\?]+//g;
+    $text =~ s/\s{2,}/ /g;
+    $text =~ s/(?:^\s+|\s+$)//;
+    return $text;
+}
 
 sub do_action {
     my ($result_ref,$action,@args) = @_;
@@ -129,9 +174,11 @@ sub do_action {
     return undef,"No results" unless(%{$result_ref});
     my %result = %{$result_ref};
     return undef,"No results" unless($result{data});
+    my $msg="";
     if($result{work_dir}) {
         mkdir $result{work_dir} unless(-d $result{work_dir});
-        chdir $result{work_dir} or return code_message(undef,"$!\n");
+        chdir $result{work_dir} or return undef,$!;
+        $msg = "[" . $result{work_dir} . "]";
     }
     if(ref $result{data} eq 'SCALAR') {
         $result{data} = [$result{data}];
@@ -142,13 +189,13 @@ sub do_action {
     $pipeto = $pipeto ? $pipeto : $result{pipeto} ;
     if($file) {
         if (-f $file) {
-            return undef,"Ingored (File exists)...";
+            return undef,$msg . "Ingored (File exists)...";
         }
         else {
             open FO,">",$file or die("$!\n");
             print FO @{$result{data}};
             close FO;
-            return 1,"Action File ($file) OK.";
+            return 1,$msg . "Action File ($file) OK.";
         }
     }
     elsif($pipeto) {
@@ -159,7 +206,7 @@ sub do_action {
             print FO $line,"\n";
         }
         close FO;
-        return 1,"Action Pipeto ($pipeto) OK.";
+        return 1,$msg . "Action Pipeto ($pipeto) OK.";
     }
     elsif($result{hook}) {
         my $index=0;
@@ -169,14 +216,14 @@ sub do_action {
             $line = URI->new_abs($line,$result{base}) if($result{base});
             process_data($line,\%result);
         }
-        return 1,"Action Hook OK.";
+        return 1,$msg . "Action Hook OK.";
     }
     else {
         foreach my $line(@{$result{data}}) {
             $line = URI->new_abs($line,$result{base}) if($result{base});
             print $line,"\n";
         }
-        return 1;"OK.";
+        return 1;$msg . "OK.";
     }
 }
 

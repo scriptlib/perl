@@ -56,7 +56,7 @@ sub wait_process {
     my $id=-1;
     until($id>0){
         $id = &para_wait;
-#        sleep 1;
+        sleep 1;
     };
     return 1;
 }

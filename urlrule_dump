@@ -24,23 +24,25 @@ my $source = $rule{"source"};
 my $level = $rule{"level"};
 my $msghd = "";
 
-app_message("%Rule :\n");
-print STDERR Dumper(\%rule),"\n";
+#app_message("%Rule :\n");
+print STDERR Data::Dumper->Dump([\%rule],["*rule"]);
 
-unless(-f $source) {
-    app_abort("File not found: $source\n");
-}
+#unless(-f $source) {
+#    app_abort("File not found: $source\n");
+#}
 
-do $source;
+#do $source;
 
-app_error("$@\n") if($@);
 app_message($msghd , "Level $level>>","For \"$url\"\n");
 app_message($msghd , "Level $level>>","Found rule: \"$source\"\n");
 app_message($msghd , "Level $level>>","Applying it ...\n");
-my %result=apply_rule($url,\%rule);
-
-app_message("%Result :\n");
-print STDERR Dumper(\%result),"\n";
+my ($status,$result)=execute_rule(%rule);
+if($status) {
+    print STDERR Data::Dumper->Dump([$result],["*result"]);
+}
+else {
+    app_message("Error:$result\n");
+}
 
 
 

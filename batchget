@@ -6,18 +6,19 @@
 ###APPDESC:     Download URLS,using simdo	
 ###APPUSAGE:	[OPTIONS...] [Task Name]
 ###APPEXAMPLE:	cat url.lst | batchget
-###APPOPTION:	-m:Max number of simultanous tasks|-n:Task name|-a:Auto rename|-d:Create directories|-e:extension name for autorename|-w:Working directory|-r:Refer URL|-h:Display this text|-b:cookie|-L:Logging programe|-f:Full name|-i:Auto rename by index|-M:Max time for a download
+###APPOPTION:	-m:Max number of simultanous tasks|-n:Task name|-a:Auto rename|-d:Create directories|-e:extension name for autorename|-w:Working directory|-r:Refer URL|-h:Display this text|-b:cookie|-L:Logging programe|-f:Full name|-i:Auto rename by index|-M:Max time for a download|-U use urls history database 
 
 use strict;
 use lib $ENV{XR_PERL_MODULE_DIR};
 use MyPlace::ParallelRun;
 use Getopt::Std;
 use URI::Escape;
+use MyPlace::Script::Message;
 
 #BEGIN {srand(time());}
 
 my %opts;
-getopts('M:hm:n:fade:w:r:L:b:i',\%opts);
+getopts('M:hm:n:fade:w:r:L:b:iU',\%opts);
 exit(system("formathelp",$0,"-n")) if($opts{"h"});
 
 my $def_mul=3;
@@ -33,6 +34,8 @@ my $logger    = $opts{"L"} ? $opts{"L"} : "";
 my $cookie    = $opts{"b"} ? $opts{"b"} : "";
 my $number    = $opts{"i"} ? $opts{"i"} : "";
 my $fullname  = $opts{"f"} ? 1 : 0;
+my $urlhist   = $opts{'U'} ? 1 : 0;
+my $URL_DATABASE_FILE = 'URLS.txt';
 
 $autoname="true" if($number);
 unless($taskname) {
@@ -47,7 +50,34 @@ if($workdir) {
 #    chdir($workdir);
 }
 
+my %URL_DATABASE;
 
+sub load_database {
+    open FI,"<",$URL_DATABASE_FILE or return;
+    while(<FI>) {
+        chomp;
+        $URL_DATABASE{$_}=1;
+    }
+    close FI;
+}
+sub check_database {
+    my $url = shift;
+    if($URL_DATABASE{$url}) {
+        app_warning("URL IN DATABASE,ignored.[$url]\n");
+        return 1;
+    }
+    else {
+        $URL_DATABASE{$url}=1;
+        return undef;
+    }
+}
+sub save_database {
+    open FO,">",$URL_DATABASE_FILE or return;
+    foreach (keys %URL_DATABASE) {
+        print FO $_,"\n";
+    }
+    close FO;
+}
 sub Uniqname($) {
     my $ext =shift;
     my $max = 10000000000;
@@ -138,9 +168,15 @@ my $prefix = $taskname ? $taskname . " " : "";
 my @URLS;
 my $index=0;
 my $count=0;
+
+if($urlhist) {
+    load_database();
+}
+
 para_init $muldown;
 while(<STDIN>) {
     chomp;
+    next if($urlhist and check_database($_));
     push @URLS,$_;
     $count++;
     if(&para_isfree()) {
@@ -153,8 +189,11 @@ while(<STDIN>) {
 foreach my $URL (@URLS) {
     $index++;
     &inqueue($URL,$index,$count,$prefix);
+    sleep 1;
 }
 para_cleanup();
+save_database() if($urlhist);
+
 #print STDERR ("\n");
 #exit 0 unless($count);
 
