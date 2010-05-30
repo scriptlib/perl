@@ -184,7 +184,7 @@ sub search {
     my $result;
     if($res->is_success) {
         my $code = $res->content;
-        if($code =~ m/dyn\.setResults\((.+?)\)\s*\;\s*\</s) {
+        if($code and $code =~ m/dyn\.setResults\((.+?)\)\s*\;\s*\</s) {
             $code = $1;
         }
         $data = eval($code);

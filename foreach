@@ -1,0 +1,84 @@
+#!/usr/bin/perl -w
+###APPNAME:     foreach
+###APPAUTHOR:   duel
+###APPDATE:	Sat May 29 19:18:48 2010
+###APPVER:	0.1
+###APPDESC:     run commands against every matched filename
+###APPUSAGE:    [-f|-d] [wildcard] [cmds|cmds "{}" args...]	
+###APPEXAMPLE:	foreach -d '*' echo mv '"{}"' ..
+###APPOPTION:	-f:Select files only|-d:select directories only
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+sub run {
+    print STDERR " ",join(@_),"\n";
+    return system(@_) == 0;
+}
+
+my $cmd_place_holder_str = '"{}"';
+my $cmd_place_holder_exp = qr/\{\}/;
+
+my $exp;
+my @cmds;
+my $opt;
+my $opt_status='';
+
+foreach(@ARGV) {
+    if($opt_status eq 'cmd') {
+        push @cmds,$_;
+    }
+    elsif($_ eq '-d') {
+        $opt='-d';
+    }
+    elsif($_ eq '-f') {
+        $opt='-f';
+    }
+    else {
+        $exp = $_;
+        $opt_status='cmd';
+    }
+}
+@cmds = ('echo','"{}"') unless(@cmds);
+$exp = "*" unless($exp);
+
+my $cmds_replacable = 0;
+foreach(@cmds) {
+    if($_ =~ $cmd_place_holder_exp) {
+        $cmds_replacable = 1;
+        last;
+    }
+}
+
+use File::Glob qw/bsd_glob/;
+
+foreach my $filename (bsd_glob($exp)) {
+    if($opt and $opt eq '-d') {
+        next unless(-d $filename);
+    }
+    elsif($opt and $opt eq '-f') {
+        next unless(! -d $filename);
+    }
+
+    if($cmds_replacable) {
+        my @cmds_new = @cmds;
+        foreach my $word (@cmds_new) {
+            $word =~ s/$cmd_place_holder_exp/$filename/g;
+        }
+        &run(@cmds_new);
+    }
+    else {
+        &run(@cmds,$filename);
+    }
+}
+
+
+
+
