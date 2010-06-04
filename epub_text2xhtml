@@ -1,0 +1,99 @@
+#!/usr/bin/perl -w
+###APPNAME:     epub_text2xhtml
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Fri Jun  4 23:06:44 2010
+###APPVER:	0.1
+###APPDESC:     epub_text2xhtml	
+###APPUSAGE:	
+###APPEXAMPLE:	epub_text2xhtml
+###APPOPTION:   -t:set TITLE|-c:set CSS|-r:set COPYRIGHT-i:set input filename|-o:set output filename
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+
+
+#exit 0 if(help_even_empty($0,@ARGV));
+sub HEADER {
+    my ($title,$css) = @_;
+    return '<?xml version="1.0" encoding="utf-8"?>' . "\n"
+           . '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">' . "\n"
+           . '<head>' . "\n"
+           . '<meta name="generator" content="epub_text2xhtml, xiaoranzzz@myplace.hell" />' . "\n"
+           . ($title ? "<title>$title</title>" . "\n" : "")
+           . ($css ? "<link rel=\"stylesheet\" href=\"$css\" type=\"text/css\" />" . "\n" : "")
+           . '<meta http-equiv="Content-Type" content="application/xhtml.xml; charset=utf-8" />' . "\n"
+           . '</head>' . "\n"
+           . '<body>' . "\n"
+           . '<div class="chapter">' . "\n";
+}
+
+sub BODY {
+    my($chap) = @_;
+    return  ($chap ?  "<h3 class=\"chapter_title\">$chap</h3>" . "\n" : "")
+            . '<div class="chapter_content">' . "\n";
+}
+
+sub BODY_TEXT {
+    my $result = "";
+    foreach(@_) {
+        $result .= '<p class="paragraph">' . ($_ ? $_ : "") . '</p>';
+    }
+    return $result;
+}
+
+sub FOOTER {
+   my($copyright) = @_;
+   return   '</div>' . "\n"             #end of <div class="chapter_content">
+            . '</div>' . "\n"           #end of <div class="chapter">
+            . '<div class="footer">' . "\n"
+            . ($copyright ? '<p class="copyright">' . $copyright . "</p>\n" : "")
+            . '</div>' . "\n"
+            . '</body>' . "\n"
+            . '</html>' . "\n";
+}
+
+use Getopt::Std;
+my %opts;
+getopts('ht:c:i:o:r:',\%opts);
+exit(system("formathelp",$0,"-h")) if($opts{"h"});
+my ($title,$css,$copyright,$input,$output) = @opts{qw/t c r i o/};
+$input = shift @ARGV unless($input);
+$output = shift @ARGV unless($output);
+
+my ($FI,$FO);
+if($input) {
+    open $FI,"<",$input or die("$!\n");
+}
+else {
+    $FI = *STDIN;
+#    open $FI,"<&STDIN" or die("$!\n");
+}
+
+my $firstline;
+while(<$FI>) {    
+    $firstline = $_;
+    chomp $firstline;
+    last if($firstline);
+}
+
+my $cached_output =  &HEADER($title,$css);
+$cached_output .=  &BODY($firstline);
+$cached_output .=  &BODY_TEXT(<$FI>);
+close $FI;
+$cached_output .=  &FOOTER($copyright);
+
+if($output) {
+    open $FO,">",$output or die("$!\n");
+}
+else {
+    $FO = *STDOUT;
+}
+print $FO $cached_output;
+
+

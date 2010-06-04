@@ -1,0 +1,212 @@
+#!/usr/bin/perl -w
+###APPNAME:     epub_blank
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Sat Jun  5 00:08:28 2010
+###APPVER:	0.1
+###APPDESC:     epub_blank	
+###APPUSAGE:	
+###APPEXAMPLE:	epub_blank
+###APPOPTION:	
+use strict;
+
+#ENV variable MUST be defined somewhere,
+#FOR perl to search modules from,
+#OR nothing will work
+use lib $ENV{XR_PERL_MODULE_DIR};
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+#exit 0 if(help_even_empty($0,@ARGV));
+
+
+sub make_directory {
+    foreach(@_) {
+        next if(-d $_);
+        mkdir $_ or die("$!\n");
+        print STDERR "directory created $_ \n";
+    }
+}
+sub write_file {
+    my $file = shift;
+    open FO,">:utf8",$file or die("$!\n");
+    print FO @_;
+    close FO;
+    print STDERR "file created $file\n";
+}
+
+my $dir = shift;
+if($dir) {
+    print STDERR "change to \"$dir\"\n";
+    chdir $dir or die("$!\n");
+}
+
+
+make_directory("META-INF");
+write_file(
+    "META-INF/container.xml",
+<<'CONTAINER'
+<?xml version="1.0" encoding="UTF-8" ?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+   <rootfiles>
+      <rootfile full-path="OPS/fb.opf" media-type="application/oebps-package+xml"/>
+   </rootfiles>
+</container>
+CONTAINER
+);
+
+write_file(
+    "mimetype",
+    "application/epub+zip",
+);
+
+make_directory("OPS");
+my $opf_uuid=`uuid`;
+chomp $opf_uuid;
+
+use POSIX qw/strftime/;
+my $date=strftime "%Y-%m-%d",localtime;
+
+write_file(
+    "OPS/fb.opf",
+<<'OPF'
+<?xml version="1.0" encoding="UTF-8" ?>
+<package version="2.0" unique-identifier="PrimaryID" xmlns="http://www.idpf.org/2007/opf">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:opf="http://www.idpf.org/2007/opf">
+    <dc:title>NO TITLE</dc:title>
+OPF
+    ,
+    "<dc:identifier id=\"PrimaryID\" opf:scheme=\"URN\">urn:uuid:$opf_uuid</dc:identifier>\n"
+    ,
+    "<dc:date opf:event=\"original-publication\">$date</dc:date>\n"
+    ,
+<<'OPF'
+    <dc:language>en</dc:language>
+    <dc:creator opf:role="aut" opf:file-as="NO CREATOR">NO CREATOR</dc:creator>
+    <dc:publisher>NO PUBLISHER</dc:publisher>
+    <dc:description>NO DESCRIPTION</dc:description>
+    <dc:coverage>NO COVERAGE</dc:coverage>
+    <dc:source>NO SOURCE</dc:source>
+    <dc:rights>NO RIGHTS</dc:rights>
+    <dc:subject>NO SUBJECT</dc:subject>
+    <dc:subject>NO SUBJECT</dc:subject>
+    <meta name="cover" content="book-cover"/>
+  </metadata>
+
+  <manifest>
+    <!-- Content Documents -->
+    <item id="cover"
+      href="cover.xhtml"
+      media-type="application/xhtml+xml"/>
+    <item id="chapter-css"
+      href="css/chapter.css"
+      media-type="text/css"/>
+    <item id="ncx"
+      href="fb.ncx"
+      media-type="application/x-dtbncx+xml"/>
+  </manifest>
+
+  <spine toc="ncx">
+    <itemref idref="cover" linear="yes"/>
+  </spine>
+
+  <guide>
+  <reference type="cover" title="Cover" href="cover.xhtml"/>
+  </guide>
+
+</package>
+OPF
+);
+
+my $ncx_uuid = `uuid`;
+chomp $ncx_uuid;
+write_file(
+"OPS/fb.ncx",
+<<'NCX'
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE ncx PUBLIC
+     "-//NISO//DTD ncx 2005-1//EN"
+     "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd">
+
+<ncx version="2005-1"
+     xml:lang="en"
+     xmlns="http://www.daisy.org/z3986/2005/ncx/">
+
+  <head>
+    <!-- The following four metadata items are required for all
+        NCX documents, including those conforming to the relaxed
+        constraints of OPS 2.0 -->
+NCX
+,
+"<meta name=\"dtb:uid\" content=\"$ncx_uuid\"/>\n"
+,
+<<'NCX'
+    <meta name="dtb:depth" content="1"/>
+    <meta name="dtb:totalPageCount" content="0"/>
+    <meta name="dtb:maxPageNumber" content="0"/>
+  </head>
+ <docTitle>
+   <text>NO TITLE</text>
+ </docTitle>
+ <docAuthor>
+     <text>NO AUTHOR</text>
+ </docAuthor>
+  <navMap>
+    <navPoint class="cover" id="cover" playOrder="1">
+      <navLabel><text>Cover</text></navLabel>
+      <content src="cover.xhtml"/>
+    </navPoint>
+ </navMap>
+</ncx>
+NCX
+);
+
+write_file(
+"OPS/cover.xhtml",
+<<'COVER'
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC
+     "-//W3C//DTD XHTML 1.1//EN"
+     "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+  <head>
+   <title>Cover</title>
+   <meta http-equiv="Content-Type" content="application/xhtml+xml; charset=utf-8"/>
+  </head>
+  <body>
+    <div style="text-align: center; page-break-after: always;">
+       <img src="images/cover.png" alt="Cover" style="height: 100%; max-width: 100%;" />
+    </div>
+  </body>
+</html>
+COVER
+);
+
+make_directory("OPS/images");
+make_directory("OPS/css");
+write_file(
+"OPS/css/chapter.css",
+<<'CSS'
+    .chapter {
+    }
+
+    .chapter_title {
+    }
+
+    .chapter_content {
+    }
+
+    .paragraph {
+    }
+
+    .footer {
+    }
+
+    .copyright {
+    }
+
+CSS
+);
+
+
+
