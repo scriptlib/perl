@@ -55,7 +55,7 @@ sub help_required {
 }
 
 sub edit_file {
-    system("vim",@_);
+    system("editor",@_);
 }
 
 sub format_help {

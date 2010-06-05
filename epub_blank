@@ -36,6 +36,7 @@ sub write_file {
 
 my $dir = shift;
 if($dir) {
+    make_directory($dir);
     print STDERR "change to \"$dir\"\n";
     chdir $dir or die("$!\n");
 }
@@ -48,7 +49,7 @@ write_file(
 <?xml version="1.0" encoding="UTF-8" ?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
    <rootfiles>
-      <rootfile full-path="OPS/fb.opf" media-type="application/oebps-package+xml"/>
+      <rootfile full-path="OPS/content.opf" media-type="application/oebps-package+xml"/>
    </rootfiles>
 </container>
 CONTAINER
@@ -67,7 +68,7 @@ use POSIX qw/strftime/;
 my $date=strftime "%Y-%m-%d",localtime;
 
 write_file(
-    "OPS/fb.opf",
+    "OPS/content.opf",
 <<'OPF'
 <?xml version="1.0" encoding="UTF-8" ?>
 <package version="2.0" unique-identifier="PrimaryID" xmlns="http://www.idpf.org/2007/opf">
@@ -89,7 +90,7 @@ OPF
     <dc:rights>NO RIGHTS</dc:rights>
     <dc:subject>NO SUBJECT</dc:subject>
     <dc:subject>NO SUBJECT</dc:subject>
-    <meta name="cover" content="book-cover"/>
+    <meta name="cover" content="images-cover"/>
   </metadata>
 
   <manifest>
@@ -97,11 +98,14 @@ OPF
     <item id="cover"
       href="cover.xhtml"
       media-type="application/xhtml+xml"/>
-    <item id="chapter-css"
-      href="css/chapter.css"
+    <item id="images-cover" 
+     href="images/cover.png"
+     media-type="image/png"/>
+    <item id="css-style"
+      href="css/style.css"
       media-type="text/css"/>
     <item id="ncx"
-      href="fb.ncx"
+      href="toc.ncx"
       media-type="application/x-dtbncx+xml"/>
   </manifest>
 
@@ -120,7 +124,7 @@ OPF
 my $ncx_uuid = `uuid`;
 chomp $ncx_uuid;
 write_file(
-"OPS/fb.ncx",
+"OPS/toc.ncx",
 <<'NCX'
 <?xml version="1.0" encoding="UTF-8"?>
 
@@ -185,7 +189,7 @@ COVER
 make_directory("OPS/images");
 make_directory("OPS/css");
 write_file(
-"OPS/css/chapter.css",
+"OPS/css/style.css",
 <<'CSS'
     .chapter {
     }

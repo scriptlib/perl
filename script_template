@@ -1,20 +1,83 @@
 #!/usr/bin/perl -w
-###APPNAME:     ___APPNAME___
-###APPAUTHOR:   ___AUTHOR___
-###APPDATE:	___DATE___
-###APPVER:	0.1
-###APPDESC:     ___APPNAME___	
-###APPUSAGE:	
-###APPEXAMPLE:	___APPNAME___
-###APPOPTION:	
+# $Id$
+=pod
+
+=head1  NAME
+
+__NAME__ - __ABOUT__
+
+=head1  SYNOPSIS
+
+__NAME__ [options] ...
+
+ Options:
+    -h,--help   Display this text
+    --version   Show version info
+    --edit-me   Invoke 'editor' against the file
+
+=head1  OPTIONS
+
+=over 8
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<--edit-me>
+
+Invoke 'editor' against the script source
+
+=back
+
+=head1  DESCRIPTION
+
+__DESC__
+
+=head1  CHANGELOG
+
+    __DATE__  __AUTHOR__  <__EMAIL__>
+        
+        * file created.
+
+=head1  AUTHOR
+
+__AUTHOR__ <__EMAIL__>
+
+=cut
+
 use strict;
+require v5.10.0;
+BEGIN {
+    our $VERSION = 'v0.1';
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC,map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+    sub _HELP_MESSAGE {require Pod::Usage;Pod::Usage::pod2usage(-verbose => 1);}
+    sub _USAGE_MESSAGE {require Pod::Usage;Pod::Usage::pod2usage(-verbose => 0);}
+    sub _VERSION_MESSAGE {print STDERR "$0 $VERSION\n";}
+    sub _EDIT_ME {exec('editor','--',$0)};
+    sub CHECK_OPTIONS {
+        my $opts = shift;
+        if($opts->{'help'}) 
+            {_HELP_MESSAGE;exit 0;}
+        elsif($opts->{'version'})
+            {_VERSION_MESSAGE;exit 0;}
+        elsif($opts->{'edit-me'}) 
+            {_EDIT_ME;exit 0;}
+    }
+}
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me/;
+if(@ARGV) {
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    CHECK_OPTIONS(\%OPTS);
+}
 
-#ENV variable MUST be defined somewhere,
-#FOR perl to search modules from,
-#OR nothing will work
-use lib $ENV{XR_PERL_MODULE_DIR};
 
-use MyPlace::Script::Usage qw/help_required help_even_empty/;
-exit 0 if(help_required($0,@ARGV));
-#exit 0 if(help_even_empty($0,@ARGV));
 
