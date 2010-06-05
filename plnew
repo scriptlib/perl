@@ -9,7 +9,7 @@
 ###APPOPTION:	-s:No template used|-r:Read from stdin
 
 use strict;
-use Env qw(USER);
+use Env qw(USER HOSTNAME);
 
 
 $ARGV[0]="--help" unless(@ARGV);
@@ -65,6 +65,8 @@ open PIPE,">:utf8",$fname or die("$!\n");
 my $date=localtime();
 $USER="xiaoranzzz" unless($USER);
 
+my $EMAIL="$USER\@" . (defined $HOSTNAME ? $HOSTNAME : "myplace.hell");
+
 if($OPT_SIMPLE) {
     print PIPE "#!/usr/bin/perl\n";
 }
@@ -73,9 +75,10 @@ else {
     if(-f $template) {
         open TEMPDATA,'<',$template;
         while(<TEMPDATA>) {
-            s/___AUTHOR___/$USER/;
-            s/___APPNAME___/$ARGV[0]/;
-            s/___DATE___/$date/;
+            s/___EMAIL___/$EMAIL/g;
+            s/___AUTHOR___/$USER/g;
+            s/___NAME___/$ARGV[0]/g;
+            s/___DATE___/$date/g;
             print(PIPE);
         }
         close(TEMPDATA);
@@ -83,12 +86,30 @@ else {
 }
 if($OPT_READ) {
     while(<STDIN>) {
+        s/___EMAIL___/$EMAIL/g;
         s/___AUTHOR___/$USER/;
-        s/___APPNAME___/$ARGV[0]/;
+        s/___NAME___/$ARGV[0]/;
         s/___DATE___/$date/;
         print(PIPE);
     }
 }
 close(PIPE);
-chmod(0775,$fname) if (-f $fname);
-system("\"$editor\" \"$fname\"");
+if(-f $fname)
+{
+    use File::stat;
+    my $oldst = stat($fname);
+    system("\"$editor\" \"$fname\"");
+    my $newst = stat($fname);
+    if($oldst->mtime < $newst->mtime) {
+        print STDERR "$fname modified.\n";
+        print STDERR "make it executable.\n";
+        chmod(0775,$fname) or print STDERR "$!\n";
+#        print STDERR "Add svn:keywords.\n";
+#        system("svn","add",$fname);
+#        system("svn","propset","svn:keywords","Id",$fname);
+    }
+    else {
+        print STDERR "$fname remain the same.\nunlink it.\n";
+        unlink($fname) or print STDERR "$!\n";
+    }
+}

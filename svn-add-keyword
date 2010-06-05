@@ -14,7 +14,7 @@ BEGIN
 }
 
 my %OPTS;
-my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+my @OPTIONS = qw/help|h|? version|ver edit-me man/;
 
 if(@ARGV)
 {
@@ -29,6 +29,18 @@ else
     MyPlace::Usage::PrintHelp();
 }
 
+my ($keyword,@files)=@ARGV;
+unless(@files)
+{
+    @files=($keyword);
+    $keyword="Id";
+}
+foreach(@files) {
+    system("svn","add",$_);
+    system("svn","propset","svn:keywords",$keyword,$_);
+}
+
+
 
 __END__
 
@@ -36,11 +48,11 @@ __END__
 
 =head1  NAME
 
-___NAME___ - PERL script
+svn-add-keyword - set svn:keywords to file
 
 =head1  SYNOPSIS
 
-___NAME___ [options] ...
+svn-add-keyword [options] (file | keyword file1 [file2 ...])
 
 =head1  OPTIONS
 
@@ -66,17 +78,17 @@ Invoke 'editor' against the source
 
 =head1  DESCRIPTION
 
-___DESC___
+Set svn:keywords to files, make them under 'Version Control' if not
 
 =head1  CHANGELOG
 
-    ___DATE___  ___AUTHOR___  <___EMAIL___>
+    Sun Jun  6 01:24:09 2010  xiaoranzzz  <xiaoranzzz@myplace.hell>
         
         * file created.
 
 =head1  AUTHOR
 
-___AUTHOR___ <___EMAIL___>
+xiaoranzzz <xiaoranzzz@myplace.hell>
 
 =cut
 
