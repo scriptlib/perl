@@ -1,0 +1,132 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man size|s=i/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
+my $max_size = $OPTS{size} ? $OPTS{size} * 1000 : 256000;
+my @target_files = @ARGV;
+
+die("No target files.\n") unless(@target_files);
+
+use File::stat;
+foreach my $filename(@target_files)
+{
+    if(! -f $filename) 
+    {
+        print STDERR "File not accesable : \"$filename\"\n";
+        next;
+    }
+    my $stat = stat($filename);
+    if($stat->size <= $max_size) {
+        print STDERR "File size does not exceed $max_size.\n \"$filename\" [Ignored]\n";
+        next;
+    }
+    print STDERR "Spliting $filename...";
+    print STDERR "\n",&split_file($max_size,$filename);
+}
+
+sub split_file {
+    my($max_size,$filename) = @_;
+    $filename =~ m/^(.+)\.([^\.]+)$/;
+    my $basename = $1 or $filename;
+    my $ext = $2 ? ".$2" : ""; 
+    
+    my $data;
+    {
+        local $|='';
+        open FI,"<",$filename or return("$!\n");
+        $data = <FI>;
+        close FI;
+    }
+    return "Nothing to do\n" unless($data);
+    
+    if($data =~ m/^([.\n]+)<body>([.\n]+)<\/body>([.\n]+)$/) {
+        my $head = $1;
+        my $body = $2;
+        my $foot = $3;
+        die("Not implemented."); 
+    }
+    else {
+        return "Nothing to do\n";
+    }
+
+}
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+epub_split_xhtml - PERL script
+
+=head1  SYNOPSIS
+
+epub_split_xhtml [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-06-06  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+

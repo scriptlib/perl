@@ -28,10 +28,15 @@ sub make_directory {
 }
 sub write_file {
     my $file = shift;
+    print STDERR "Creating $file ...";
+    if(-f $file) {
+        print STDERR " [Ignored] File exist.\n";
+        return;
+    }
     open FO,">:utf8",$file or die("$!\n");
     print FO @_;
     close FO;
-    print STDERR "file created $file\n";
+    print STDERR " [OK]\n";
 }
 
 my $dir = shift;
@@ -99,8 +104,8 @@ OPF
       href="cover.xhtml"
       media-type="application/xhtml+xml"/>
     <item id="images-cover" 
-     href="images/cover.png"
-     media-type="image/png"/>
+     href="images/cover.jpg"
+     media-type="image/jpeg"/>
     <item id="css-style"
       href="css/style.css"
       media-type="text/css"/>
@@ -179,7 +184,7 @@ write_file(
   </head>
   <body>
     <div style="text-align: center; page-break-after: always;">
-       <img src="images/cover.png" alt="Cover" style="height: 100%; max-width: 100%;" />
+       <img src="images/cover.jpg" alt="Cover" style="height: 100%; max-width: 100%;" />
     </div>
   </body>
 </html>

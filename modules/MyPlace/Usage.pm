@@ -31,7 +31,7 @@ sub Process
     my $version = shift;
     if    ($opts->{'help'})    { &PrintHelp;    exit 0; }
     elsif ($opts->{'version'}) { &PrintVersion($version); exit 0; }
-    elsif ($opts->{'man'})     { &PrintMan; exit 0; }
+    elsif ($opts->{'manual'})  { &PrintMan; exit 0; }
     elsif ($opts->{'edit-me'}) { &Edit;    exit 0; }
 }
 1;

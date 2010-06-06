@@ -29,17 +29,12 @@ else
     MyPlace::Usage::PrintHelp();
 }
 
-my ($keyword,@files)=@ARGV;
-unless(@files)
+foreach my $filename (@ARGV)
 {
-    @files=($keyword);
-    $keyword="Id";
+    $filename =~ m/^(.+)\.[^\.]+$/;
+    my $basename = $1 || $filename;
+    system("split","--verbose","-d","-C","100K","--",$filename,"${basename}_part");
 }
-foreach(@files) {
-    system("svn","add",$_);
-    system("svn","propset","svn:keywords",$keyword,$_);
-}
-
 
 
 __END__
@@ -48,11 +43,11 @@ __END__
 
 =head1  NAME
 
-svn-add-keyword - set svn:keywords to file
+epub_split_text - split text files
 
 =head1  SYNOPSIS
 
-svn-add-keyword [options] (file | keyword file1 [file2 ...])
+epub_split_text file1 [file2 file3 ...]
 
 =head1  OPTIONS
 
@@ -78,11 +73,11 @@ Invoke 'editor' against the source
 
 =head1  DESCRIPTION
 
-Set svn:keywords to files, make them under 'Version Control' if not
+Split text files
 
 =head1  CHANGELOG
 
-    Sun Jun  6 01:24:09 2010  xiaoranzzz  <xiaoranzzz@myplace.hell>
+    2010-06-06  xiaoranzzz  <xiaoranzzz@myplace.hell>
         
         * file created.
 

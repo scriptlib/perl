@@ -1,0 +1,145 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
+sub edit_text
+{
+    my ($exps_ref,@text) = @_;
+    foreach(@text) {
+        for(my $i=0;$i<@{$exps_ref};$i+=2) {
+            s{$exps_ref->[$i]}{$exps_ref->[$i+1]}g;
+       }
+    }
+    return @text;
+}
+
+sub create_exp
+{
+    my $property_of = shift;
+    my @exps;
+    foreach my $name(keys %{$property_of})
+    {
+        push @exps,qr/(?<=")$name(?=")|(?<=\>)$name(?=\<)/; 
+        push @exps,$property_of->{$name};
+    }
+    return \@exps;
+}
+
+my %property_of;
+my @target_file;
+foreach(@ARGV) {
+    if(/^\s*([^=]+)\s*=\s*(.+)\s*$/) {
+        $property_of{$1} = $2;
+    }
+    else {
+        push @target_file,$_;
+    }
+}
+die("No property specified!\n") unless(%property_of);
+
+my $exps_ref = &create_exp(\%property_of);
+if(@target_file)
+{
+    foreach(@target_file)
+    {
+        if(! -f $_)
+        {
+            print STDERR "File not exist: $_ \n";
+            next;
+        }
+        open FI,"<",$_ or die("$!\n");
+        my @text = <FI>;
+        close FI;
+        my @new_text = edit_text($exps_ref,@text);
+        open FO,">",$_ or die("$!\n");
+        print FO @new_text;
+        close FO;
+        print STDERR "$_ modified.\n";
+    }
+}
+else
+{
+    while(<STDIN>)
+    {
+        print &edit_text($exps_ref,$_);    
+    }
+}
+__END__
+
+=pod
+
+=head1  NAME
+
+epub_propset - edit propetries on OPF NCX files
+
+=head1  SYNOPSIS
+
+epub_propset [options] PROPERTY1=VALUE1 file1 file2 PROPERTY2=VALUE2...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+Editor for EPUB .OPF & .NCX files property, 
+using string replacement rawfully.
+
+=head1  CHANGELOG
+
+    2010-06-06  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+

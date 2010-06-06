@@ -1,42 +1,46 @@
 #!/usr/bin/perl -w
-###APPNAME:	plnew
-###APPAUTHOR:	xiaoranzzz
-###APPDATE:	2007-09-14 06:00
-###APPVER:	0.1
-###APPDESC:	Create a new perl script
-###APPUSAGE:	[Options] (name)
-###APPEXAMPLE:	plnew plnew
-###APPOPTION:	-s:No template used|-r:Read from stdin
-
+# $Id$
 use strict;
+require v5.10.0;
+our $VERSION = 'v1.1';
+BEGIN
+{
+    our $PROGRAM_DIR;
+    $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man simple|s read|r/;
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
 use Env qw(USER HOSTNAME);
-
-
-$ARGV[0]="--help" unless(@ARGV);
-exit 0 unless(system("plhelp",$0,(@ARGV)));
-
-my $pldir=$ENV{XR_PERL_SOURCE_DIR};
+our $PROGRAM_DIR;
+my $pldir=$PROGRAM_DIR;#$ENV{XR_PERL_SOURCE_DIR};
 die "Can't not locate script directory.\n" if(!$pldir);
 die "Direcoty not exists:\"$pldir\"\n" if (! -d $pldir);
 
+my $OPT_READ = $OPTS{'read'};
+my $OPT_SIMPLE = $OPTS{'simple'};
+my $NAME = shift @ARGV;
+die("Invalid usage.\n") unless($NAME);
 
-my $fname;
-my $OPT_READ;
-my $OPT_SIMPLE;
-foreach my $opt(@ARGV) {
-    if($opt eq "-s") {
-        $OPT_SIMPLE=1;
-    }
-    elsif($opt eq "-r") {
-        $OPT_READ=1;
-    }
-    else {
-        if($fname) {
-            print STDERR "\"$fname\" ingored...\n";
-        }
-        $fname=$opt;
-    }
-}
+print STDERR "Using source directory:$pldir\n";
+my $fname = $NAME;
+
 if(-f "$pldir/$fname") {
     $fname="$pldir/$fname";
 }
@@ -52,19 +56,20 @@ else {
 }
 
 
-my $editor="vim";
-$editor = "notepad++" if($ENV{"OS"} and $ENV{"OS"} =~ /win/i);
+my $editor="editor";
+$editor = "notepad++" if($^O =~ /win/i);
 
 if (-f $fname) {
-    print("$fname exists,will be open for editing instead.\n");
-    system $editor,$fname;
+    print STDERR "$fname exists,will be open for editing instead.\n";
+    exec $editor,$fname;
     exit 0;
 }
 
 open PIPE,">:utf8",$fname or die("$!\n");
-my $date=localtime();
-$USER="xiaoranzzz" unless($USER);
 
+use POSIX qw/strftime/;
+my $DATE= strftime("%Y-%m-%d",localtime());
+$USER="xiaoranzzz" unless($USER);
 my $EMAIL="$USER\@" . (defined $HOSTNAME ? $HOSTNAME : "myplace.hell");
 
 if($OPT_SIMPLE) {
@@ -77,8 +82,8 @@ else {
         while(<TEMPDATA>) {
             s/___EMAIL___/$EMAIL/g;
             s/___AUTHOR___/$USER/g;
-            s/___NAME___/$ARGV[0]/g;
-            s/___DATE___/$date/g;
+            s/___NAME___/$NAME/g;
+            s/___DATE___/$DATE/g;
             print(PIPE);
         }
         close(TEMPDATA);
@@ -88,8 +93,8 @@ if($OPT_READ) {
     while(<STDIN>) {
         s/___EMAIL___/$EMAIL/g;
         s/___AUTHOR___/$USER/;
-        s/___NAME___/$ARGV[0]/;
-        s/___DATE___/$date/;
+        s/___NAME___/$NAME/;
+        s/___DATE___/$DATE/;
         print(PIPE);
     }
 }
@@ -104,12 +109,71 @@ if(-f $fname)
         print STDERR "$fname modified.\n";
         print STDERR "make it executable.\n";
         chmod(0775,$fname) or print STDERR "$!\n";
-#        print STDERR "Add svn:keywords.\n";
-#        system("svn","add",$fname);
-#        system("svn","propset","svn:keywords","Id",$fname);
     }
     else {
         print STDERR "$fname remain the same.\nunlink it.\n";
         unlink($fname) or print STDERR "$!\n";
     }
 }
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+plnew2 - PERL script
+
+=head1  SYNOPSIS
+
+plnew2 [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<-s>,B<--simple>
+
+Disable using template.
+
+=item B<-r>,B<--read>
+
+Read template from STDIN
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-06-06  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * recreated from new template
+        * set version 1.1
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+

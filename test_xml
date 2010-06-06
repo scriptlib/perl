@@ -29,17 +29,11 @@ else
     MyPlace::Usage::PrintHelp();
 }
 
-my ($keyword,@files)=@ARGV;
-unless(@files)
-{
-    @files=($keyword);
-    $keyword="Id";
+use XML::Parser;
+my $parser = new XML::Parser(Style=>'Debug');
+foreach(@ARGV) {
+    $parser->parsefile($_);
 }
-foreach(@files) {
-    system("svn","add",$_);
-    system("svn","propset","svn:keywords",$keyword,$_);
-}
-
 
 
 __END__
@@ -48,11 +42,11 @@ __END__
 
 =head1  NAME
 
-svn-add-keyword - set svn:keywords to file
+test_xml - PERL script
 
 =head1  SYNOPSIS
 
-svn-add-keyword [options] (file | keyword file1 [file2 ...])
+test_xml [options] ...
 
 =head1  OPTIONS
 
@@ -78,11 +72,11 @@ Invoke 'editor' against the source
 
 =head1  DESCRIPTION
 
-Set svn:keywords to files, make them under 'Version Control' if not
+___DESC___
 
 =head1  CHANGELOG
 
-    Sun Jun  6 01:24:09 2010  xiaoranzzz  <xiaoranzzz@myplace.hell>
+    2010-06-07  xiaoranzzz  <xiaoranzzz@myplace.hell>
         
         * file created.
 

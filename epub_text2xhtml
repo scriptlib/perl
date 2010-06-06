@@ -6,7 +6,7 @@
 ###APPDESC:     epub_text2xhtml	
 ###APPUSAGE:	
 ###APPEXAMPLE:	epub_text2xhtml
-###APPOPTION:   -t:set TITLE|-c:set CSS|-r:set COPYRIGHT-i:set input filename|-o:set output filename
+###APPOPTION:   -m:Mass covert muitiple files|-t:set TITLE|-c:set CSS|-r:set COPYRIGHT-i:set input filename|-o:set output filename
 use strict;
 
 #ENV variable MUST be defined somewhere,
@@ -60,40 +60,59 @@ sub FOOTER {
 
 use Getopt::Std;
 my %opts;
-getopts('ht:c:i:o:r:',\%opts);
+getopts('ht:c:i:o:r:m',\%opts);
 exit(system("formathelp",$0,"-h")) if($opts{"h"});
 my ($title,$css,$copyright,$input,$output) = @opts{qw/t c r i o/};
 $input = shift @ARGV unless($input);
 $output = shift @ARGV unless($output);
-
-my ($FI,$FO);
-if($input) {
-    open $FI,"<",$input or die("$!\n");
+if($opts{'m'}) {
+    push @ARGV,$input if($input);
+    push @ARGV,$output if($output);
+    foreach my $filename (@ARGV) {
+        my $basename = $filename;
+        $basename =~ s/\.te?xt$//i;
+        my $newname = "$basename.xhtml";
+        $basename =~ s/.*\///;
+        print STDERR "Coverting $filename to $newname ...\n";
+        &convert($filename,$newname,$basename,$css,$copyright);
+    }
 }
 else {
-    $FI = *STDIN;
-#    open $FI,"<&STDIN" or die("$!\n");
+    &convert($input,$output,$title,$css,$copyright);
 }
+exit;
 
-my $firstline;
-while(<$FI>) {    
-    $firstline = $_;
-    chomp $firstline;
-    last if($firstline);
+sub convert
+{
+    my($input,$output,$title,$css,$copyright) = @_;
+    my ($FI,$FO);
+    if($input) {
+        open $FI,"<",$input or die("$!\n");
+    }
+    else {
+        $FI = *STDIN;
+    #    open $FI,"<&STDIN" or die("$!\n");
+    }
+    
+    my $firstline;
+    while(<$FI>) {    
+        $firstline = $_;
+        chomp $firstline;
+        last if($firstline);
+    }
+    
+    my $cached_output =  &HEADER($title,$css);
+    $cached_output .=  &BODY($firstline);
+    $cached_output .=  &BODY_TEXT(<$FI>);
+    close $FI;
+    $cached_output .=  &FOOTER($copyright);
+    if($output) {
+        open $FO,">",$output or die("$!\n");
+    }
+    else {
+        $FO = *STDOUT;
+    }
+    print $FO $cached_output;
 }
-
-my $cached_output =  &HEADER($title,$css);
-$cached_output .=  &BODY($firstline);
-$cached_output .=  &BODY_TEXT(<$FI>);
-close $FI;
-$cached_output .=  &FOOTER($copyright);
-
-if($output) {
-    open $FO,">",$output or die("$!\n");
-}
-else {
-    $FO = *STDOUT;
-}
-print $FO $cached_output;
 
 
