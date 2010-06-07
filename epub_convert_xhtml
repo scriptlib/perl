@@ -1,0 +1,127 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+unless(@ARGV)
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
+sub run 
+{
+    my $cmd = shift;
+    print STDERR $cmd," ",join(" ",map "\'$_\'",@_),"\n";
+    system($cmd,@_) == 0;
+}
+
+
+my $input = shift;
+my $output = shift;
+if($output =~ m/^--/) {
+    unshift @ARGV,$output;
+    $output = undef;
+}
+die("Usage: input_file [[output_file] [options...]]\n") unless($input);
+
+my %def_arg = ();
+
+my $source_base = $input;
+$source_base =~ s/\.[^.]+$//;
+my $target_base = $output || $input;
+$target_base =~ s/\.[^.]+$//;
+my $input_file_xhtml = "content.xhtml";
+$output = $target_base . ".epub" unless($output);
+my $title = $target_base;
+$title =~ s/^.*\///;
+
+print STDERR "Convert $input to $input_file_xhtml...\n";
+unlink $input_file_xhtml if(-f $input_file_xhtml);
+system("cp","-av","--",$input,$input_file_xhtml);
+die("Failed!") unless(-f $input_file_xhtml);
+$def_arg{"--title"}=$title;
+foreach my $img_ext qw/.jpg .png .jpeg/
+{
+    if (-f "${source_base}${img_ext}")
+    {
+        $def_arg{"--cover"}="$source_base$img_ext";
+    }
+    elsif(-f "cover$img_ext")
+    {
+        $def_arg{"--cover"}="cover$img_ext";
+    }
+}
+{
+    my $last_arg="";
+    foreach(@ARGV)
+    {
+        if(m/^-/) {
+            $def_arg{$_} = "!EMPTY!_!MARK!";
+            $last_arg = $_;
+        }
+        elsif($last_arg) {
+            $def_arg{$last_arg} = $_;
+        }
+    }
+}
+print STDERR "Convert $input_file_xhtml to $output...\n";
+unlink $output if(-f $output);
+my @calibre_args = ();
+foreach (keys %def_arg) {
+    if($def_arg{$_} eq '!EMPTY!_!MARK!') {
+        push @calibre_args,$_;
+    }
+    else {
+        push @calibre_args,$_,$def_arg{$_};
+    }
+}
+
+&run("epub_convert",$input_file_xhtml,$output,@calibre_args);
+unlink $input_file_xhtml;
+
+__END__
+
+=pod
+
+=head1  NAME
+
+epub_convert_xhtml - Covert xhtml file to EPUB book
+
+=head1  SYNOPSIS
+
+epub_convert_xhtml input_file [[output_file] [options...]]
+
+=head1  OPTIONS
+
+options are passing to calibre 'B<ebook-convert>'
+
+=head1  DESCRIPTION
+
+Covert plain text file to EPUB, Implemented 
+using "epub_convert" which depends on 
+"ebook-convert" privided by "calibre".
+
+=head1  CHANGELOG
+
+    2010-06-07  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+

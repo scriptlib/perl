@@ -16,9 +16,34 @@ use lib $ENV{XR_PERL_MODULE_DIR};
 
 use MyPlace::Script::Usage qw/help_required help_even_empty/;
 exit 0 if(help_required($0,@ARGV));
+use utf8;
+use Encode;
+my $utf8 = find_encoding("utf8");
+my @OLDARGV = @ARGV;
+@ARGV = ();
+foreach(@OLDARGV) {
+    push @ARGV,$utf8->decode($_);
+}
+binmode STDERR,'utf8';
+binmode STDOUT,'utf8';
+binmode STDIN,'utf8';
 
 
-#exit 0 if(help_even_empty($0,@ARGV));
+my $H2_EXP = qr/
+            ^\s*(?:第.+章|section)[\s\n]+
+            |^\s*序\s*$
+            |^\s*序\s*言\s*$
+            |^\s*序\s*幕\s*$  
+            /x;
+my $H3_EXP = qr/
+            ^\s*(?:第.+节|chapter)[\s\n]+
+            |^\s*[一二三四五六七八九十零]+\s*$
+#           |^\s*[0-9]+\s*$
+            |^\s*[１２３４５６７８９０]+\s*$
+            /x;
+my $H4_EXP;
+my $H5_EXP;
+
 sub HEADER {
     my ($title,$css) = @_;
     return '<?xml version="1.0" encoding="utf-8"?>' . "\n"
@@ -30,27 +55,54 @@ sub HEADER {
            . '<meta http-equiv="Content-Type" content="application/xhtml.xml; charset=utf-8" />' . "\n"
            . '</head>' . "\n"
            . '<body>' . "\n"
-           . '<div class="chapter">' . "\n";
+           . ($title ? "<h1 class=\"title\">$title</h1>" . "\n" : "")
+           . '<div class="content">' . "\n";
 }
 
-sub BODY {
-    my($chap) = @_;
-    return  ($chap ?  "<h3 class=\"chapter_title\">$chap</h3>" . "\n" : "")
-            . '<div class="chapter_content">' . "\n";
-}
-
-sub BODY_TEXT {
+sub BODY_TEXT
+{
     my $result = "";
-    foreach(@_) {
-        $result .= '<p class="paragraph">' . ($_ ? $_ : "") . '</p>';
+    foreach(@_)
+    {
+        s/[\n\r\s]+$//;
+        next if(/^\s*$/);
+        my ($class,$tag);
+        if(/$H2_EXP/oi) {
+            s/^\s+//;
+            s/\s+$//;
+            $class = 'section_title';
+            $tag = 'h2';
+        }
+        elsif(/$H3_EXP/oi) {
+            s/^\s+//;
+            s/\s+$//;
+            $class = 'chapter_title';
+            $tag = 'h3';
+        }
+        elsif($H4_EXP and $_ =~ m/$H4_EXP/oi) {
+            s/^\s+//;
+            s/\s+$//;
+            $class = 'h4';
+            $tag = 'h4';
+        }
+        elsif($H5_EXP and $_ =~ m/$H5_EXP/oi) {
+            s/^\s+//;
+            s/\s+$//;
+            $class = 'h5';
+            $tag = 'h5';
+        }
+        else {
+            $class = 'paragraph';
+            $tag = 'p';
+        }
+        $result .= "<$tag class=\"$class\">" . ($_ ? $_ : "") . "</$tag>\n";
     }
     return $result;
 }
 
 sub FOOTER {
    my($copyright) = @_;
-   return   '</div>' . "\n"             #end of <div class="chapter_content">
-            . '</div>' . "\n"           #end of <div class="chapter">
+   return   '</div>' . "\n"             #end of <div class="content">
             . '<div class="footer">' . "\n"
             . ($copyright ? '<p class="copyright">' . $copyright . "</p>\n" : "")
             . '</div>' . "\n"
@@ -60,9 +112,14 @@ sub FOOTER {
 
 use Getopt::Std;
 my %opts;
-getopts('ht:c:i:o:r:m',\%opts);
+getopts('ht:c:i:o:r:m2:3:4:5:',\%opts);
 exit(system("formathelp",$0,"-h")) if($opts{"h"});
-my ($title,$css,$copyright,$input,$output) = @opts{qw/t c r i o/};
+my ($title,$css,$copyright,$input,$output,$h2,$h3,$h4,$h5) = @opts{qw/t c r i o 2 3 4 5/};
+$H2_EXP=qr/$h2/ if($h2);
+$H3_EXP=qr/$h3/ if($h3);
+$H4_EXP=qr/$h4/ if($h4);
+$H5_EXP=qr/$h5/ if($h5);
+
 $input = shift @ARGV unless($input);
 $output = shift @ARGV unless($output);
 if($opts{'m'}) {
@@ -86,28 +143,31 @@ sub convert
 {
     my($input,$output,$title,$css,$copyright) = @_;
     my ($FI,$FO);
-    if($input) {
-        open $FI,"<",$input or die("$!\n");
+    if(!$title)
+    {
+        $title = $input || $output;
+        if($title)
+        {
+            $title =~ s/.*\///;
+            $title =~ s/\.[^\.]*$//;
+        }
     }
-    else {
+    if($input)
+    {
+        open $FI,"<:utf8",$input or die("$!\n");
+    }
+    else
+    {
         $FI = *STDIN;
-    #    open $FI,"<&STDIN" or die("$!\n");
-    }
-    
-    my $firstline;
-    while(<$FI>) {    
-        $firstline = $_;
-        chomp $firstline;
-        last if($firstline);
     }
     
     my $cached_output =  &HEADER($title,$css);
-    $cached_output .=  &BODY($firstline);
+#    $cached_output .=  &BODY($firstline);
     $cached_output .=  &BODY_TEXT(<$FI>);
     close $FI;
     $cached_output .=  &FOOTER($copyright);
     if($output) {
-        open $FO,">",$output or die("$!\n");
+        open $FO,">:utf8",$output or die("$!\n");
     }
     else {
         $FO = *STDOUT;
