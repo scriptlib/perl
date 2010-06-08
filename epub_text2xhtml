@@ -29,17 +29,19 @@ binmode STDOUT,'utf8';
 binmode STDIN,'utf8';
 
 
+my $number_exp = "(?:[一二三四五六七八九十零百千\\s]+|[123456789\\s]+|[１２３４５６７８９０\\s]+)";
 my $H2_EXP = qr/
-            ^\s*(?:第.+章|section)[\s\n]+
-            |^\s*序\s*$
-            |^\s*序\s*言\s*$
-            |^\s*序\s*幕\s*$  
+            ^\s*《(.+)》\s*$
+            |^\s*(第${number_exp}+[章|部].*)\s*$
+            |^\s*(section${number_exp}+.*)\s*$
+            |^\s*(序${number_exp}*)\s*$
+            |^\s*(序\s*[言章幕]${number_exp}*)\s*$
             /x;
 my $H3_EXP = qr/
-            ^\s*(?:第.+节|chapter)[\s\n]+
-            |^\s*[一二三四五六七八九十零]+\s*$
-#           |^\s*[0-9]+\s*$
-            |^\s*[１２３４５６７８９０]+\s*$
+            ^\s*＜(.+)＞\s*$
+            |^\s*(第${number_exp}+[节|篇].*)\s*$
+            |^\s*(chapter${number_exp}+.*)\s*$
+            |^\s*${number_exp}+$
             /x;
 my $H4_EXP;
 my $H5_EXP;
@@ -67,34 +69,36 @@ sub BODY_TEXT
         s/[\n\r\s]+$//;
         next if(/^\s*$/);
         my ($class,$tag);
-        if(/$H2_EXP/oi) {
-            s/^\s+//;
-            s/\s+$//;
+        if(/^<(h\d)>(.+)<\/(\1)>/) {
+           $class = $1 eq 'h2' ? 'section_title' : 'chapter_title';
+           $tag = $1;
+           $_ = $2;
+        }
+        elsif(/$H2_EXP/oi) {
             $class = 'section_title';
             $tag = 'h2';
+            $_ = $1 if($1);
         }
         elsif(/$H3_EXP/oi) {
-            s/^\s+//;
-            s/\s+$//;
             $class = 'chapter_title';
             $tag = 'h3';
+            $_ = $1 if($1);
         }
         elsif($H4_EXP and $_ =~ m/$H4_EXP/oi) {
-            s/^\s+//;
-            s/\s+$//;
             $class = 'h4';
             $tag = 'h4';
+            $_ = $1 if($1);
         }
         elsif($H5_EXP and $_ =~ m/$H5_EXP/oi) {
-            s/^\s+//;
-            s/\s+$//;
             $class = 'h5';
             $tag = 'h5';
+            $_ = $1 if($1);
         }
         else {
             $class = 'paragraph';
             $tag = 'p';
         }
+        next unless($_);
         $result .= "<$tag class=\"$class\">" . ($_ ? $_ : "") . "</$tag>\n";
     }
     return $result;

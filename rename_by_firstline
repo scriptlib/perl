@@ -1,0 +1,146 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
+die("Invalid Usage\n") unless(@ARGV);
+foreach my $org_filename (@ARGV)
+{
+    if(-f $org_filename)
+    {
+        if(open FI,"<",$org_filename)
+        {
+            my $new_basename;
+            while(<FI>)
+            {
+                s/^[\s\n\r]+//;
+                s/[\s\n\r]+$//;
+                next unless($_);
+                $new_basename = $_;
+                last;
+            }
+            close FI;
+            if($new_basename)
+            {
+                my $ext_name = "";
+                my $dirname = $org_filename;
+                if($dirname =~ m/^(.*)\.([^\.]+)$/)
+                {
+                    $dirname = $1;
+                    $ext_name = ".$2";
+                }
+                if($dirname =~ /^(.+)\/[^\/]*$/) {
+                    $dirname = "$1/";
+                }
+                else {
+                    $dirname = "";
+                }
+                my $new_name = "$dirname$new_basename$ext_name";
+                if($new_name eq $org_filename)
+                {
+                    print STDERR "$org_filename: New name is the same as orginal name\n";
+                    next;
+                }
+                else 
+                {
+                    print STDERR "Rename $org_filename to $new_name\n";
+                    system("mv","-v","--",$org_filename,$new_name) unless($OPTS{'--test'});
+                }
+            }
+            else 
+            {
+                print STDERR "$org_filename MAYBE NOT contains any NON-EMPTY line\n";
+                print STDERR "$org_filename Skipped.\n";
+            }
+        }
+        else 
+        {
+            print STDERR "$!\n";
+        }
+    }
+    else {
+        print STDERR "File not accessible : $org_filename\n";
+    }
+}
+
+__END__
+
+=pod
+
+=head1  NAME
+
+rename_by_firstline - rename files according to the FIRST NON-EMPTY LINE
+
+=head1  SYNOPSIS
+
+rename_by_firstline [options] file1 [file2...]
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=item B<--test>
+
+Do not perform renaming action
+
+=back
+
+=head1  DESCRIPTION
+
+rename files according to the FIRST NON-EMPTY LINE
+
+=head1  CHANGELOG
+
+    2010-06-08  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+

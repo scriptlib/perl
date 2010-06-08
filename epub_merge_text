@@ -1,0 +1,121 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man language|lang zh en/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+$OPTS{language}='zh' if($OPTS{zh});
+$OPTS{language}='en' if($OPTS{en});
+
+my $content_title = 'content';
+if($OPTS{language} and $OPTS{language} eq 'zh') {
+    $content_title = "目录";
+}
+
+my @files = @ARGV;
+
+if(! @files)
+{
+#    print STDERR "Input filenames please.\n";
+    while(<STDIN>) {
+        chomp;
+        push @files,$_;
+    }
+}
+
+die("Usage:$0 [options] file1 [file2...]\n") unless(@files);
+print STDOUT "$content_title\n\n";
+local $/=undef;
+foreach(@files)
+{
+    my $title = $_;
+    $title =~ s/.*\///;
+    $title =~ s/\.[^.]*$//;
+    print STDOUT "    $title\n"
+}
+foreach(@files)
+{
+    open FI,"<",$_ or die("$!\n");
+    my $title = $_;
+    $title =~ s/.*\///;
+    $title =~ s/\.[^.]*$//;
+    print STDOUT "\n《$title》\n";
+    print STDOUT <FI>;
+    close FI;
+}
+
+__END__
+
+=pod
+
+=head1  NAME
+
+epub_merge_text - merge texts and build a content according to each file name
+
+=head1  SYNOPSIS
+
+epub_merge_text [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-06-08  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+

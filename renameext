@@ -31,10 +31,27 @@ my $exp=shift;
 my $test;
 $exp=shift,$test="true" if($exp eq "-t");
 if($exp =~ /\/.*\//) {
-    eval("sub s_code {my \$r = shift;\$r =~ $exp if(\$r);return \$r}");
+    eval
+    ('
+        sub s_code 
+        {
+            my $r = shift;
+            $r =~ ' . "$exp" . ' if(\$r);
+            return $r;
+        }
+    ');
 }
 else {
-    eval("sub s_code {my \$r = shift;\$r = $exp \$r;return \$r}");
+    eval
+    (   '
+        sub s_code 
+        {
+            my $r = shift;
+            $r = ' . "$exp" . ' $r;
+            return $r;
+        }
+        '
+    );
 }
 die("$@\n") if($@);
 

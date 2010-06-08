@@ -1,0 +1,137 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
+my($start_exp,$end_exp,@files) = @ARGV;
+die("Usage:$0 start_exp end_exp files...\n") unless(@files);
+foreach my $org_file (@files) {
+    if(-f $org_file) {
+        my @org_data=();
+        my @new_data=();
+        my $modified=0;
+        if(open FI,"<",$org_file) {
+            @org_data = <FI>;
+            close FI;
+            my $between;
+            foreach(@org_data) 
+            {
+                if($between)
+                {
+                    $between=0 if(m/$end_exp/);
+                }
+                elsif(/$start_exp/) 
+                {
+                    $between = 1;
+                    $modified = 1;
+
+                }
+                else {
+                    push @new_data,$_;
+                }
+            }
+            if($modified) {
+                print STDERR "Backup $org_file ...\n";
+                system("cp","-av",$org_file,$org_file . ".org");
+                print STDERR "Modify $org_file ...\n";
+                if(open FO,">",$org_file)
+                {
+                    print FO @new_data;
+                    close FO;
+                }
+                else
+                {
+                    print STDERR "$!\n";
+                    next;
+                }
+            }
+        }
+        else {
+            print STDERR "$!\n";
+            next;
+        }
+    }
+    else {
+        print STDERR "File not accessible : $org_file\n";
+    }
+}
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+strip_lines_between - strip lines from text files using regextp
+
+=head1  SYNOPSIS
+
+strip_lines_between start_exp end_exp file1 [file2 ...]
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+Strip lines between START_EXP and END_EXP from text files 
+
+=head1  CHANGELOG
+
+    2010-06-08  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+
