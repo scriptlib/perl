@@ -8,6 +8,14 @@
 ###APPEXAMPLE:	cat url.lst | batchget
 ###APPOPTION:	-m:Max number of simultanous tasks|-n:Task name|-a:Auto rename|-d:Create directories|-e:extension name for autorename|-w:Working directory|-r:Refer URL|-h:Display this text|-b:cookie|-L:Logging programe|-f:Full name|-i:Auto rename by index|-M:Max time for a download|-U use urls history database 
 
+
+
+
+#Usage:
+#Accept URLS from STDIN, which should formated as 
+#URL\tSAVE AS
+
+
 use strict;
 use lib $ENV{XR_PERL_MODULE_DIR};
 use MyPlace::ParallelRun;
@@ -36,6 +44,7 @@ my $number    = $opts{"i"} ? $opts{"i"} : "";
 my $fullname  = $opts{"f"} ? 1 : 0;
 my $urlhist   = $opts{'U'} ? 1 : 0;
 my $URL_DATABASE_FILE = 'URLS.txt';
+my %Local_Map;
 
 $autoname="true" if($number);
 unless($taskname) {
@@ -145,7 +154,15 @@ sub inqueue {
     my ($URL,$index,$count,$prefix)=@_;
     my $curname= "[$prefix$index/$count]";
     my $stridx = "0" x (length($count)-length($index)+1) . $index if($number);
-    my $filename= $fullname ? GetFilename_Fullname(uri_unescape($URL)) : ($autoname ? GetFilename_Auto(uri_unescape($URL),$stridx) : GetFilename_NoAuto($URL));
+    my $filename =
+            $Local_Map{$URL} ? 
+                $Local_Map{$URL} 
+            : $fullname ? 
+                GetFilename_Fullname(uri_unescape($URL)) 
+            : $autoname ? 
+                GetFilename_Auto(uri_unescape($URL),$stridx) 
+            : GetFilename_NoAuto($URL);
+
     my $thisrefer= $refer ? $refer : $URL;
     if($logger) {system($logger,$filename,$URL);}
     my @DARG;
@@ -173,9 +190,14 @@ if($urlhist) {
     load_database();
 }
 
+
 para_init $muldown;
 while(<STDIN>) {
     chomp;
+    if($_ =~ /([^\t]+)\t+([^\t]+)/) {
+        $Local_Map{$1} = $2;
+        $_ = $1;
+    }
     next if($urlhist and check_database($_));
     push @URLS,$_;
     $count++;

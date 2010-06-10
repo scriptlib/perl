@@ -120,9 +120,9 @@ sub execute_rule {
     unless(-f $source) {
         return undef,"File not found: $source";
     }
-    $! = undef;
+   # $! = undef;
     do $source; 
-    return undef,$! if($!);
+   #return undef,$! if($!);
     my %result = &apply_rule($url,\%rule);
     return 1,\%result;
 }

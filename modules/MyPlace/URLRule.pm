@@ -116,9 +116,11 @@ sub execute_rule {
     unless(-f $source) {
         return undef,"File not found: $source";
     }
-    $! = undef;
+#    $! = undef;
     do $source; 
-    return undef,$! if($!);
+#    print STDERR "\"$source\" : $! \n" if($!);
+#    die("$source,$!\n");
+#    return undef,$! if($!);
     my %result = &apply_rule($url,\%rule);
     if($result{work_dir}) {
         $result{work_dir} = &unescape_text($result{work_dir});
@@ -168,6 +170,17 @@ sub unescape_text {
     return $text;
 }
 
+sub make_url {
+    my $line = shift;
+    my $base = shift;
+    if($line =~ /^([^\t]+)\t+(.+)$/) {
+        return URI->new_abs($1,$base) . "\t" . $2;
+    }
+    else {
+        return URI->new_abs($line,$base);
+    }
+}
+
 sub do_action {
     my ($result_ref,$action,@args) = @_;
     return undef,"No results" unless(ref $result_ref);
@@ -202,7 +215,7 @@ sub do_action {
         $pipeto .= ' "' . join('" "',@args) . '"' if(@args);
         open FO,"|-",$pipeto;
         foreach my $line (@{$result{data}}) {
-            $line = URI->new_abs($line,$result{base}) if($result{base});
+            $line = &make_url($line,$result{base}) if($result{base});
             print FO $line,"\n";
         }
         close FO;
@@ -213,14 +226,14 @@ sub do_action {
         foreach my $line(@{$result{data}}) {
             $index ++;
             my @msg = ref $line ? @{$line} : ($line);
-            $line = URI->new_abs($line,$result{base}) if($result{base});
+            $line = &make_url($line,$result{base}) if($result{base});
             process_data($line,\%result);
         }
         return 1,$msg . "Action Hook OK.";
     }
     else {
         foreach my $line(@{$result{data}}) {
-            $line = URI->new_abs($line,$result{base}) if($result{base});
+            $line = &make_url($line,$result{base}) if($result{base});
             print $line,"\n";
         }
         return 1;$msg . "OK.";
