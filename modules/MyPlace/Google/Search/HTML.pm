@@ -8,9 +8,9 @@ use constant {
     APPID=>'BlVF2czV34FVChK2mzsN7SBghcl.NwZ4YayhlbBXiYxPnRScC49U1ja4HnnF',
     IMAGE_SEARCH_REFER=>'http://images.google.com',
     URL_ID=>'url',
-    DEFAULT_COUNT=>18,
-    MAX_COUNT=>18,
-    DATA_ID=>'results',
+    IMAGE_DEFAULT_COUNT=>18,
+    IMAGE_MAX_COUNT=>18,
+    IMAGE_DATA_ID=>'results',
 };
 my @GOOGLE_IP = (
 #    'www.google.com',
@@ -34,35 +34,32 @@ my @GOOGLE_IP = (
 );
 #http://images.google.com/images?hl=en&newwindow=1&safe=off&as_st=y&tbs=isch%3A1%2Cisz%3Alt%2Cislt%3Axga&sa=1&q=%22Michelle+Marsh%22+nude&aq=f&aqi=&aql=&oq=&gs_rfai=
 #http://www.google.com/images?q=Jordan+Carver&um=1&hl=en&newwindow=1&safe=off&tbs=isch:1,isz:lt,islt:2mp
-my @VALID_PARAMS =(
-    'start',
-    'safe',
-    'hl',
-    'um',
-    'source',
-    'imgsz',
+my %DEFAULT_PARAMS = 
+(
+    www => {},
+    images => 
+    {
+        'safe'=>'off',
+        'hl'=>'en',
+    },
 );
-        #valid size is
-        #icon
-        #medium
-        #large
-        #xlarge
-        #xxlarge
-        #valid dimensions is
-        #qsvga  >400x300
-        #vga    >640x480
-        #svga   >800x600
-        #xga    >1024x768 
-        #2mp    >1600x1200
-        #4mp    >2272x1704
-        #6mp    >2816x2112
-        #8mp    >3264x2448
-        #10mp   >3648x2736
-        #12mp   >4096x3072
-        #15mp   >4480x3360
-        #20mp   >5120x3840
-        #40mp   >7216x5412
-        #70mp   >9600x7200
+
+my %IMAGE_DMS_MAP = (
+        '>400x300'=>'qsvga',
+        '>640x480'=>'vga',
+        '>800x600'=>'svga',
+        '>1024x768'=>'xga',
+        '>1600x1200'=>'2mp',
+        '>2272x1704'=>'4mp',
+        '>2816x2112'=>'6mp',
+        '>3264x2448'=>'8mp',
+        '>3648x2736'=>'10mp',
+        '>4096x3072'=>'12mp',
+        '>4480x3360'=>'15mp',
+        '>5120x3840'=>'20mp',
+        '>7216x5412'=>'40mp',
+        '>9600x7200'=>'70mp',
+);
 
 my $HTTP;
 
@@ -71,32 +68,46 @@ sub get_google_ip {
 }
 
 sub get_api_url {
-    my ($vertical,$query,%params) = @_;
-    my %valid_params = (
-        safe=>"off",
-        hl=>'en',
-    );
-    foreach(@VALID_PARAMS) {
-        $valid_params{$_} = $params{$_} if($params{$_});
+    my ($vertical,$keyword,$page,%params) = @_;
+    my %api_params;
+    foreach (keys  %params) {
+        next if($_ eq 'type');
+        next if($_ eq 'dimensions');
+        next if($_ eq 'size');
+        if($_ eq 'filter') {
+            $api_params{safe} = $params{$_} eq 'no' ? 'off' : 'on';
+        }
+        elsif($_ eq 'lang' or $_ eq 'region') {
+            $api_params{hl} = $params{$_};
+        }
+        else {
+            $api_params{$_} = $params{$_}; 
+        }
     }
-#    $valid_params{ndsp}=$params{count} if($params{count});
-    $valid_params{safe}=$params{filter} eq 'no' ? 'off' : 'on'  if($params{filter});
-    $valid_params{hl}=$params{lang} if($params{lang});
-    $valid_params{hl}=$params{region} if($params{region});
-
-    if($params{dimensions}) {
-        $valid_params{tbs}='isch:1,isz:lt,islt:' . $params{dimensions};
+    if($vertical eq 'images') {
+        if($params{dimensions}) {
+            $api_params{tbs}='isch:1,isz:lt,islt:' . $params{dimensions};
+        }
+        elsif($params{size} and $IMAGE_DMS_MAP{$params{size}}) {
+            $api_params{tbs}='isch:1,isz:lt,islt:' . $IMAGE_DMS_MAP{$params{size}};
+        }
+        elsif($params{type}) {
+            $api_params{imgsz}=$params{type};
+        }
+        $api_params{ndsp} = IMAGE_DEFAULT_COUNT;
     }
-    elsif($params{size}) {
-        $valid_params{imgsz}=$params{size};
+    if(!$api_params{q}) {
+        $api_params{q} = $keyword;
     }
-
-
-    #my $params = join("&",map ("$_=" . uri_escape($valid_params{$_}),keys %valid_params));
-    my $params = join("&",map ("$_=" . $valid_params{$_},keys %valid_params));
-#    return IMAGE_SEARCH . "?q=$query&$params";
-    return 'http://' . &get_google_ip()  . "/images?q=$query&$params";
-#    return "http://images.google.com/imghp",('q'=>$query,%valid_params);
+    if(!$api_params{start}) {
+        if($page and $page =~ m/^[0-9]+$/ and $page>1) {
+            $api_params{start} = $api_params{ndsp} * ($page - 1);
+        }
+    }
+    $api_params{hl} = 'en' unless($api_params{hl});
+    $api_params{safe} = 'off' unless($api_params{safe});
+    my $params = join("&",map ("$_=" . $api_params{$_},keys %api_params));
+    return 'http://' . &get_google_ip()  . "/$vertical?$params";
 }
 
 sub new {
@@ -104,34 +115,10 @@ sub new {
     return bless {@_},$class;
 }
 
-sub get_count {
-    my %args = @_;
-    return DEFAULT_COUNT unless($args{count});
-    return $args{count}>MAX_COUNT ? MAX_COUNT : $args{count};
-}
-
-sub grep_size {
-    my ($pattern,$images)=@_;
-    return $images unless($pattern);
-    return "No results." unless($images and @{$images});
-    my @result;
-    if($pattern =~ /^>(\d+)/) {
-        @result = grep $_->{size}>$1,@{$images}; 
-    }
-    elsif($pattern =~ /^<(\d+)/) {
-        @result = grep $_->{size}<$1,@{$images}; 
-    }
-    elsif($pattern =~ /^=?=?(\d+)/) {
-        @result = grep $_->{size}==$1,@{$images}; 
-    }
-    return "Result all filter out." unless(@result);
-    return \@result;
-}
 sub _make_data {
     my $org = shift;
-    my $data_id = shift;
-    my $result = {$data_id=>[]};
-    return $result unless($org and @{$org});
+    my @result;
+    return \@result unless($org and @{$org});
     foreach(@{$org}) {
         my %cur = (
                 "clickurl"=>$_->[0],
@@ -145,70 +132,66 @@ sub _make_data {
                 "referurl"=>$_->[11],
                 "thumburl"=>$_->[14],
         );
-        if($_->[9] =~ /(\d+)\s*\&times;\s*(\d+)\s*-\s*(\d+)([kKmM]?)/) {
+        if($_->[9] =~ /(\d+)\s*\&times;\s*(\d+)\s*-\s*(\d+[kKmM]?)/) {
             $cur{width}=$1;
             $cur{height}=$2;
             $cur{size}=$3;
-            my $size_k=$4;
-            if($size_k eq 'k' or $size_k eq 'K') {
-                $cur{size} *= 1000;
-            }
-            elsif($size_k eq 'm' or $size_k eq 'M') {
-                $cur{size} *= 1000*1000;
-            }
         }
-        push @{$result->{$data_id}},\%cur;
+        push @result,\%cur;
     }
-    return $result;
+    return \@result;
 }
 sub search {
     my $self = shift;
     unshift @_,$self unless($self and ref $self);
-    my($ajax,$data_id,$refer,$keyword,%args)=@_;
-    if($args{count}) {
-        $args{count}=MAX_COUNT if($args{count}>MAX_COUNT);
-    }
-    else {
-        $args{count}=DEFAULT_COUNT;
-    }
-    my ($URL,%params) = &get_api_url($ajax,$keyword,%args);
-#    print STDERR "Retriving $URL...\n";
+    my($ajax,$data_id,$refer,$keyword,$page,%args)=@_;
+    my $URL = &get_api_url($ajax,$keyword,$page,%args);
+    print STDERR "Retrieving $URL ...";
     if(!$HTTP) {
         $HTTP = LWP::UserAgent->new();
         $HTTP->agent("Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
     }
-   # my $res = $HTTP->post($URL,[%params]);#get($URL,"referer"=>$refer);
     my $res = $HTTP->get($URL,"referer"=>$refer);
-#    use Data::Dumper;print STDERR Dumper($res);
+    print STDERR " [",$res->code,"]\n";
     my $data;
-    my $result;
+    my $results;
+    my $status;
     if($res->is_success) {
         my $code = $res->content;
         if($code and $code =~ m/dyn\.setResults\((.+?)\)\s*\;\s*\</s) {
             $code = $1;
         }
         $data = eval($code);
-      #  use Data::Dumper;print STDERR Dumper($data);
-        if($!) {
-            $result=[-1,$!,$data],
+    #    use Data::Dumper;print Dumper($data);
+        if(ref $data) {
+            $results = _make_data($data);
+            $status = 1;
         }
-        elsif(ref $data) {
-            $data = _make_data($data,$data_id);
-#        use Data::Dumper;print STDERR Dumper($data);
-            $result=[200,grep_size($args{match_size},$data->{$data_id}),$data],
+        elsif($!) {
+            $status = -1;
+            $results = $!;
+            $data = $code;
         }
         else {
-            $result=[-2,$data,$data];
+            $status = -2;
+            $results = $data;
+            $data = $code;
         }
     }
     else {
-        $result=[$res->code,$res->status_line];
+        $status = undef;
+        $results = $res->code . " " . $res->status_line;
     }
     if($self and ref $self) {
-        $self->{data}=$result->[0];
-        $self->{results}=$result->[1];
+        $self->{keyword}=$keyword;
+        $self->{ajax} = $ajax;
+        $self->{refer}=$refer;
+        $self->{args} = \%args;
+        $self->{status}=$status;
+        $self->{data}=$data;
+        $self->{results}=$results;
     }
-    return @{$result};
+    return $status,$results,$data;
 }
 
 sub extract_url {
@@ -219,12 +202,12 @@ sub extract_url {
 sub search_images {
     my $self = shift;
     if($self and ref $self) {
-        return $self->search("images",DATA_ID,IMAGE_SEARCH_REFER,@_);
+        return $self->search("images",IMAGE_DATA_ID,IMAGE_SEARCH_REFER,@_);
         
     }
     else {
         unshift @_,$self;
-        return &search("images",DATA_ID,IMAGE_SEARCH_REFER,@_);
+        return &search("images",IMAGE_DATA_ID,IMAGE_SEARCH_REFER,@_);
    } 
 }
 

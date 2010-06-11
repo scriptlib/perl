@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
+# $Id$
 use strict;
 require v5.10.0;
 our $VERSION = 'v0.1';
-
 BEGIN
 {
     my $PROGRAM_DIR = $0;
@@ -11,6 +11,7 @@ BEGIN
     unshift @INC, 
         map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
 }
+use utf8;
 
 my %OPTS;
 my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
@@ -28,7 +29,7 @@ else
     MyPlace::Usage::PrintHelp();
 }
 
-use MyPlace::Google::Search;
+use MyPlace::Baidu::Search;
 
 my %SIZE_BASE = 
 (
@@ -44,7 +45,6 @@ my %SIZE_BASE =
 sub compare_size
 {
     my($left,$right) = @_;
-#    print STDERR "Compare_size $left : $right\n"; 
     return undef unless($left and $right);
     if($left =~ m/^(\d+)([kKmMgG])/) {
        $left = $1 * $SIZE_BASE{$2}; 
@@ -61,17 +61,15 @@ sub compare_size
 my $query = shift;
 my $page;
 my $page_count;
-my $type;
 my $size;
 my %params;
 foreach(@ARGV) {
     if($_ =~ /^\s*([^=]+)\s*=\s*(.+)\s*$/) {
-        if($1 eq 'page' or $1 eq 'start_page' or $1 eq 'startpage') {
+        if($1 eq 'page' or $1 eq 'startpage' or $1 eq 'start_page') {
             $page = $2;
         }
         elsif($1 eq 'size') {
             $size = $2;
-            $params{size} = $2;
         }
         elsif($1 eq 'pages' or $1 eq 'page_count' or $1 eq 'pagecount') {
             $page_count = $2;
@@ -84,15 +82,15 @@ foreach(@ARGV) {
         print STDERR "Invalid params [$_]\n";
     }
 }
-$params{'type'} = 'xlarge' unless($params{'type'});
+$params{'type'} = 'large' unless($params{'type'});
 $page = 1 unless($page and $page =~ m/[0-9]+/ and  $page>1);
 $page_count = 1 unless($page_count and $page_count =~ m/[0-9]+/ and  $page_count>1);
 foreach my $page_idx ($page .. ($page + $page_count - 1)) {
     print STDERR "Searching for $query, page [$page_idx] ...\n";
-    my ($status,$images) = MyPlace::Google::Search::search_images($query,$page_idx,%params);
+    my ($status,$images) = MyPlace::Baidu::Search::search_images($query,$page_idx,%params);
     if($status) {
         print STDERR "Get " . scalar(@{$images}) . " image[s].\n";
-        if($size and $size =~ m/^\s*\d+\s*[kKmMgG]?$/) {
+        if($size) {
             my $small_image=0;
             foreach(@{$images}) {
                 if(compare_size($_->{size},$size) > 0) {
@@ -123,16 +121,16 @@ __END__
 
 =head1  NAME
 
-google.search.image - searching image.google.com 
+baidu.search.image - searching image.baidu.com 
 
 =head1  SYNOPSIS
 
-google.search.image [options] keyword [param1=value1 param2=value2 ...]
+baidu.search.image [options] keyword [param1=value1 param2=value2 ...]
 
-    google.search.image 'Hello+Kitty' size=100k
-    google.search.image '(Hello|Kitty)' size=100k
-    google.search.image 'Hello -Kitty)' size=100k
-    google.search.image '"Hello Kitty"' size=100k
+    baidu.search.image 'Hello+Kitty' size=100k
+    baidu.search.image '(Hello|Kitty)' size=100k
+    baidu.search.image 'Hello -Kitty)' size=100k
+    baidu.search.image '"Hello Kitty"' size=100k
 
 =head1  OPTIONS
 
@@ -156,7 +154,7 @@ Invoke 'editor' against the source
 
 =back
 
-Searching image.google.com, print out results to STDOUT
+Searching image.baidu.com, print out results to STDOUT
 
 ___DESC___
 
@@ -171,10 +169,5 @@ ___DESC___
 xiaoranzzz <xiaoranzzz@myplace.hell>
 
 =cut
-
-
-
-
-
 
 
