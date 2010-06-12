@@ -77,9 +77,9 @@ sub build_image_url {
         }
     }
     $url_params{word}=$query unless($url_params{word});
-    if($page and $page =~ m/[0-9]+/ and $page>1 and (!$url_params{pn})) 
+    if($page and $page =~ m/^[0-9]+$/ and $page>1 and (!$url_params{pn})) 
     {
-        $params{pn}=($page - 1) * 21;
+        $url_params{pn}=($page - 1) * 21;
     }
     return &build_url($base,\%url_params);
 }

@@ -84,13 +84,16 @@ foreach(@ARGV) {
         print STDERR "Invalid params [$_]\n";
     }
 }
-$params{'type'} = 'xlarge' unless($params{'type'});
+$params{'size'} = '>800x600' unless($params{'size'} or $params{'type'});
 $page = 1 unless($page and $page =~ m/[0-9]+/ and  $page>1);
 $page_count = 1 unless($page_count and $page_count =~ m/[0-9]+/ and  $page_count>1);
-foreach my $page_idx ($page .. ($page + $page_count - 1)) {
-    print STDERR "Searching for $query, page [$page_idx] ...\n";
+my $page_end = $page + $page_count -1;
+foreach my $page_idx ($page .. $page_end)
+{
+    print STDERR "Searching for $query, page [$page_idx/$page_end] ...\n";
     my ($status,$images) = MyPlace::Google::Search::search_images($query,$page_idx,%params);
     if($status) {
+        my $count = scalar(@{$images});
         print STDERR "Get " . scalar(@{$images}) . " image[s].\n";
         if($size and $size =~ m/^\s*\d+\s*[kKmMgG]?$/) {
             my $small_image=0;
@@ -108,6 +111,11 @@ foreach my $page_idx ($page .. ($page + $page_count - 1)) {
         }
         else {
             print $_->{url},"\n" foreach(@{$images});
+        }
+        if($page_idx < $page_end and $count < 10)
+        {
+            print STDERR "Less than 10 images returned, Ingored remain pages\n";
+            last;
         }
     }
     else {

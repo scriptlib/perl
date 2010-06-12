@@ -2,16 +2,20 @@
 package MyPlace::URLRule;
 use URI;
 use URI::Escape;
+use MyPlace::Script::Message;
+use strict;
+use Cwd;
 
 BEGIN {
     use Exporter ();
     our ($VERSION,@ISA,@EXPORT,@EXPORT_OK,%EXPORT_TAGS);
     $VERSION        = 1.00;
     @ISA            = qw(Exporter);
-    @EXPORT         = qw(&get_domain &get_rule_dir &build_url &parse_rule &do_action &execute_rule &make_passdown);
+    @EXPORT         = qw($URLRULE_DIRECTORY &urlrule_process_data &urlrule_process_passdown &urlrule_process_args &urlrule_process_result &get_domain &get_rule_dir &build_url &parse_rule &urlrule_do_action &execute_rule &make_passdown);
 }
 
-my $RULE_DIRECTORY = "$ENV{XR_PERL_SOURCE_DIR}/urlrule";
+#my $URLRULE_DIRECTORY = "$ENV{XR_PERL_SOURCE_DIR}/urlrule";
+our $URLRULE_DIRECTORY = "$ENV{XR_PERL_SOURCE_DIR}/urlrule";
 sub strnum($$) {
     my $num=shift;
     my $len=shift;
@@ -24,7 +28,7 @@ sub strnum($$) {
     }
 }
 sub get_rule_dir() {
-    return $RULE_DIRECTORY;
+    return $URLRULE_DIRECTORY;
 }
 sub get_domain($) {
     my $url = shift;
@@ -40,13 +44,6 @@ sub get_domain($) {
     else {
         return $url;
     }
-}
-
-sub get_rule(\$) {
-    my %rule = %{ shift(@_) };
-    my $domain=get_domain( shift );
-    my $level=shift;$level=0 unless($level && $level =~ /^\d+$/);
-    return "$dirname/$domain.pl";
 }
 
 sub parse_rule(@) {
@@ -83,22 +80,34 @@ sub parse_rule(@) {
     $r{action} = shift;
     $r{action} = "" unless($r{action});
     @{$r{args}} = @_;
-    my $rule_dir = $RULE_DIRECTORY . "/" . $r{level};
-    for my $fn ($r{domain},"$r{domain}.pl","www.$r{domain}","www.$r{domain}.pl") {
-        if( -f "$rule_dir/$fn" ) {
-            $r{source}="$rule_dir/$fn";
-        }
-    }
-    unless($r{source}) {
-        my $domain = $r{domain};
-        while($domain =~ /[^\.]+\.[^\.]+\./) {
-            $domain =~ s/^[^\.]*\.//;
-            for my $fn ($domain, $domain . ".pl", "www.$domain", "www.$domain" . ".pl") {
-                $r{source}="$rule_dir/$fn" if(-f "$rule_dir/$fn");
+    my $domain = $r{domain};
+    do 
+    {
+        for my $directory (
+            "$URLRULE_DIRECTORY/$r{level}",
+            "$URLRULE_DIRECTORY/common",
+            )
+        {
+            for my $basename 
+                    (
+                        $domain,
+                        "${domain}.pl",
+                        "www.$domain",
+                        "www.${domain}.pl",
+                    )
+
+            {
+                if(-f "$directory/$basename") 
+                {
+                    $r{source} = "$directory/$basename";
+                    last;
+                }
             }
-        } 
-    }
-    $r{source} = "$rule_dir/$r{domain}" unless($r{source});
+            last if($r{source});
+        }
+    } while($domain =~ s/^[^\.]*\.// and !$r{source});
+    $r{source} 
+        = "$URLRULE_DIRECTORY/$r{level}/$r{domain}" unless($r{source});
     return \%r;
 }
 
@@ -106,6 +115,130 @@ sub build_url($$) {
     my ($base,$url) = @_;
     $url = URI->new_abs($url,$base) if($base);
     return $url;
+}
+
+sub callback_process_data {
+    my $from = shift;
+    app_message("callback:$from\n") if($from);
+    goto &urlrule_process_data;
+#    &main::process_data(@_);
+}
+sub callback_process_passdown {
+    my $from = shift;
+    app_message("callback:$from\n") if($from);
+    goto &urlrule_process_passdown;
+#    &main::process_passdown(@_);
+}
+sub callback_do_action {
+    my $from = shift;
+    app_message("callback:$from\n") if($from);
+    goto &urlrule_do_action;
+#    &main::do_action(@_);
+}
+
+
+sub urlrule_process_data {
+    my $rule_ref = shift;
+    return unless(ref $rule_ref);
+    return unless(%{$rule_ref});
+    my $result_ref = shift;
+    return unless(ref $result_ref);
+    return unless(%{$result_ref});
+
+    return unless($result_ref->{data});
+    my %rule = %{$rule_ref};
+    my %result = %{$result_ref};
+    
+    my $url=$rule{"url"};
+    my $level = $rule{"level"};
+    my $action = $rule{"action"};
+    my @args = $rule{"args"} ? @{$rule{"args"}} : ();
+    my $msghd = $result{work_dir} ? "[". $result{work_dir} . "]" : "";
+    my $count = @{$result{data}};
+    app_message($msghd , "Level $level>>","Get $count Lines,performing action $action..\n");
+    my ($status,@message) = callback_do_action(undef,$result_ref,$action,@args);
+    if($status) {
+        app_message($msghd,"Level $level>>",@message,"\n");
+        return 1;
+    }
+    else {
+        app_warning($msghd,"Level $level>>",@message,"\n");
+        return undef;
+    }
+}
+
+
+sub urlrule_process_passdown {
+    my $rule_ref = shift;
+    return unless(ref $rule_ref);
+    return unless(%{$rule_ref});
+    my $result_ref = shift;
+    return unless(ref $result_ref);
+    return unless(%{$result_ref});
+    my $msghd="";
+    my ($count,@passdown) = make_passdown($rule_ref,$result_ref);
+    my $level = $rule_ref->{level};
+    if($count) {
+        app_message($msghd,"Level $level>>","Get $count rules to pass down\n");
+    }
+    else {
+        return undef;
+        return 1;
+    }
+    my $CWD = getcwd;
+    foreach(@passdown) {
+        my($status1,$rule,$result) = urlrule_process_args(@{$_});
+        if($status1)
+        {
+            my($status2,$pass_count,@pass_args)
+                = urlrule_process_result($rule,$result);
+            my $CWD = getcwd;
+            if($status2) {
+                foreach(@pass_args) {
+                    callback_process_passdown(undef,@{$_});
+                    chdir $CWD;
+                }
+            }
+        }
+        chdir $CWD;
+    }
+    return 1;
+}
+
+sub urlrule_process_args 
+{
+    my ($dir,@args) = @_;
+    my $rule = parse_rule(@args);
+    unless($rule)
+    {
+        app_message("Invalid args : " . join(" ",@args),"\n");
+        return undef;
+    }
+    my $level = $rule->{level};
+    if($dir)
+    {
+        mkdir $dir unless(-d $dir);
+        if(!chdir $dir) {
+            app_error("Level $level>>","$!\n");
+            return undef;
+        }
+    }
+    my $url = $rule->{url};
+    my $source = $rule->{"source"};
+    my $msghd = "Level $level>>";
+    app_message($msghd,"For \"$url\" ...\n");
+    app_message($msghd,"Found rule: \"$source\"\n");
+    unless(-f $source) {
+        app_error($msghd,"File not found: $source\n");
+        return undef;
+    }
+    app_message($msghd,"Applying it...\n");
+    do $source; 
+    my %result = &apply_rule($url,$rule);
+    if($result{work_dir}) {
+        $result{work_dir} = &unescape_text($result{work_dir});
+    }
+    return 1,$rule,\%result;
 }
 
 sub execute_rule {
@@ -128,6 +261,49 @@ sub execute_rule {
     return 1,\%result;
 }
 
+sub urlrule_process_result
+{
+    #return #status,pass_count,@pass_args;
+    my($rule,$result,$p_action,@p_args) = @_;
+    unless($rule and ref $rule and %{$rule})
+    {
+        app_error("Invaild Rule\n");
+        return undef;
+    }
+    my $level = $rule->{"level"};
+    unless($result and ref $result and %{$result})
+    {
+        app_error("Level $level>>","Invalid Result\n");
+        return undef;
+    }
+    my $action;
+    my @args;
+    if($p_action) 
+    {
+        $action = $p_action;
+        @args = @p_args;
+    }
+    else
+    {
+        $action = $rule->{action};
+        @args = @{$rule->{args}} if($rule->{args});
+    }
+    my $count = $result->{data} ? @{$result->{data}} : 0;
+#    if($count > 0)
+#    {
+        app_message("Level $level>>","Get $count Lines,performing action $action..\n") if($count > 0);
+        my($action_status,$action_message) = callback_do_action(undef,$result,$action,@args);
+        if($action_status) {
+            app_message "Level $level>>$action_message\n";
+        }
+        else {
+            app_warning "Level $level>>$action_message\n" if($action_message);
+        }
+#    }
+    my ($pass_count,@pass_args) = make_passdown($rule,$result);
+    app_message "Level $level>>", "Get $pass_count rules to pass down\n" if($pass_count);
+    return 1,$pass_count,@pass_args;
+}
 
 sub unescape_text {
     my %ESCAPE_MAP = (
@@ -181,18 +357,18 @@ sub make_url {
     }
 }
 
-sub do_action {
+sub urlrule_do_action {
     my ($result_ref,$action,@args) = @_;
     return undef,"No results" unless(ref $result_ref);
     return undef,"No results" unless(%{$result_ref});
     my %result = %{$result_ref};
-    return undef,"No results" unless($result{data});
     my $msg="";
     if($result{work_dir}) {
         mkdir $result{work_dir} unless(-d $result{work_dir});
         chdir $result{work_dir} or return undef,$!;
         $msg = "[" . $result{work_dir} . "]";
     }
+    return undef,"No results" unless($result{data});
     if(ref $result{data} eq 'SCALAR') {
         $result{data} = [$result{data}];
     }
@@ -275,7 +451,7 @@ sub make_passdown {
     $level = $result{pass_level} if(exists $result{pass_level});
     my @ACTARG=($level,$action);
     unshift (@ACTARG,"domain:" . $result{pass_domain}) if($result{pass_domain});
-    push @ARTARG,@args if(@args);
+    push @ACTARG,@args if(@args);
     my @actions;
     my $count=@data;
     for(my $i=0;$i<$count;$i++) {
@@ -285,7 +461,56 @@ sub make_passdown {
         push @current, $result{pass_arg}->[$i] if($result{pass_arg});
         push @actions,\@current;
     }
-    return $level,$count,@actions;
+    return $count,@actions;
 }
 
-return 1;
+1;
+
+__END__
+
+=pod
+
+=head1  NAME
+
+MyPlace::URLRule - Common routines form urlrule
+
+=head1  SYNOPSIS
+
+    use MyPlace::URLRule;
+
+    sub process_rule
+    {
+        my ($status1,$rule,$result) 
+            = urlrule_process_args(@_);
+        if($status1) {
+            my ($status2,$pass_count,@pass_args) 
+                = urlrule_process_result($rule,$result);
+            if($status2 and $pass_count>0) 
+            {
+                foreach my $args_ref (@pass_args) {
+                    process_rule(@{$_});
+                }
+            }
+        }
+    }
+    process_rule(undef,@ARGV);
+        
+=head1 DESCRIPTION
+
+Common rountines for urlrule_action urlrule_task ...
+
+=head1  CHANGELOG
+
+    2010-06-12  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * add POD document
+        * add function perform_action()
+        * add $URLRULE_DIRECTORY/common for rules not differ in level.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+

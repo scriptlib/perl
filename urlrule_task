@@ -4,6 +4,7 @@ use lib $ENV{XR_PERL_MODULE_DIR};
 use MyPlace::URLRule;
 use MyPlace::ReEnterable;
 use MyPlace::Script::Message;
+use Cwd;
 use strict;
 
 #use MyPlace::URLRule::HostMap qw/%HOST_MAP get_task valid_hostname add_host get_hosts/;
@@ -24,81 +25,23 @@ my $Names = MyPlace::Config->new();
 $Names->read_plainfile($TASK_DATABASE);
 
 
-sub MyPlace::URLRule::callback_process_data {
-    my($from,$rule,$result) = @_;
-    app_message("callback:$from\n");
-    &process_data($rule,$result);
-}
-sub MyPlace::URLRule::callback_process_passdown {
-    my($from,$rule,$result) = @_;
-    app_message("callback:$from\n");
-    &process_passdown($rule,$result);
-}
-
-sub process_data {
-    my $rule_ref = shift;
-    return unless(ref $rule_ref);
-    return unless(%{$rule_ref});
-    my $result_ref = shift;
-    return unless(ref $result_ref);
-    return unless(%{$result_ref});
-
-    return unless($result_ref->{data});
-    my %rule = %{$rule_ref};
-    my %result = %{$result_ref};
-    
-    my $url=$rule{"url"};
-    my $level = $rule{"level"};
-    my $action = $rule{"action"};
-    my @args = $rule{"args"} ? @{$rule{"args"}} : ();
-    my $msghd = $result{work_dir} ? "[". $result{work_dir} . "]" : "";
-    my $count = @{$result{data}};
-    app_message($msghd , "Level $level>>","Get $count Lines,performing action $action..\n");
-    my ($status,@message) = do_action($result_ref,$action,@args);
-    if($status) {
-        app_message($msghd,"Level $level>>",@message,"\n");
-        return 1;
-    }
-    else {
-        app_warning($msghd,"Level $level>>",@message,"\n");
-        return undef;
-    }
-}
-
-
-sub process_passdown {
-    my $rule_ref = shift;
-    return unless(ref $rule_ref);
-    return unless(%{$rule_ref});
-    my $result_ref = shift;
-    return unless(ref $result_ref);
-    return unless(%{$result_ref});
-    my $msghd="";
-    my ($level,$count,@passdown) = make_passdown($rule_ref,$result_ref);
-    my $tlevel = $rule_ref->{level};
-    if($count) {
-        app_message($msghd,"Level $tlevel>>","Get $count rules to pass down to level $tlevel.\n");
-    }
-    else {
-        return undef;
-#        app_message($msghd,"Level $level>>","Get nothing to pass.\n");
-        return 1;
-    }
-    for(my $i=0;$i<$count;$i++) {
-        my ($dir,@args) = @{$passdown[$i]};
-        my $cwd = getcwd();
-        if($dir) {
-            mkdir $dir unless(-d $dir);
-            if(!chdir $dir) {
-                app_error($msghd,"Level $tlevel>>","$!\n");
-                next;
+sub load_rule {
+    my $CWD = getcwd;
+    my ($status1,$rule,$result) = urlrule_process_args(@_);
+    if($status1) {
+        my($status2,$pass_count,@passdown)
+            = urlrule_process_result($rule,$result);
+        if($status2 and $pass_count>0) {
+            my $CWD = getcwd;
+            foreach(@passdown) {
+                my($cwd,@args) = @{$_};
+                if(@args) {
+                    $phnd->push($CWD,'load_rule',$cwd,@args);
+                }
             }
         }
-        app_message($msghd , "Level $tlevel>>","[" . ($i + 1) . "/$count] $args[0]\n");
-        $phnd->push(getcwd(),'process_rule',@args);
-        chdir $cwd;
+        chdir $CWD;
     }
-    return 1;
 }
 
 sub convert_records {
@@ -139,25 +82,10 @@ sub action_ECHO {
 }
 
 
-sub do_apply_rule {
-    my %rule = %{parse_rule(@_)};
-    my $url = $rule{"url"};
-    my $domain = $rule{"domain"};
-    my $source = $rule{"source"};
-    my $level = $rule{"level"};
-    my $action = $rule{"action"};
-    my @args = $rule{"args"} ? @{$rule{"args"}} : ();
-    app_message("For \"$url\"\n");
-    app_message("Level $level>>","Found rule: \"$source\"\n");
-    app_message("Level $level>>","Applying it ...\n");
-    my($status,$result) =  execute_rule(%rule);
-    return $status,\%rule,$result;
-}
-
 sub action_DUMP {
     my $task = shift;
     my($name,$id,$host,$url,$level) = @{$task};
-    my($status,$rule,$result,@msg) = do_apply_rule($url,$level);
+    my($status,$rule,$result,@msg) = urlrule_process_args(undef,$url,$level);
     if($status) {
         use Data::Dumper;
         print STDERR Data::Dumper->Dump([$result],['*result']);
@@ -189,27 +117,9 @@ sub action_DOWNLOAD {
     $Names->propset(scalar(localtime),$name,$id,$host,"last");
     print STDERR "Saving $TASK_DATABASE...\n";
     $Names->write_plainfile($TASK_DATABASE);
-    if(!chdir("$name/$host")) {
-        app_error("$!\n");
-        return undef;
-    }
     app_message("Processing $name/$host\n");
-    if(&process_rule($url,$level,'batchget -U -M 300 -f')) {
-    }
-    chdir $cwd;
+    load_rule("$name/$host",$url,$level,'batchget -U -M 300 -f');
     return 1;
-}
-sub process_rule {
-    my($status,$rule,$result,@msg) = do_apply_rule(@_);
-    if($status) {
-        process_data($rule,$result);
-        process_passdown($rule,$result);
-        return 1;
-    }
-    else {
-        app_error("Error:",$rule,$result,@msg,"\n");
-        return undef;
-    }
 }
 sub log {
     return unless($TASK_FILEHANDLE_LOG);
@@ -224,7 +134,7 @@ sub sig_killed {
     }
     chdir($TASK_WORKDIR) if($TASK_WORKDIR);
     $phnd->saveToFile(TASK_FILE_RESUME);
-    app_message($phnd->length," tasks saved to TASK_FILE_RESUME\n");
+    app_message($phnd->length," task(s) saved to " . TASK_FILE_RESUME . "\n");
     &log("Updating aborted!");
     clean_up();
     exit 1;
