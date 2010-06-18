@@ -2,17 +2,22 @@ package MyPlace::Discuz;
 use strict;
 use lib $ENV{XR_PERL_MODULE_DIR};
 use HTML::TreeBuilder;
-use LWP::UserAgent;
-use HTTP::Cookies;
+#use LWP::UserAgent;
+#use HTTP::Cookies;
+use MyPlace::Curl;
 use URI;
 use Encode qw/decode/;
 use MyPlace::HTML::Convertor;
-use MyPlace::Cache;
-
-my $ua;
-my $cookie;
+my $CURL;
+my $COOKIE_FILENAME = $ENV{'HOME'} . "/.discuz_cookie.curl";
 my %login_try;
-my $cache = MyPlace::Cache->new("httpget");
+#my $cache = MyPlace::Cache->new("httpget");
+
+sub download {
+    my ($self,$url,$filename) = @_;
+    $CURL = _make_curl_object() unless($CURL);
+    $CURL->get($url,"--referer",$url,"--output",$filename);
+}
 
 sub new {
     my $class=shift;
@@ -21,8 +26,61 @@ sub new {
 
 
 sub get_url {
-    my ($ua,$url) = @_;
-    return $ua->request(HTTP::Request->new(GET=>$url));
+    my $self = shift;
+    my $url = shift;
+    $CURL = _make_curl_object() unless($CURL);
+    return $CURL->get($url);
+}
+
+sub _make_curl_object 
+{
+    my $CURL = MyPlace::Curl->new;
+    $CURL->set("cookie",$COOKIE_FILENAME);
+    $CURL->set("cookie-jar",$COOKIE_FILENAME);
+    $CURL->set("user-agent","Mozilla/5.0");# (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
+    return $CURL;
+}
+
+sub _do_login {
+    my($url,$referer,$user,$pass) = @_;
+    $CURL = _make_curl_object() unless($CURL);
+    my $action;
+    my %posts;
+    foreach my $content ($CURL->get($url,"--referer",$referer)) {
+        if((!$action) and $content =~ /\<form\s+[^<>]*\s*action=['"]([^'"]+)['"]/i) {
+            $action = $1;
+        }
+        my @match = $content =~ /\<((?:input|select)\s+[^<>]+)/g;
+        foreach(@match) {
+            my ($name,$value)= /^select/ ? ("",0) :  ("","");
+            if(/\s*name=['"]([^'"]*)['"]/) {
+                $name = $1;
+                if(/\s*value=['"]([^'"]+)['"]/) {
+                    $value=$1;
+                };
+                $posts{$name}=$value;
+            }
+        }
+    }
+    if($action)
+    {
+        $action = URI->new_abs($action,$url);
+    }
+    else
+    {
+        print STDERR "Error: Login form not found!\n";
+        return undef;
+    }
+    $posts{loginfield}="username";
+    $posts{loginsubmit}="true";
+    $posts{username}=$user;
+    $posts{password}=$pass;
+    $posts{referer}=$referer;
+    my @posts = map "$_=$posts{$_}",keys %posts;
+    print STDERR "Posting $action ...\n";
+    print STDERR "Post-Data: ",join("&",@posts),"\n";
+    return $CURL->post($action,$referer,%posts);
+    #join("&",@posts),"--referer",$referer);
 }
 
 sub http_get {
@@ -31,21 +89,17 @@ sub http_get {
     if($url =~ /\?/) {
         $url = "$url&adult=agreed" unless($url =~ /adult=agreed/);
     }
-    my @cached = $cache->load($url);
-    return (1,@cached) if(@cached);
+#    my @cached = $cache->load($url);
+#    return (1,@cached) if(@cached);
     $user ||= $self->{user};
     $pass ||= $self->{pass};
-    unless($ua) {
-        $ua = LWP::UserAgent->new;
-        $cookie = HTTP::Cookies->new(file => "$ENV{'HOME'}/.discuz_cookies.dat", autosave => 1);
-        $ua->cookie_jar($cookie);
-        $ua->agent("Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
-    }
+    $CURL = _make_curl_object() unless($CURL);
     $try = 6 unless($try);
-    my $req = HTTP::Request->new(GET => $url);
-    my $res = $ua->request($req);
-    if($res->is_success) {
-        my($state,$login,%posts) = _parse_res_content($res->content);        
+    my ($res,@data) = $CURL->get($url,"--silent","--referer",$url);
+    #my $req = HTTP::Request->new(GET => $url);
+    #my $res = $CURL->request($req);
+    if($res eq 0) {
+        my($state,$login,%posts) = _parse_res_content(@data);
         if($state and $state == 1 and $login) {
             $login_try{$url} =  $login_try{$url} ? $login_try{$url}+1 : 1;
             if($login_try{$url}>4) {
@@ -56,18 +110,10 @@ sub http_get {
             $posts{username}=$user;
             $posts{password}=$pass;
             $posts{referer}=$url;
-            my $post="" ; #= "username=$user&password=$pass";
-            foreach(keys %posts) {
-                $post = $post . "&$_=" . $posts{$_};
-            }
-            $post = substr($post,1);
-            print STDERR "Posting:$post\n";
-            $req = HTTP::Request->new(POST=>$login);
-            $req->header(referer=>$url);
-            $req->content_type('application/x-www-form-urlencoded');
-            $req->content($post);
-            $res = $ua->request($req);
-            if($res->is_success) {
+            print STDERR "$login...\n";
+            ($res,@data) = $CURL->post($login,$url,%posts);
+            #$user,4$CURL->post($login,$post,"--referer",$url);
+            if($res eq '0') {
                 @_ = ($self,$url,$user,$pass);
                 sleep 3;
                 goto &http_get;
@@ -75,47 +121,61 @@ sub http_get {
             else {
                 $try--;
                 if($try>0) {
-                    print STDERR $res->status_line," ($try)Try again...\n";
+                    print STDERR $res," ($try)Try again...\n";
                     @_ = ($self,$url,$user,$pass,$try);
                     sleep 3;
                     goto &http_get;
                 }
                 else {
-                    return (undef,$res->status_line);
+                    return (undef,join('',@data));
                 }
             }
         }
         elsif($state == 2) {
                 $try--;
                 if($try>0) {
-                    print STDERR "\n",$res->status_line," ($try)Reloading...";
+                    print STDERR "\n",$res," ($try)Reloading...";
                     @_ = ($self,$url,$user,$pass,$try);
                     sleep 3;
                     goto &http_get;
                 }
                 else {
-                    return (undef,$res->status_line);
+                    return (undef,join("",@data));
                 }
         }
+        elsif($state == 3 and $login) {
+            print STDERR "No login, go to login page...\n";
+            $login = URI->new_abs($login,$url);
+            print STDERR "$login...\n";
+            _do_login($login,$url,$user,$pass);
+            sleep 1; 
+            print STDERR "Reloading $url...\n";
+            @_ = ($self,$url,$user,$pass,$try);
+            goto &http_get;
+#            $self->http_get($login,$user,$pass,$try);
+#            return $self->http_get($url,$user,$pass,$try);
+        }
         else {
-            return (1,$cache->save($url,$res->content));
+            return (1,@data);
+            #$cache->save($url,@data));
+            #$res->content));
         }
     }
-    elsif($res->code eq 404 || $res->code eq 301 || $res->code eq 500) {
+    elsif($res eq 404 || $res eq 301 || $res eq 500) {
         $try--;
         if($try>0) {
-            print STDERR "\n",$res->status_line," ($try)Try again...";
+            print STDERR "\n",$res," ($try)Try again...";
             @_ = ($self,$url,$user,$pass,$try);
             sleep 3;
             goto &http_get;
         }
-        return (undef,$res->status_line); 
+        return (undef,@data);
         
     }
     else {
 #                if($try>0) {
 #                    $try--;
-                    print STDERR "\n",$res->status_line," ($try)Try again...";
+                    print STDERR "\n",$res," ($try)Try again...";
                     @_ = ($self,$url,$user,$pass,$try);
                     sleep 3;
                     goto &http_get;
@@ -130,14 +190,19 @@ sub _parse_res_content {
     my $need_auth;
     my ($state,$login,%fields);
     $state=0;
-    foreach my $content (@_) {
+    my $content = join("",@_);
+#    foreach my $content (@_) {
         if($content =~ /input\s+[^<>]*\s*name=['"]username['"]/i) {
             $state = 1;
         }
         elsif($content =~ /location\.reload\(\)/i) {
             $state = 2;
         }
-        if((!$login) && $content =~ /\<form\s+[^<>]*\s*action=['"]([^'"]+)['"]/i) {
+        elsif($content =~ /href="([^"]+\.php\?action=login[^"]*)"/) {
+            $state = 3;
+            $login = $1;
+        }
+        if($content =~ /\<form\s+[^<>]*\s*action=['"]([^'"]+)['"]/i) {
             $login = $1;
         }
         my @match = $content =~ /\<((?:input|select)\s+[^<>]+)/g;
@@ -153,7 +218,7 @@ sub _parse_res_content {
         }
         $fields{loginfield}="username";
         $fields{loginsubmit}="true";
-    }
+ #   }
     return ($state,$login,%fields);# if($state);
     return undef;
 }
@@ -278,7 +343,14 @@ sub init {
     }
     @postcontent = $tree->look_down("id","thread_body_0") unless(@postcontent);
     $self->{posts} = \@postcontent;
-    $self->{post} = $postcontent[0] if(@postcontent);
+    if(@postcontent) 
+    {
+        $self->{post} = $postcontent[0];
+        my @attachment= $postcontent[0]->look_down("_tag","a", "href",qr/attachment\.php\?/);
+        foreach(@attachment) {
+            push @{$self->{attachment}},[$_->attr("href"),$_->as_text];
+        }
+    }
     $self->{tree}=$tree;
     return $self;
 }
@@ -300,9 +372,6 @@ sub get_post_images {
     my @imgs = $post->look_down("_tag","img","src",qr/.+/);
     return grep /:\/\//, map $_->attr("src"),@imgs;
 }
-sub get_attachments {
-
-}
 
 sub delete {
     my $self =shift;
@@ -318,3 +387,14 @@ sub DESTROY {
     return 1;
 }
 1;
+
+__END__
+
+=pod
+=head1 CHANGELOG
+    2010-06-17  xiaoranzzz <xiaoranzzz@gmail.com>
+        * Make usage of MyPlace::Curl instead of LWP
+        * Add method 'download'
+    2010-06-18  xiaoranzzz <xiaoranzzz@gmail.com>
+        * Remove usage of MyPlace::Cache
+=cut

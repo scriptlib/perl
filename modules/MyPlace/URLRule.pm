@@ -11,7 +11,7 @@ BEGIN {
     our ($VERSION,@ISA,@EXPORT,@EXPORT_OK,%EXPORT_TAGS);
     $VERSION        = 1.00;
     @ISA            = qw(Exporter);
-    @EXPORT         = qw($URLRULE_DIRECTORY &urlrule_process_data &urlrule_process_passdown &urlrule_process_args &urlrule_process_result &get_domain &get_rule_dir &build_url &parse_rule &urlrule_do_action &execute_rule &make_passdown);
+    @EXPORT         = qw($URLRULE_DIRECTORY &urlrule_process_data &urlrule_process_passdown &urlrule_process_args &urlrule_process_result &get_domain &get_rule_dir &build_url &parse_rule &urlrule_do_action &execute_rule &urlrule_get_passdown);
 }
 
 #my $URLRULE_DIRECTORY = "$ENV{XR_PERL_SOURCE_DIR}/urlrule";
@@ -176,7 +176,7 @@ sub urlrule_process_passdown {
     return unless(ref $result_ref);
     return unless(%{$result_ref});
     my $msghd="";
-    my ($count,@passdown) = make_passdown($rule_ref,$result_ref);
+    my ($count,@passdown) = urlrule_get_passdown($rule_ref,$result_ref);
     my $level = $rule_ref->{level};
     if($count) {
         app_message($msghd,"Level $level>>","Get $count rules to pass down\n");
@@ -291,7 +291,7 @@ sub urlrule_process_result
     my $count = $result->{data} ? @{$result->{data}} : 0;
 #    if($count > 0)
 #    {
-        app_message("Level $level>>","Get $count Lines,performing action $action..\n") if($count > 0);
+        app_message("Level $level>>","Get $count Lines,performing action \"$action\" ...\n") if($count > 0);
         my($action_status,$action_message) = callback_do_action(undef,$result,$action,@args);
         if($action_status) {
             app_message "Level $level>>$action_message\n";
@@ -300,7 +300,7 @@ sub urlrule_process_result
             app_warning "Level $level>>$action_message\n" if($action_message);
         }
 #    }
-    my ($pass_count,@pass_args) = make_passdown($rule,$result);
+    my ($pass_count,@pass_args) = urlrule_get_passdown($rule,$result);
     app_message "Level $level>>", "Get $pass_count rules to pass down\n" if($pass_count);
     return 1,$pass_count,@pass_args;
 }
@@ -363,8 +363,11 @@ sub urlrule_do_action {
     return undef,"No results" unless(%{$result_ref});
     my %result = %{$result_ref};
     my $msg="";
-    if($result{work_dir}) {
-        mkdir $result{work_dir} unless(-d $result{work_dir});
+    if(($action or $result{action} or $result{pipeto} or $result{hook}) and $result{work_dir}) {
+        unless( -d $result{work_dir}) {
+            app_message "Creating directory : \"$result{work_dir}\"...\n";
+            mkdir $result{work_dir};
+        }
         chdir $result{work_dir} or return undef,$!;
         $msg = "[" . $result{work_dir} . "]";
     }
@@ -372,6 +375,7 @@ sub urlrule_do_action {
     if(ref $result{data} eq 'SCALAR') {
         $result{data} = [$result{data}];
     }
+    app_message("Do Action>>",getcwd,"\n");
     my $file=$result{file};
     $file =~ s/\s*\w*[\/\\]\w*\s*//g if($file);
     my $pipeto=$action ? $action : $result{action};
@@ -412,11 +416,11 @@ sub urlrule_do_action {
             $line = &make_url($line,$result{base}) if($result{base});
             print $line,"\n";
         }
-        return 1;$msg . "OK.";
+        return 1,$msg . "OK.";
     }
 }
 
-sub make_passdown {
+sub urlrule_get_passdown {
     my $rule_ref = shift;
     return unless(ref $rule_ref);
     return unless(%{$rule_ref});
