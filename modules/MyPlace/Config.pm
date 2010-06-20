@@ -115,6 +115,7 @@ sub propset {
     my $p=$self->{data};
     my $r;
     my $last;
+    my $key = pop @keys;
     foreach(@keys) {
         $last=$_;
         $p ->{$_} = {} unless($p->{$_});
@@ -122,7 +123,8 @@ sub propset {
         $p = $p->{$_};
     }
     return unless($r);
-    $r->{$last} = {$value=>{}};
+    #${$r} = {$last=>{$value=>{}}};
+    $r->{$last} = {$key=>{$value=>{}}};
     $self->{dirty}=1;
     return $p;
 }

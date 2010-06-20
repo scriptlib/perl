@@ -42,9 +42,9 @@ sub build_dir {
     return "$f/$s";
 }
 sub loadpage {
-    my ($url,$g_USER,$g_PASS) = @_;
+    my ($url,$g_USER,$g_PASS,$prompt) = @_;
     app_message "loading $url...";
-    sleep 2;
+    sleep 1;
     my $page = MyPlace::Discuz->new(user=>$g_USER,pass=>$g_PASS);
     if($page->init_with_url($url)) {
         app_message "--no-prefix","\t[OK]\n";
@@ -59,11 +59,18 @@ sub loadpage {
 
 sub save_post {
     my ($dir,$filename,$url,$prompt,$subpage,$type) = @_;
-    $prompt = $prompt ? "[$prompt]" : "";
+#    $prompt = $prompt ? "[$prompt]" : "";
+#    app_message $prompt,"\n";
+    if(not &write_thread_dbase($url,1)) 
+    {
+        app_warning "$url [Ignored, in THREAD_DBASE!]\n";
+        return undef;
+    }
     $type = $g_TYPE unless($type);
     $subpage = loadpage($url,$g_USER,$g_PASS) unless($subpage);
     unless($subpage and $subpage->{post}) {
         app_warning "Empty post...\n";
+        &write_thread_dbase($url,0);
         return undef;
     }
     mkdir $dir unless(-d $dir);
@@ -85,7 +92,7 @@ sub save_post {
             save_text($dir,$filename,$subpage);
         }
     }
-    &write_thread_dbase($url);
+    &write_thread_dbase($url,0);
 }
 
 
@@ -118,11 +125,12 @@ sub get_filename {
     my ($fst,$sec)=@_;
     $sec ="" unless($sec);
     my $idx=0;
-    while (-e "$fst$sec") {
+    my $basename = $fst;
+    while (-e "$basename$sec") {
         $idx++;
-        $fst="$fst\_$idx";
+        $basename="$fst\_$idx";
     }
-    return "$fst$sec";
+    return "$basename$sec";
 }
 
 sub save_text {
@@ -200,12 +208,12 @@ sub process_url {
     my $prompt = shift;
     my $type = shift;
     my $page = loadpage($url,$g_USER,$g_PASS);
+    #,$prompt);
     mkdir $dir unless(-d $dir);
     return unless($page);
     if($page->{post}) {
-        save_post($dir,$page->{title} ,$url,$prompt,$page,$type);
-        #$page->get_post_text($page->{post}));
-        $page->delete();
+            save_post($dir,$page->{title} ,$url,$prompt,$page,$type);
+            $page->delete();
         return 1;
     }
     if(!$no_subpage and $dir eq ".") {
@@ -221,7 +229,6 @@ sub process_url {
         }
     }
     if((!$no_subpage) and  $page->{pages}) {
-            #use Data::Dumper;die(Dumper($page->{pages}),"\n");
         foreach my $idx (0 .. $#{$page->{pages}}) {
             my $suburl = $page->build_url($page->{pages}->[$idx],$url);
             $g_HANDLER->push(undef,"process_url", $dir,$suburl,1,$prompt . " page " . min_max($idx,$#{$page->{pages}}),$type);
@@ -230,10 +237,6 @@ sub process_url {
     else {
         foreach my $idx (0 .. $#{$page->{threads}}) {
             my $suburl = $page->build_url($page->{threads}->[$idx]->[0],$url);
-            if(!&write_thread_dbase($suburl)) {
-                app_message "$suburl [Ignored: In THREAD_DBASE!]\n";
-                next;
-            }
             my $subfile = $page->{threads}->[$idx]->[1];
             $g_HANDLER->push(undef,"save_post",$dir,$subfile,$suburl,$prompt . " thread " . min_max( $idx,$#{$page->{threads}} . " "),undef,$type);
         }
@@ -242,13 +245,20 @@ sub process_url {
 }
 
 
+
 sub write_thread_dbase {
     my $str = shift;
+    my $flag_no_save = shift;
     return undef if($THREAD_DBASE{$str});
     $str =~ s/^[a-zA-Z]+:\/+[^\/]+//;
     return undef if($THREAD_DBASE{$str});
+    return 1 if($flag_no_save);
     $THREAD_DBASE{$str}=1;
-    &save_thread_dbase if(int(rand(10)) == 5);
+    my $rand_number = int(rand(10));
+    if($rand_number == 5)
+    {
+        &save_thread_dbase
+    }
     return 1;
 }
 
@@ -269,7 +279,7 @@ sub load_thread_dbase
 sub save_thread_dbase
 {
     my $file = $g_START_DIRECTORY . "/" . THREAD_DBASE_FILE;
-    app_message "saving thread dbase...\n";
+    app_message "Saving thread dbase...\n";
     open FO,">",$file;
     foreach(keys %THREAD_DBASE) {
         print FO "$_\n";
@@ -283,7 +293,7 @@ sub save_thread_dbase
     sub sig_killed {
         return if($killingme);
         $killingme=1;
-        app_warning "I AM KILLED!!!\n";
+        app_warning "\nI AM KILLED!!!\n";
         if($g_HANDLER->{lastStack}) {
             $g_HANDLER->push(@{$g_HANDLER->{lastStack}});
         }

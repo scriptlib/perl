@@ -46,20 +46,30 @@ sub _do_login {
     $CURL = _make_curl_object() unless($CURL);
     my $action;
     my %posts;
-    foreach my $content ($CURL->get($url,"--referer",$referer)) {
-        if((!$action) and $content =~ /\<form\s+[^<>]*\s*action=['"]([^'"]+)['"]/i) {
-            $action = $1;
-        }
-        my @match = $content =~ /\<((?:input|select)\s+[^<>]+)/g;
-        foreach(@match) {
-            my ($name,$value)= /^select/ ? ("",0) :  ("","");
-            if(/\s*name=['"]([^'"]*)['"]/) {
-                $name = $1;
-                if(/\s*value=['"]([^'"]+)['"]/) {
-                    $value=$1;
-                };
-                $posts{$name}=$value;
+    my ($code,@data) = $CURL->get($url,"--referer",$referer);
+    foreach my $content (@data)
+    {
+        if($code == 0)
+        {
+            if((!$action) and $content =~ /\<form\s+[^<>]*\s*action=['"]([^'"]+)['"]/i) {
+                $action = $1;
             }
+            my @match = $content =~ /\<((?:input|select)\s+[^<>]+)/g;
+            foreach(@match) {
+                my ($name,$value)= /^select/ ? ("",0) :  ("","");
+                if(/\s*name=['"]([^'"]*)['"]/) {
+                    $name = $1;
+                    if(/\s*value=['"]([^'"]+)['"]/) {
+                        $value=$1;
+                    };
+                    $posts{$name}=$value;
+                }
+            }
+        }
+        else 
+        {
+            print STDERR "Error: ",$CURL->error_message($code),"\n";
+            return undef;
         }
     }
     if($action)
@@ -94,11 +104,11 @@ sub http_get {
     $user ||= $self->{user};
     $pass ||= $self->{pass};
     $CURL = _make_curl_object() unless($CURL);
-    $try = 6 unless($try);
+    $try = 6 unless[$try] ;
     my ($res,@data) = $CURL->get($url,"--silent","--referer",$url);
     #my $req = HTTP::Request->new(GET => $url);
     #my $res = $CURL->request($req);
-    if($res eq 0) {
+    if($res == 0) {
         my($state,$login,%posts) = _parse_res_content(@data);
         if($state and $state == 1 and $login) {
             $login_try{$url} =  $login_try{$url} ? $login_try{$url}+1 : 1;
@@ -112,8 +122,7 @@ sub http_get {
             $posts{referer}=$url;
             print STDERR "$login...\n";
             ($res,@data) = $CURL->post($login,$url,%posts);
-            #$user,4$CURL->post($login,$post,"--referer",$url);
-            if($res eq '0') {
+            if($res == 0) {
                 @_ = ($self,$url,$user,$pass);
                 sleep 3;
                 goto &http_get;
@@ -121,7 +130,7 @@ sub http_get {
             else {
                 $try--;
                 if($try>0) {
-                    print STDERR $res," ($try)Try again...\n";
+                    print STDERR "Error: ",$CURL->error_message($res),", [$try] Try again...\n";
                     @_ = ($self,$url,$user,$pass,$try);
                     sleep 3;
                     goto &http_get;
@@ -134,7 +143,7 @@ sub http_get {
         elsif($state == 2) {
                 $try--;
                 if($try>0) {
-                    print STDERR "\n",$res," ($try)Reloading...";
+                    print STDERR " [$try] Reloading...";
                     @_ = ($self,$url,$user,$pass,$try);
                     sleep 3;
                     goto &http_get;
@@ -161,29 +170,31 @@ sub http_get {
             #$res->content));
         }
     }
-    elsif($res eq 404 || $res eq 301 || $res eq 500) {
+#    elsif($res eq 404 || $res eq 301 || $res eq 500) {
+    else 
+    {
         $try--;
         if($try>0) {
-            print STDERR "\n",$res," ($try)Try again...";
+            print STDERR "\n Error:", $CURL->error_message($res),", [$try] Retry in 1 seconds...";
             @_ = ($self,$url,$user,$pass,$try);
-            sleep 3;
+            sleep 1;
             goto &http_get;
         }
         return (undef,@data);
         
     }
-    else {
+#    else {
 #                if($try>0) {
 #                    $try--;
-                    print STDERR "\n",$res," ($try)Try again...";
-                    @_ = ($self,$url,$user,$pass,$try);
-                    sleep 3;
-                    goto &http_get;
+#                    print STDERR "\nHTTP Error:",$res,", Re-connecting in 3 seconds...";
+#                    @_ = ($self,$url,$user,$pass,$try);
+#                    sleep 3;
+#                    goto &http_get;
 #                }
 #                else {
 #            return (undef,$res->status_line); 
 #            }
-    }
+#    }
 }
 
 sub _parse_res_content {
