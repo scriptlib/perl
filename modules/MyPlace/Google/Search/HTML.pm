@@ -45,6 +45,7 @@ my %DEFAULT_PARAMS =
 );
 
 my %IMAGE_DMS_MAP = (
+        'any'=>'',
         '>400x300'=>'qsvga',
         '>640x480'=>'vga',
         '>800x600'=>'svga',
@@ -97,7 +98,18 @@ sub get_api_url {
         $api_params{ndsp} = IMAGE_DEFAULT_COUNT;
     }
     if(!$api_params{q}) {
-        $api_params{q} = $keyword;
+        if($keyword)
+        {
+            my @keywords;
+            while($keyword =~ m/(["']([^"']+)["']|[^\s]+)/g)
+            {
+                my $word = $1;
+                next unless($word);
+                $word =~ s/\s+/+/g;
+                push @keywords,$word;
+            }
+            $api_params{q} = join("+OR+",@keywords);
+        }
     }
     if(!$api_params{start}) {
         if($page and $page =~ m/^[0-9]+$/ and $page>1) {
