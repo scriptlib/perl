@@ -1,0 +1,17 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+my @tagfs = ('tagfs','-r',$ENV{'HOME'} . "/public/videos");
+if(@ARGV)
+{
+    push @tagfs,@ARGV;
+    print STDERR join(" ",@tagfs),"\n";
+    exec(@tagfs);
+}
+else 
+{
+    print STDERR "Usage:$0 \"tag1,tag2,tag3,tag 4,tag 5\" files...\n";
+    exit 0;
+}
+
+
