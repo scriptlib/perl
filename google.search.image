@@ -90,9 +90,14 @@ $page_count = 1 unless($page_count and $page_count =~ m/[0-9]+/ and  $page_count
 my $page_end = $page + $page_count -1;
 foreach my $page_idx ($page .. $page_end)
 {
+REDOIT:
     print STDERR "Searching for $query, page [$page_idx/$page_end] ...\n";
     my ($status,$images) = MyPlace::Google::Search::search_images($query,$page_idx,%params);
-    if($status) {
+    if($status and $images) {
+        #print STDERR ref $images,"\n";
+        if (!((ref $images) eq 'ARRAY')) {
+            goto REDOIT;
+        }
         my $count = scalar(@{$images});
         print STDERR "Get " . scalar(@{$images}) . " image[s].\n";
         if($size and $size =~ m/^\s*\d+\s*[kKmMgG]?$/) {

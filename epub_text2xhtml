@@ -31,11 +31,11 @@ binmode STDIN,'utf8';
 
 my $space_exp = '[\s　]';
 my $not_space_exp = '[^\s　]';
-my $number_exp = "(?:[一二三四五六七八九十零百千\\s]+|[1234567890\\s]+|[１２３４５６７８９０\\s]+)";
+my $number_exp = "(?:[一二三四五六七八九十零百千]+|[1234567890]+|[１２３４５６７８９０]+)";
 my $H2_EXP = qr/
             ^(${not_space_exp}+)${space_exp}*$
             |^${space_exp}*《(.+)》${space_exp}*$
-            |^${space_exp}*(第${number_exp}+[章|部].*)${space_exp}*$
+            |^${space_exp}*(第${number_exp}+[章|部|辑].*)${space_exp}*$
             |^${space_exp}*(section${number_exp}+.*)${space_exp}*$
             |^${space_exp}*(序${number_exp}*)${space_exp}*$
             |^${space_exp}*(序${space_exp}*[言章幕]${number_exp}*)${space_exp}*$
@@ -45,6 +45,7 @@ my $H3_EXP = qr/
             |^${space_exp}*(第${number_exp}+[节|篇].*)${space_exp}*$
             |^${space_exp}*(chapter${number_exp}+.*)${space_exp}*$
             |^${space_exp}*${number_exp}+$
+            |^${space_exp}*${number_exp}+${space_exp}+.+$
             /x;
 my $H4_EXP;
 my $H5_EXP;
@@ -72,7 +73,11 @@ sub BODY_TEXT
         s/[\n\r\s]+$//;
         next if(/^\s*$/);
         my ($class,$tag);
-        if(/^<(h\d)>(.+)<\/(\1)>/) {
+        if(length($_) > 100) {
+            $class = 'paragraph';
+            $tag = 'p';
+        }
+        elsif(/^<(h\d)>(.+)<\/(\1)>/) {
            $class = $1 eq 'h2' ? 'section_title' : 'chapter_title';
            $tag = $1;
            $_ = $2;
@@ -101,6 +106,11 @@ sub BODY_TEXT
             $class = 'paragraph';
             $tag = 'p';
         }
+        
+        if(!($tag eq 'p')) {
+            s/^\s+//;
+        }
+
         next unless($_);
         $result .= "<$tag class=\"$class\">" . ($_ ? $_ : "") . "</$tag>\n";
     }

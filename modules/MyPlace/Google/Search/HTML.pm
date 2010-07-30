@@ -13,7 +13,7 @@ use constant {
     IMAGE_DATA_ID=>'results',
 };
 my @GOOGLE_IP = (
-#    'www.google.com',
+    'images.google.com',
     '72.14.204.95',
     '72.14.204.96',
     '72.14.204.98',
@@ -30,8 +30,9 @@ my @GOOGLE_IP = (
     '209.85.227.100',
     '209.85.227.104',
     '209.85.227.103',
-    '216.239.59.147',
 );
+#@GOOGLE_IP = ('images.google.com');
+
 #http://images.google.com/images?hl=en&newwindow=1&safe=off&as_st=y&tbs=isch%3A1%2Cisz%3Alt%2Cislt%3Axga&sa=1&q=%22Michelle+Marsh%22+nude&aq=f&aqi=&aql=&oq=&gs_rfai=
 #http://www.google.com/images?q=Jordan+Carver&um=1&hl=en&newwindow=1&safe=off&tbs=isch:1,isz:lt,islt:2mp
 my %DEFAULT_PARAMS = 
@@ -161,7 +162,7 @@ sub search {
     print STDERR "Retrieving $URL ...";
     if(!$HTTP) {
         $HTTP = LWP::UserAgent->new();
-        $HTTP->agent("Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
+        $HTTP->agent("Mozilla/5.0");# (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
     }
     my $res = $HTTP->get($URL,"referer"=>$refer);
     print STDERR " [",$res->code,"]\n";
@@ -170,7 +171,7 @@ sub search {
     my $status;
     if($res->is_success) {
         my $code = $res->content;
-        if($code and $code =~ m/dyn\.setResults\((.+?)\)\s*\;\s*\</s) {
+        if($code and $code =~ m/\;\s*dyn\.setResults\((.+?)\)\s*\;\s*/s) {
             $code = $1;
         }
         $data = eval($code);

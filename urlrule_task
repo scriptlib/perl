@@ -55,14 +55,13 @@ sub convert_records {
             next unless($name);
             next unless($id);
             next unless($host);
-            my $hostname = undef;
-            if($host =~ m/^([^\|]+)\|(.*)$/) {
-                $hostname = $2 || "";
-                $host = $1;
+            my $hostname = $host;
+            if($hostname =~ m/^([^\|]+)\|(.*)$/) {
+                $hostname = $1;
             }
-            my ($url) = $Hosts->propget($host);
+            my ($url) = $Hosts->propget($hostname);
             if($url) {
-                my ($level) = $Hosts->propget($host,$url);
+                my ($level) = $Hosts->propget($hostname,$url);
                 my ($id_name,@id_text) = split(/\s*:\s*/,$id);
                 $url =~ s/###(?:ID|NAME])###/$id_name/g;
                 my $index = 0;
@@ -70,7 +69,7 @@ sub convert_records {
                     $index++;
                     $url =~ s/###TEXT$index###/$_/g;
                 }
-                push @r,[$name,$id,(defined $hostname ? $hostname : $host),$url,$level];
+                push @r,[$name,$id,$host,$url,$level];
             }
             else {
                 app_error("HOST $host isn't valid, or not defined in :\n\t$HOST_DATABASE\n");
