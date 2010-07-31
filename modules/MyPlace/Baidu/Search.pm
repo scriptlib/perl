@@ -116,8 +116,10 @@ sub search_images
     }
     my $html = $_gb->decode($res->content);
     my @images;
-    while($html =~ m/<img .+?(\d+)x(\d+)\s*(\d+[kmbgKMBG])\s*.+?\s*,\s*u:'([^']+)'/gs) {
-        push @images,new_image_url($4,$3,$1,$2);
+    while($html =~ m/"objURL":"([^"]+?)\s*",.+?"width":(\d+),"height":(\d+),.+?"filesize":"(\d+)"/gs) {
+        push @images,new_image_url($1,$2,$3,"$4k");
+#    while($html =~ m/<img .+?(\d+)x(\d+)\s*(\d+[kmbgKMBG])\s*.+?\s*,\s*u:'([^']+)'/gs) {
+#        push @images,new_image_url($4,$3,$1,$2);
     }
     return 1,\@images;
 }
