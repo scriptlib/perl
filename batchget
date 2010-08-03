@@ -1,48 +1,54 @@
 #!/usr/bin/perl -w
-###APPNAME:     batchget
-###APPAUTHOR:   xiaoranzzz
-###APPDATE:	Fri Sep 28 12:31:18 2007
-###APPVER:	0.2
-###APPDESC:     Download URLS,using simdo	
-###APPUSAGE:	[OPTIONS...] [Task Name]
-###APPEXAMPLE:	cat url.lst | batchget
-###APPOPTION:	-m:Max number of simultanous tasks|-n:Task name|-a:Auto rename|-d:Create directories|-e:extension name for autorename|-w:Working directory|-r:Refer URL|-h:Display this text|-b:cookie|-L:Logging programe|-f:Full name|-i:Auto rename by index|-M:Max time for a download|-U use urls history database 
-
-
-
-
-#Usage:
-#Accept URLS from STDIN, which should formated as 
-#URL\tSAVE AS
-
-
+# $Id$
 use strict;
-use lib $ENV{XR_PERL_MODULE_DIR};
+require v5.10.0;
+our $VERSION = 'v0.3';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/
+                help|h|? version|ver edit-me manual|man
+                autoname|a cookie|b=s directory|d ext|e=s 
+                fullname|f logger|L=s maxtime|M=i maxtask|m=i
+                taskname|n=s referer|r=s workdir|w=s urlhist|U
+                no-clobber|nc|c
+              /;
+
+if(@ARGV)
+{
+    use Getopt::Long qw(:config no_ignore_case);
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+
 use MyPlace::ParallelRun;
-use Getopt::Std;
 use URI::Escape;
 use MyPlace::Script::Message;
 
-#BEGIN {srand(time());}
-
-my %opts;
-getopts('M:hm:n:fade:w:r:L:b:iU',\%opts);
-exit(system("formathelp",$0,"-n")) if($opts{"h"});
 
 my $def_mul=3;
-my $createdir = $opts{"d"} ? $opts{"d"} : 0;
-my $maxtime = $opts{"M"} ? $opts{"M"} : undef;
-my $muldown   = $opts{"m"} ? $opts{"m"} : $def_mul;
-my $taskname  = $opts{"n"} ? $opts{"n"} : "";
-my $autoname  = $opts{"a"} ? $opts{"a"} : 0;
-my $extname   = $opts{"e"} ? $opts{"e"} : "";
-my $workdir   = $opts{"w"} ? $opts{"w"} : "";
-my $refer     = $opts{"r"} ? $opts{"r"} : "";
-my $logger    = $opts{"L"} ? $opts{"L"} : "";
-my $cookie    = $opts{"b"} ? $opts{"b"} : "";
-my $number    = $opts{"i"} ? $opts{"i"} : "";
-my $fullname  = $opts{"f"} ? 1 : 0;
-my $urlhist   = $opts{'U'} ? 1 : 0;
+my $createdir = $OPTS{"d"} ? $OPTS{"d"} : 0;
+my $maxtime = $OPTS{"M"} ? $OPTS{"M"} : undef;
+my $muldown   = $OPTS{"m"} ? $OPTS{"m"} : $def_mul;
+my $taskname  = $OPTS{"n"} ? $OPTS{"n"} : "";
+my $autoname  = $OPTS{"a"} ? $OPTS{"a"} : 0;
+my $extname   = $OPTS{"e"} ? $OPTS{"e"} : "";
+my $workdir   = $OPTS{"w"} ? $OPTS{"w"} : "";
+my $refer     = $OPTS{"r"} ? $OPTS{"r"} : "";
+my $logger    = $OPTS{"L"} ? $OPTS{"L"} : "";
+my $cookie    = $OPTS{"b"} ? $OPTS{"b"} : "";
+my $number    = $OPTS{"i"} ? $OPTS{"i"} : "";
+my $fullname  = $OPTS{"f"} ? 1 : 0;
+my $urlhist   = $OPTS{'U'} ? 1 : 0;
 my $URL_DATABASE_FILE = 'URLS.txt';
 my %Local_Map;
 
@@ -163,6 +169,13 @@ sub inqueue {
                 GetFilename_Auto(uri_unescape($URL),$stridx) 
             : GetFilename_NoAuto($URL);
 
+    if($OPTS{"no-clobber"}) {
+        if(-f $workdir . $filename) {
+            app_warning($curname . "Target exist, $URL\t[Ignored]\n");
+            return undef;
+        }
+    }
+
     my $thisrefer= $refer ? $refer : $URL;
     if($logger) {system($logger,$filename,$URL);}
     my @DARG;
@@ -174,6 +187,7 @@ sub inqueue {
     pushArgPair(@DARG,"-m",$maxtime);
     push(@DARG,"-d");
     para_queue "download",@DARG;
+    return 1;
 }
 
 if($cookie) {
@@ -201,17 +215,18 @@ while(<STDIN>) {
     next if($urlhist and check_database($_));
     push @URLS,$_;
     $count++;
-    if(&para_isfree()) {
-        my $URL = shift @URLS;
-        $index++;
-        &inqueue($URL,$index,$count,$prefix);
-    }
+    #if(0 and &para_isfree()) { # disable pre processing! (08/03/2010 xiaoranzzz@gmail.com)
+    #    my $URL = shift @URLS;
+    #    $index++;
+    #    &inqueue($URL,$index,$count,$prefix);
+    #}
 #    print STDERR ("\r$count URLS enqueued...                 ");
 }
 foreach my $URL (@URLS) {
     $index++;
-    &inqueue($URL,$index,$count,$prefix);
-    sleep 1;
+    if(inqueue($URL,$index,$count,$prefix)) {
+        sleep 1;
+    }
 }
 para_cleanup();
 save_database() if($urlhist);
@@ -219,5 +234,112 @@ save_database() if($urlhist);
 #print STDERR ("\n");
 #exit 0 unless($count);
 
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+batchget - A batch mode downloader
+
+=head1  SYNOPSIS
+
+batchget [options] ...
+
+cat url.lst | batchget
+
+cat url.lst | batchget -a -d 
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<-a,--autoname>
+
+Use indexing of URLs as output filename 
+
+=item B<-b,--cookie>
+
+Use cookie jar
+
+=item B<-c,--nc,--no-clobber>
+
+No clobber when target exists.
+
+=item B<-d,--directory>
+
+Create directories
+
+=item B<-e,--ext>
+
+Extension name for autonaming
+
+=item B<-f,--fullname>
+
+Use URL as output filename
+
+=item B<-M,--maxtime>
+
+Max time for a single download process
+
+=item B<-m,--maxtask>
+
+Max number of simulatanous downloading task
+
+=item B<-n,--taskname>
+
+Task name
+
+=item B<-r,--referer>
+
+Global referer URL
+
+=item B<-w,--workdir>
+
+Global working directory
+
+=item B<-U,--urlhist>
+
+Use URL downloading history databasa
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+A downloader which can download multiple urls at the same time and/or in queue.
+
+=head1  CHANGELOG
+
+    2007-10-28  xiaoranzzz  <xiaoranzzz@myplace.hell>
+    
+        * file created, version 0.1
+
+    2010-08-03  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * update to version 0.2
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
 
 
