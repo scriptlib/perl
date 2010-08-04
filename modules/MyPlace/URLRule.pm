@@ -32,7 +32,7 @@ sub get_rule_dir() {
 }
 sub get_domain($) {
     my $url = shift;
-	$url =~ s/^.*:\/+//g;
+	$url =~ s/^.*?:\/+//g;
 	$url =~ s/\/.*//g;
 	return $url;
     if($url =~ /([^\.\/]+\.[^\.\/]+)\//) {

@@ -48,6 +48,12 @@ sub print_status {
     }
 }
 
+sub get_data {
+    my $CONFIG=shift;
+    my @r=$CONFIG->list(@_);
+    return sort @r;
+}
+
 sub print_target {
     my $pre=shift;
     my $suf=shift;
@@ -106,6 +112,10 @@ else {
     $!=undef;
     if($action eq 'list') {
         print_target("","\n",$CONFIG,@target);
+        exit 0;
+    }
+    elsif($action eq 'print') {
+        print $_,"\n" foreach(&get_data($CONFIG,@target));
         exit 0;
     }
     elsif($action eq 'read') {

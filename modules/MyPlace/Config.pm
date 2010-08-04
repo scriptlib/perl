@@ -166,6 +166,21 @@ sub write {
 sub _get_query {
     my $query=shift;
     return unless $query;
+    if($query =~ /^\$/) {
+        my $text = '';
+        foreach my $idx (1..10) {
+            if($query =~ /\$$idx=([^\$]+)/) {
+                $text= $text . ',' . $1;
+            }
+            else {
+                $text = $text . ',' . '/.+/';
+            }
+        }
+        $text =~ s/^,+//;
+        $text =~ s/(,\/\.\+\/)+$//;
+        $query = $text;
+#        print STDERR $text;
+    }
     $query =~ s/$ESCAPE_MARK$ESCAPE_MARK/$ESCAPE_MARK_ESCAPE/g;
     $query =~ s/$ESCAPE_MARK$SEPARATOR/$SEPARATOR_ESCAPE/g;
     my @querys = split(/\s*$SEPARATOR\s*/,$query);

@@ -19,7 +19,7 @@ my @OPTIONS = qw/
                 autoname|a cookie|b=s directory|d ext|e=s 
                 fullname|f logger|L=s maxtime|M=i maxtask|m=i
                 taskname|n=s referer|r=s workdir|w=s urlhist|U
-                no-clobber|nc|c
+                no-clobber|nc|c numlen|i=i
               /;
 
 if(@ARGV)
@@ -36,19 +36,19 @@ use MyPlace::Script::Message;
 
 
 my $def_mul=3;
-my $createdir = $OPTS{"d"} ? $OPTS{"d"} : 0;
-my $maxtime = $OPTS{"M"} ? $OPTS{"M"} : undef;
-my $muldown   = $OPTS{"m"} ? $OPTS{"m"} : $def_mul;
-my $taskname  = $OPTS{"n"} ? $OPTS{"n"} : "";
-my $autoname  = $OPTS{"a"} ? $OPTS{"a"} : 0;
-my $extname   = $OPTS{"e"} ? $OPTS{"e"} : "";
-my $workdir   = $OPTS{"w"} ? $OPTS{"w"} : "";
-my $refer     = $OPTS{"r"} ? $OPTS{"r"} : "";
-my $logger    = $OPTS{"L"} ? $OPTS{"L"} : "";
-my $cookie    = $OPTS{"b"} ? $OPTS{"b"} : "";
-my $number    = $OPTS{"i"} ? $OPTS{"i"} : "";
-my $fullname  = $OPTS{"f"} ? 1 : 0;
-my $urlhist   = $OPTS{'U'} ? 1 : 0;
+my $createdir = $OPTS{"directory"} ? $OPTS{"directory"} : 0;
+my $maxtime = $OPTS{"maxtime"} ? $OPTS{"maxtime"} : undef;
+my $muldown   = $OPTS{"maxtask"} ? $OPTS{"maxtask"} : $def_mul;
+my $taskname  = $OPTS{"taskname"} ? $OPTS{"taskname"} : "";
+my $autoname  = $OPTS{"autoname"} ? $OPTS{"autoname"} : 0;
+my $extname   = $OPTS{"ext"} ? $OPTS{"ext"} : "";
+my $workdir   = $OPTS{"workdir"} ? $OPTS{"workdir"} : "";
+my $refer     = $OPTS{"referer"} ? $OPTS{"referer"} : "";
+my $logger    = $OPTS{"logging"} ? $OPTS{"logging"} : "";
+my $cookie    = $OPTS{"cookie"} ? $OPTS{"cookie"} : "";
+my $number    = $OPTS{"numlen"} ? $OPTS{"numlen"} : "";
+my $fullname  = $OPTS{"fullname"} ? 1 : 0;
+my $urlhist   = $OPTS{'urlhist'} ? 1 : 0;
 my $URL_DATABASE_FILE = 'URLS.txt';
 my %Local_Map;
 
@@ -279,6 +279,10 @@ Extension name for autonaming
 =item B<-f,--fullname>
 
 Use URL as output filename
+
+=item B<-i,--numlen>
+
+Number length for index filename
 
 =item B<-M,--maxtime>
 
