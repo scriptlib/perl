@@ -185,7 +185,9 @@ sub _run_curl
     my $self = shift;
     my @cmds = (@CURL,$self->_build_cmd);
     push @cmds,@_ if(@_);
-    my $data = qx{@cmds};
+    open FI,"-|",@cmds;
+    my $data = join("",<FI>);
+    close FI;
     my $exit_code = $?;
     if($exit_code == 0) 
     {

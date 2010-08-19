@@ -1,7 +1,5 @@
 package MyPlace::Baidu::Search;
-#use MyPlace::HTTPGet;
-use LWP::UserAgent;
-my $HTTP;
+use MyPlace::Search;
 use Encode;
 use utf8;
 my $_utf8 = find_encoding('utf8');
@@ -9,8 +7,8 @@ my $_gb = find_encoding('gb2312');
 
 my %URLS = 
 (
-    image=>'http://image.baidu.com/i',
-    www=>'http://www.baidu.com/s',
+    image=>'http://image.baidu.com/i?',
+    www=>'http://www.baidu.com/s?',
 );
 
 my %DEFAULT_PARAMS =
@@ -77,25 +75,14 @@ sub build_image_url {
         }
     }
     $url_params{word}=$query unless($url_params{word});
+    $url_params{word}=build_keyword($url_params{word});
     if($page and $page =~ m/^[0-9]+$/ and $page>1 and (!$url_params{pn})) 
     {
         $url_params{pn}=($page - 1) * 21;
     }
-    return &build_url($base,\%url_params);
+    return build_url($base,\%url_params);
 }
 
-
-sub build_url {
-    my($base,$params) = @_;
-    my @params;
-#    my $url = URI->new($base);
-#    $url->query_form(%{$params});
-#    return $url;
-    while(my($key,$value) = each %{$params}) {
-        push @params,"$key=$value";
-    }
-    return $base . '?' . join('&',@params); 
-}
 
 use URI::Escape;
 sub search_images 
@@ -103,13 +90,7 @@ sub search_images
     my($query,$page,%params)= @_;
     $query =uri_escape($_gb->encode($_utf8->decode($query)),'^\-_~\"\+a-zA-z0-9');
     my $search_url = build_image_url($URLS{image},$query,$page,\%params);
-    if(!$HTTP) {
-        $HTTP = LWP::UserAgent->new();
-        $HTTP->agent("Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
-    }
-    print STDERR "Retrieving $search_url ...";
-    my $res = $HTTP->get($search_url,referer=>$search_url);
-    print STDERR " [",$res->code,"]\n";
+    my $res = get_url($search_url);
     unless($res->is_success) 
     {
         return undef,"error : " . $res->code . " " . $res->$status_line . "\n";

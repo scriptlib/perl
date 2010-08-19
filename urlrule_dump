@@ -15,16 +15,17 @@ exit 0 if(help_even_empty($0,@ARGV));
 
 use MyPlace::Script::Message;
 use MyPlace::URLRule;
+use Data::Dumper;
+my $rule = parse_rule(@ARGV);
+print STDERR Data::Dumper->Dump([$rule],['*rule']);
 
-
-my($status,$rule,$result,@msg) = urlrule_process_args(undef,@ARGV);
+my ($status,@r) = execute_rule($rule);
 if($status) {
-        require Data::Dumper;
-        print STDERR Data::Dumper->Dump([$rule,$result],['*rule','*result']);
+        print STDERR Data::Dumper->Dump([\@r],['result']);
         exit 0;
 }
 else {
-    app_error("Error:",$rule,$result,@msg,"\n");
+    app_error("Error:",$rule,@r,"\n");
     exit 1;
 }
 

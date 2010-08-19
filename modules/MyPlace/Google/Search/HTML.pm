@@ -4,6 +4,7 @@ use strict;
 use JSON;
 use LWP::UserAgent;
 use URI::Escape;
+use MyPlace::Search;
 use constant {
     APPID=>'BlVF2czV34FVChK2mzsN7SBghcl.NwZ4YayhlbBXiYxPnRScC49U1ja4HnnF',
     IMAGE_SEARCH_REFER=>'http://images.google.com',
@@ -101,15 +102,7 @@ sub get_api_url {
     if(!$api_params{q}) {
         if($keyword)
         {
-            my @keywords;
-            while($keyword =~ m/(["']([^"']+)["']|[^\s]+)/g)
-            {
-                my $word = $1;
-                next unless($word);
-                $word =~ s/\s+/+/g;
-                push @keywords,$word;
-            }
-            $api_params{q} = join("+OR+",@keywords);
+            $api_params{q} = build_keyword($keyword);
         }
     }
     if(!$api_params{start}) {
@@ -119,8 +112,8 @@ sub get_api_url {
     }
     $api_params{hl} = 'en' unless($api_params{hl});
     $api_params{safe} = 'off' unless($api_params{safe});
-    my $params = join("&",map ("$_=" . $api_params{$_},keys %api_params));
-    return 'http://' . &get_google_ip()  . "/$vertical?$params";
+#    my $params = join("&",map ("$_=" . $api_params{$_},keys %api_params));
+    return build_url('http://' . &get_google_ip()  . "/$vertical?",\%api_params);
 }
 
 sub new {
@@ -159,16 +152,12 @@ sub search {
     unshift @_,$self unless($self and ref $self);
     my($ajax,$data_id,$refer,$keyword,$page,%args)=@_;
     my $URL = &get_api_url($ajax,$keyword,$page,%args);
-    print STDERR "Retrieving $URL ...";
-    if(!$HTTP) {
-        $HTTP = LWP::UserAgent->new();
-        $HTTP->agent("Mozilla/5.0");# (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
-    }
-    my $res = $HTTP->get($URL,"referer"=>$refer);
-    print STDERR " [",$res->code,"]\n";
+
     my $data;
     my $results;
     my $status;
+    my $res = get_url($URL,$refer);
+
     if($res->is_success) {
         my $code = $res->content;
         if($code and $code =~ m/\;\s*dyn\.setResults\((.+?)\)\s*\;\s*/s) {

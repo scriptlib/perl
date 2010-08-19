@@ -70,14 +70,15 @@ ___DESC___
 
 =head1  CHANGELOG
 
-    ___DATE___  ___AUTHOR___  <___EMAIL___>
+    2010-08-15 21:10:05  xiaoranzzz  <___EMAIL___>
         
         * file created.
 
 =head1  AUTHOR
 
-___AUTHOR___ <___EMAIL___>
+xiaoranzzz <___EMAIL___>
 
 =cut
 
-#       vim:filetype=perl
+
+

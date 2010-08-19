@@ -84,7 +84,7 @@ foreach(@ARGV) {
         print STDERR "Invalid params [$_]\n";
     }
 }
-$params{'size'} = '>800x600' unless($params{'size'} or $params{'type'});
+#$params{'type'} = 'xxlarge' unless($params{'size'} or $params{'type'});
 $page = 1 unless($page and $page =~ m/[0-9]+/ and  $page>1);
 $page_count = 1 unless($page_count and $page_count =~ m/[0-9]+/ and  $page_count>1);
 my $page_end = $page + $page_count -1;

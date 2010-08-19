@@ -1,0 +1,122 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
+my $editor="r-edit";
+$editor = "notepad++" if($^O =~ /win/i);
+my $fname=shift @ARGV;
+
+if(!$fname) {
+    print STDERR "Usage: $0 [options] filename\n";
+    exit 1;
+}
+
+if (-f $fname) {
+    print STDERR "$fname exists, openning it...\n";
+    exec $editor,$fname;
+    exit 0;
+}
+print STDERR "Creating \"$fname\"...\n";
+open PIPE,">:utf8",$fname or die("$!\n");
+print PIPE <STDIN>;
+close PIPE;
+
+if(-f $fname)
+{
+    use File::stat;
+    my $oldst = stat($fname);
+    print STDERR "Opening it in editor...\n";
+    system("$editor","$fname");
+    my $newst = stat($fname);
+    if($oldst->mtime < $newst->mtime) {
+        print STDERR "$fname modified.\n";
+    }
+    else {
+        print STDERR "File doesn't be modified, cancel.\n";
+        unlink($fname) or print STDERR "$!\n";
+    }
+}
+
+__END__
+
+=pod
+
+=head1  NAME
+
+editpipe - Editor helper, creating file from PIPE
+
+=head1  SYNOPSIS
+
+editpipe [options] filename
+
+cat template | editpipe filename
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+Editor helper program, which creates file from 
+PIPE, invokes the editor(r-edit), delete the 
+file if no modifition.
+
+=head1  CHANGELOG
+
+    2010-08-12  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+
+

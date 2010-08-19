@@ -20,9 +20,14 @@ my $pm=shift;
 my $pn = $pm;
 $pn =~ s/::/\//g;
 my $fn="$ENV{XR_PERL_MODULE_DIR}/$pn.pm";
-exit system("vim",$fn) if(-f $fn);
+my $dn=$fn;
+$dn =~ s/\/[^\/]+$/\//;
+if(!-d $dn) {
+    system("mkdir","-p",$dn) and die("$!\n");
+}
+exit system("r-vim",$fn) if(-f $fn);
 
-open FO,"|-","vim -c \'file $fn\' -" or die("$!\n");
+open FO,"|-","r-vim - -c \"file \"$fn\"\"" or die("$!\n");
 print FO '#!/usr/bin/perl -w',"\n";
 print FO "package $pm;\n";
 print FO <<'EOF'

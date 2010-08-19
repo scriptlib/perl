@@ -60,10 +60,26 @@ sub request {
 
 sub get {
     my $self = shift;
-    my $req = HTTP::Request->new(GET => @_);
+    my @args;
+    my $charset;
+    my $decoder;
+    foreach(@_) {
+        next unless($_);
+        if(m/^charset:([^\s]+)/) {
+            $charset = $1;
+        }
+        else {
+            push @args,$_;
+        }
+    }
+    if($charset) {
+        use Encode;
+        $decoder = find_encoding($charset);
+    }
+    my $req = HTTP::Request->new(GET => @args);
     my $res = $self->{ua}->request($req);
     if ($res->is_success) {
-        return $res->code,$res->content;
+        return $res->code,$decoder ? $decoder->decode($res->content) : $res->content;
     }
     else {
         return $res->code,$res->status_line;

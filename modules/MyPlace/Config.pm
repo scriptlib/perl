@@ -254,6 +254,7 @@ sub text_to_hash {
     my $next_exp = $level_mark_exp x ($level+1);
     while(@{$text}) {
         my $line = shift @{$text};
+        $line =~ s/\s+$//;
         next unless($line);
         if($cur and $line =~ /^$next_exp/) {
             unshift @{$text},$line;

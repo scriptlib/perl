@@ -59,11 +59,11 @@ unless($taskname) {
 $taskname = "" unless($taskname);
 $muldown = 1 if( $muldown<1);
 
-if($workdir) {
-    mkdir $workdir unless(-d $workdir);
-    $workdir .= "/" unless($workdir =~ /\/$/);
+#if($workdir) {
+#    mkdir $workdir unless(-d $workdir);
+#    $workdir .= "/" unless($workdir =~ /\/$/);
 #    chdir($workdir);
-}
+#}
 
 my %URL_DATABASE;
 
@@ -156,17 +156,26 @@ sub pushArgPair(\@$$) {
         push @{$DARG},$value;
     }
 }
+
+my %record;
 sub inqueue {
     my ($URL,$index,$count,$prefix)=@_;
     my $curname= "[$prefix$index/$count]";
     my $stridx = "0" x (length($count)-length($index)+1) . $index if($number);
+    if($record{$URL}) {
+        app_warning($curname . "Duplicated, $URL [Ignored]\n");
+        return undef;
+    }
+    $record{$URL} = 1;
     my $filename =
             $Local_Map{$URL} ? 
                 $Local_Map{$URL} 
             : $fullname ? 
-                GetFilename_Fullname(uri_unescape($URL)) 
+                GetFilename_Fullname($URL) 
+                #GetFilename_Fullname(uri_unescape($URL)) 
             : $autoname ? 
-                GetFilename_Auto(uri_unescape($URL),$stridx) 
+                GetFilename_Auto($URL,$stridx) 
+                #GetFilename_Auto(uri_unescape($URL),$stridx) 
             : GetFilename_NoAuto($URL);
 
     if($OPTS{"no-clobber"}) {
@@ -180,7 +189,8 @@ sub inqueue {
     if($logger) {system($logger,$filename,$URL);}
     my @DARG;
     pushArgPair(@DARG,"-u",$URL);
-    pushArgPair(@DARG,"-s",$workdir . $filename);
+    pushArgPair(@DARG,"-s",$filename);
+    #pushArgPair(@DARG,"-s",$workdir . $filename);
     pushArgPair(@DARG,"-n",$curname);
     pushArgPair(@DARG,"-r",$thisrefer);
     pushArgPair(@DARG,"-b",$cookie);
@@ -190,27 +200,56 @@ sub inqueue {
     return 1;
 }
 
-if($cookie) {
-    system("mkcookie '$cookie' >download.cookie");
-    $cookie="download.cookie";
-}
 
 my $prefix = $taskname ? $taskname . " " : "";
 my @URLS;
 my $index=0;
 my $count=0;
 
-if($urlhist) {
-    load_database();
+
+sub set_workdir {
+    my $w = shift;
+    return undef unless($w);
+    if(! -d $w) {
+        system("mkdir","-p","--",$w) and die("$!\n");
+    }
+    chdir $w or die("$!\n");
+    return $w;
 }
 
+use Cwd;
+my $PWD;
+if($workdir) {
+    set_workdir($workdir);
+}
+$PWD = getcwd;
 
+if($cookie) {
+    system("mkcookie '$cookie' >download.cookie");
+    $cookie="download.cookie";
+}
+
+load_database() if($urlhist);
 para_init $muldown;
+my $no_urls_count=0;
 while(<STDIN>) {
     chomp;
-    if($_ =~ /([^\t]+)\t+([^\t]+)/) {
+    s/^\s+//;
+    s/\s+$//;
+    if(!$_) {
+        next;
+    }
+    elsif($_ =~ m/^#BATCHGET:/) {
+        $no_urls_count++;
+        push @URLS,$_;
+        $count++;
+        next;
+    }
+    elsif($_ =~ /([^\t]+)\t+([^\t]+)/) {
         $Local_Map{$1} = $2;
         $_ = $1;
+        $Local_Map{$_} =~ s/^(http|ftp|https):?\/*//gi;
+        $Local_Map{$_} =~ s/[\/:,\?\*\\]/_/g;
     }
     next if($urlhist and check_database($_));
     push @URLS,$_;
@@ -222,12 +261,26 @@ while(<STDIN>) {
     #}
 #    print STDERR ("\r$count URLS enqueued...                 ");
 }
-foreach my $URL (@URLS) {
-    $index++;
-    if(inqueue($URL,$index,$count,$prefix)) {
-        sleep 1;
+$count = $count - $no_urls_count;
+foreach(@URLS) {
+    if(m/^#BATCHGET:chdir:(.+)$/) {
+        my $w = $1;
+        $w =~ s/[:\?\*]+//g;
+        if($w) {
+            app_message('Change working directory to ' . "$w\n");
+            chdir $PWD or die("$!\n");
+            set_workdir($w);
+        }
+    }
+    else {
+        $index++;
+        if(inqueue($_,$index,$count,$prefix)) {
+            sleep 1;
+        }
     }
 }
+chdir $PWD;
+#or die("$!\n");
 para_cleanup();
 save_database() if($urlhist);
 

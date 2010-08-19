@@ -1,0 +1,144 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
+die("This program doesn't work.\n");
+my $url = shift;
+die("Usage:$0 url\n") unless($url);
+
+use MyPlace::Curl;
+use URI::Escape;
+sub _E {
+    my @o = @_;
+    my @r;
+    foreach (@o) {
+        tr/a-zA-Z#/n-za-mN-ZA-M@/;
+        push @r,$_;
+    }
+    return @r;
+}
+
+my $COOKIE_FILENAME = $ENV{'HOME'} . "/.myplace_curl.cookie";
+my $CURL = MyPlace::Curl->new;
+$CURL->set("cookie",$COOKIE_FILENAME);
+$CURL->set("cookie-jar",$COOKIE_FILENAME);
+$CURL->set("user-agent","Mozilla/5.0");# (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1");
+
+my ($_U,$_P)=_E("keysha#tznvy.pbz","nofserrqbz");
+my %POSTDATA = (
+    service=>"miniblog",
+    client=>"ssologin.js%28v1.3.9%29",
+    entry=>"miniblog",
+    encoding=>"utf-8",
+    gateway=>"1",
+    savestate=>"7",
+    useticket=>"0",
+    from=>'',
+    url=>uri_unescape("http%3A%2F%2Ft.sina.com.cn%2Fajaxlogin.php%3Fframelogin%3D1%26callback%3Dparent.sinaSSOController.feedBackUrlCallBack"),
+    returntype=>"META",
+);
+$POSTDATA{_E("hfreanzr")}=$_U;
+$POSTDATA{_E("cnffjbeq")}=$_P;
+my $LOGINURL='http://login.sina.com.cn/sso/login.php?client=ssologin.js(v1.3.9)';
+
+#die(join(" ",_E("user","name","pass","word")));
+#hfre anzr cnff jbeq
+
+$CURL->set('referer',$url);
+my ($exit_code,$data) = $CURL->get($url);
+if(!$exit_code == 0) {
+    print STDERR "Error when retriving '$url',\n";
+}
+elsif($data =~ /;return false;">登录<\/a>/) {
+    print STDERR "Trying to login first [$LOGINURL]...\n";
+    $CURL->set('location');
+    ($exit_code,$data) = $CURL->post($LOGINURL,$url,%POSTDATA);
+    ($exit_code,$data) = $CURL->get(uri_unescape('http%3A%2F%2Ft.sina.com.cn%2Fajaxlogin.php%3Fframelogin%3D1%26callback%3Dparent.sinaSSOController.feedBackUrlCallBack?retcode=6102'));
+    print STDERR "Reloading [$url]...\n";
+    ($exit_code,$data) = $CURL->get($url);
+    print $data;
+}
+else {
+   # print $data;
+   print 'OK',"\n";
+}
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+t.sina.com.cn - PERL script
+
+=head1  SYNOPSIS
+
+t.sina.com.cn [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-08-14  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+

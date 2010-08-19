@@ -7,6 +7,9 @@ if(@ARGV) {
         exec('urlrule_task',$action,@ARGV);
         exit 0;
     }
+    elsif($action =~ /^(?:ADD)$/) {
+        push @ARGV,'newly',unless ($ARGV[$#ARGV] eq 'newly');
+    }
 }
 
 my $TASK_DATABASE   = "DATABASE.URL";

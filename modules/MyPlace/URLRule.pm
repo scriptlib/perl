@@ -205,6 +205,48 @@ sub urlrule_process_passdown {
     return 1;
 }
 
+use MyPlace::HTTPGet;
+sub urlrule_quick_parse {
+    my $url = shift(@_);
+    my %rule = %{shift(@_)};
+    my ($data_exp,$data_map,$pass_exp,$pass_map,$charset) = @_;
+    my $http = MyPlace::HTTPGet->new();
+    my (undef,$html) = $http->get($url,(defined $charset ? "charset:$charset" : undef));
+    my @data;
+    my @pass_data;
+    $data_map = '$1' unless($data_map);
+    $pass_map = '$1' unless($pass_map);
+    if($data_exp) {
+        while($html =~ m/$data_exp/g) {
+            eval('push @data,' . $data_map);
+        }
+    }
+    if($pass_exp) {
+        while($html =~ m/$pass_exp/g) {
+            eval('push @pass_data,' . $pass_map);
+        }
+    }
+    return (
+        count=>scalar(@data),
+        data=>[@data],
+        pass_count=>scalar(@pass_data),
+        pass_data=>[@pass_data],
+        base=>$url,
+        no_subdir=>1,
+        work_dir=>undef,
+    );
+}
+sub urlrule_parse_pass_data {
+    my ($url,$rule,$pass_exp,$pass_map,$charset) = @_;
+    @_ = ($url,$rule,undef,undef,$pass_exp,$pass_map,$charset);
+    goto &urlrule_quick_parse;
+}
+sub urlrule_parse_data {
+    my ($url,$rule,$data_exp,$data_map,$charset) = @_;
+    @_ = ($url,$rule,$data_exp,$data_map,undef,undef,$charset);
+    goto &urlrule_quick_parse;
+}
+
 sub urlrule_process_args 
 {
     my ($dir,@args) = @_;
@@ -233,8 +275,23 @@ sub urlrule_process_args
         return undef;
     }
     app_message($msghd,"Applying it...\n");
-    do $source; 
+    unless(my $do_exit = do $source) { 
+        die("couldn't parse $source:\n$@") if($@);
+        #die("couldn't do $source:$!") unless defined $do_exit;
+        #die("couldn't run $source") unless $do_exit;
+    }
     my %result = &apply_rule($url,$rule);
+    if($result{"#use quick parse"}) {
+        %result = &urlrule_quick_parse(
+            $url,
+            $rule,
+            $result{data_exp},
+            $result{data_map},
+            $result{pass_exp},
+            $result{pass_map},
+            $result{charset},
+        );
+    }
     if($result{work_dir}) {
         $result{work_dir} = &unescape_text($result{work_dir});
     }
@@ -242,7 +299,7 @@ sub urlrule_process_args
 }
 
 sub execute_rule {
-    my %rule = @_;
+    my %rule = %{$_[0]};
     my $url = $rule{url};
     my $source = $rule{"source"};
     my @args = $rule{"args"} ? @{$rule{"args"}} : ();
@@ -250,11 +307,25 @@ sub execute_rule {
         return undef,"File not found: $source";
     }
 #    $! = undef;
-    do $source; 
-#    print STDERR "\"$source\" : $! \n" if($!);
-#    die("$source,$!\n");
-#    return undef,$! if($!);
+    no warnings 'all';
+    unless(my $do_exit = do $source) { 
+        return undef,"couldn't parse $source:\n$@" if($@);
+        #die("couldn't do $source:$!") unless defined $do_exit;
+        #die("couldn't run $source") unless $do_exit;
+    }
+    use warnings;
     my %result = &apply_rule($url,\%rule);
+    if($result{"#use quick parse"}) {
+        %result = &urlrule_quick_parse(
+            $url,
+            \%rule,
+            $result{data_exp},
+            $result{data_map},
+            $result{pass_exp},
+            $result{pass_map},
+            $result{charset},
+        );
+    }
     if($result{work_dir}) {
         $result{work_dir} = &unescape_text($result{work_dir});
     }
@@ -338,7 +409,7 @@ sub unescape_text {
     }
     $text =~ s/&#(\d+);/chr($1)/eg;
     $text = uri_unescape($text);
-    $text =~ s/[_-]+/ /g;
+#    $text =~ s/[_-]+/ /g;
     $text =~ s/[\:]+/, /g;
     $text =~ s/[\\\<\>"\^\&\*\?]+//g;
     $text =~ s/\s{2,}/ /g;
