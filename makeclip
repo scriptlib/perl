@@ -4,7 +4,7 @@
 ###APPDATE:	2008-04-29 07:56:16
 ###APPVER:	0.1
 ###APPDESC:     makeclip	
-###APPUSAGE:	(file name) (start) (length) [profile]
+###APPUSAGE:	(file name) (start) (length) [clip_name] [profile]
 ###APPEXAMPLE:	makeclip input.avi 00:00 00:20 wmv
 ###APPOPTION:	
 use strict;
@@ -21,36 +21,72 @@ exit 0 if(help_even_empty($0,@ARGV));
 my $input=shift;
 my $start=shift;
 my $length=shift;
+my $clip_name=shift;
 my $profile=shift;
 
 die("File not exists:$input\n") unless(-f $input);
 $profile="avi" unless($profile);
 
+my $ext = $profile;
+$ext = 'mp4' if($profile =~ m/^(?:milestone|ms)$/i);
+
+my $output;
 require MyPlace::Filename;
 my $basename=MyPlace::Filename::get_basename($input);
-my $idx=1;
-while(-f "$basename-clip$idx.$profile") {
-    $idx++;
+unless($clip_name) {
+    my $idx=1;
+    while(-f "$basename-clip$idx.$ext") {
+        $idx++;
+    }
+    $clip_name = "clip$idx";
 }
-my $output="$basename-clip$idx.$profile";
+my $output="$basename-$clip_name.$ext";
 
-my $encoder="mencoder";
-die("\"$encoder\" not installed!\n") unless(`which "$encoder"`);
+my $encoder="ffmpeg";
+unless(`which "$encoder"`) {
+    $encoder = 'mencoder';
+}
+die("Both encoder \"ffmpeg\" and \"mencoder\" not installed!\n") unless(`which "$encoder"`);
 
-my $comment=`date +%x`;
-chomp($comment);
+#my $comment=`date +%x`;
+#chomp($comment);
+
+sub fix_time_arg {
+    my $time = shift;
+    $time = '0:0:0:' . $time;
+    $time =~ s/^.+(\d+:\d+:\d+)$/\1/;
+    return $time;
+}
 
 my @enarg;
-push @enarg,$input,"-o","$output","-profile",$profile,"-info","name=$basename:comment=$comment:artist=$ENV{USER}";
-push @enarg,"-ss",$start if($start);
-push @enarg,"-endpos",$length if($length);
-
+push @enarg,'-ss',fix_time_arg($start) if($start);
+if($encoder eq 'ffmpeg') {
+    push @enarg,'-t',fix_time_arg($length) if($length);
+    push @enarg,'-i',$input;
+    if($profile =~ m/^(?:3gp|mp4)$/i) {
+        push @enarg,'-s','320x240','-vf','scale=-1:-1';
+    }
+    elsif($profile =~ m/^(?:milestone|ms)$/i) {
+        push @enarg,'-s','428x240','-vf','scale=-1:-1';
+    }
+    push @enarg,@ARGV if(@ARGV);
+    push @enarg,$output;
+}
+else {
+    push @enarg,$input;
+    push @enarg,'-endpos',fix_time_arg($length) if($length);
+    push @enarg,'-profile',$profile if($profile);
+    push @enarg,'-o',$output;
+    push @enarg,@ARGV if(@ARGV);
+}
 
 open FO,">>","makeclip.log";
+print FO "makeclip $input $start $length $clip_name $profile", @ARGV ? @ARGV : "","\n";
 print FO $encoder," \"",join("\" \"",@enarg),"\"\n";
 print STDERR $encoder," \"",join("\" \"",@enarg),"\"\n";
 close FO;
 
+print STDERR join(" ",($encoder,@enarg)),"\n";
 exec $encoder,@enarg;
 
 

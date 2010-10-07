@@ -11,7 +11,7 @@ BEGIN {
     our ($VERSION,@ISA,@EXPORT,@EXPORT_OK,%EXPORT_TAGS);
     $VERSION        = 1.00;
     @ISA            = qw(Exporter);
-    @EXPORT         = qw($URLRULE_DIRECTORY &urlrule_process_data &urlrule_process_passdown &urlrule_process_args &urlrule_process_result &get_domain &get_rule_dir &build_url &parse_rule &urlrule_do_action &execute_rule &urlrule_get_passdown);
+    @EXPORT         = qw($URLRULE_DIRECTORY &urlrule_process_data &urlrule_process_passdown &urlrule_process_args &urlrule_process_result &get_domain &get_rule_dir &build_url &parse_rule &urlrule_do_action &execute_rule &urlrule_get_passdown urlrule_parse_pages);
 }
 
 #my $URLRULE_DIRECTORY = "$ENV{XR_PERL_SOURCE_DIR}/urlrule";
@@ -155,7 +155,8 @@ sub urlrule_process_data {
     my @args = $rule{"args"} ? @{$rule{"args"}} : ();
     my $msghd = $result{work_dir} ? "[". $result{work_dir} . "]" : "";
     my $count = @{$result{data}};
-    app_message($msghd , "Level $level>>","Get $count Lines,performing action $action..\n");
+    app_message($msghd , "Level $level>>","Get $count Lines\n");
+    #,performing action $action..\n");
     my ($status,@message) = callback_do_action(undef,$result_ref,$action,@args);
     if($status) {
         app_message($msghd,"Level $level>>",@message,"\n");
@@ -205,17 +206,41 @@ sub urlrule_process_passdown {
     return 1;
 }
 
-use MyPlace::HTTPGet;
+use MyPlace::Curl;
 sub urlrule_quick_parse {
-    my $url = shift(@_);
-    my %rule = %{shift(@_)};
-    my ($data_exp,$data_map,$pass_exp,$pass_map,$charset) = @_;
-    my $http = MyPlace::HTTPGet->new();
+    my %args = @_;
+    my $url = $args{url};
+    die("Error 'url=>undef'\n") unless($url);
+    my $title;
+#    my %rule = %{$args{rule}};
+    my ($title_exp,$title_map,$data_exp,$data_map,$pass_exp,$pass_map,$pass_name_exp,$pages_exp,$pages_map,$pages_pre,$pages_suf,$pages_start,$charset) = @args{qw/
+        title_exp
+        title_map
+        data_exp
+        data_map
+        pass_exp
+        pass_map
+        pass_name_exp
+        pages_exp
+        pages_map
+        pages_pre
+        pages_suf
+        pages_start
+        charset
+    /};
+    my $http = MyPlace::Curl->new();
     my (undef,$html) = $http->get($url,(defined $charset ? "charset:$charset" : undef));
     my @data;
     my @pass_data;
+    my @pass_name;
     $data_map = '$1' unless($data_map);
     $pass_map = '$1' unless($pass_map);
+    if($title_exp) {
+        $title_map = '$1' unless($title_map);
+        if($html =~ m/$title_exp/g) {
+            eval('$title = ' . $title_map);
+        }
+    }
     if($data_exp) {
         while($html =~ m/$data_exp/g) {
             eval('push @data,' . $data_map);
@@ -224,6 +249,28 @@ sub urlrule_quick_parse {
     if($pass_exp) {
         while($html =~ m/$pass_exp/g) {
             eval('push @pass_data,' . $pass_map);
+            if($pass_name_exp) {
+                eval('push @pass_name,' . $pass_name_exp);
+            }
+        }
+    }
+    elsif($pages_exp) {
+        $pages_start = 2 unless(defined $pages_start);
+        my $last = $pages_start - 1; 
+        my $pre = "";
+        my $suf = "";
+        while($html =~ m/$pages_exp/g) {
+            eval("
+                if($pages_map > \$last) {
+                    \$last = $pages_map;
+                    \$pre = $pages_pre if($pages_pre);
+                    \$suf = $pages_suf if($pages_suf);
+                }
+            ");
+            if($last >= $pages_start) {
+                @pass_data = map "$pre$_$suf",($pages_start .. $last);
+            }
+            push @pass_data,$url;
         }
     }
     return (
@@ -231,20 +278,12 @@ sub urlrule_quick_parse {
         data=>[@data],
         pass_count=>scalar(@pass_data),
         pass_data=>[@pass_data],
+        pass_name=>[@pass_name],
         base=>$url,
-        no_subdir=>1,
-        work_dir=>undef,
+        no_subdir=>(@pass_name ? 0 : 1),
+        work_dir=>$title,
+        %args,
     );
-}
-sub urlrule_parse_pass_data {
-    my ($url,$rule,$pass_exp,$pass_map,$charset) = @_;
-    @_ = ($url,$rule,undef,undef,$pass_exp,$pass_map,$charset);
-    goto &urlrule_quick_parse;
-}
-sub urlrule_parse_data {
-    my ($url,$rule,$data_exp,$data_map,$charset) = @_;
-    @_ = ($url,$rule,$data_exp,$data_map,undef,undef,$charset);
-    goto &urlrule_quick_parse;
 }
 
 sub urlrule_process_args 
@@ -282,15 +321,7 @@ sub urlrule_process_args
     }
     my %result = &apply_rule($url,$rule);
     if($result{"#use quick parse"}) {
-        %result = &urlrule_quick_parse(
-            $url,
-            $rule,
-            $result{data_exp},
-            $result{data_map},
-            $result{pass_exp},
-            $result{pass_map},
-            $result{charset},
-        );
+        %result = &urlrule_quick_parse('url'=>$url,%result);
     }
     if($result{work_dir}) {
         $result{work_dir} = &unescape_text($result{work_dir});
@@ -316,15 +347,7 @@ sub execute_rule {
     use warnings;
     my %result = &apply_rule($url,\%rule);
     if($result{"#use quick parse"}) {
-        %result = &urlrule_quick_parse(
-            $url,
-            \%rule,
-            $result{data_exp},
-            $result{data_map},
-            $result{pass_exp},
-            $result{pass_map},
-            $result{charset},
-        );
+        %result = &urlrule_quick_parse('url'=>$url,%result);
     }
     if($result{work_dir}) {
         $result{work_dir} = &unescape_text($result{work_dir});
@@ -347,6 +370,13 @@ sub urlrule_process_result
         app_error("Level $level>>","Invalid Result\n");
         return undef;
     }
+    if($result->{work_dir}) {
+        unless( -d $result->{work_dir}) {
+            app_message "Creating directory : \"$result->{work_dir}\"...\n";
+            mkdir $result->{work_dir};
+        }
+        chdir $result->{work_dir} or return undef,$!;
+    }
     my $action;
     my @args;
     if($p_action) 
@@ -362,7 +392,8 @@ sub urlrule_process_result
     my $count = $result->{data} ? @{$result->{data}} : 0;
 #    if($count > 0)
 #    {
-        app_message("Level $level>>","Get $count Lines,performing action \"$action\" ...\n") if($count > 0);
+        app_message("Level $level>>","Get $count Lines\n");
+        #,performing action \"$action\" ...\n") if($count > 0);
         my($action_status,$action_message) = callback_do_action(undef,$result,$action,@args);
         if($action_status) {
             app_message "Level $level>>$action_message\n";
@@ -434,14 +465,8 @@ sub urlrule_do_action {
     return undef,"No results" unless(%{$result_ref});
     my %result = %{$result_ref};
     my $msg="";
-    if(($action or $result{action} or $result{pipeto} or $result{hook}) and $result{work_dir}) {
-        unless( -d $result{work_dir}) {
-            app_message "Creating directory : \"$result{work_dir}\"...\n";
-            mkdir $result{work_dir};
-        }
-        chdir $result{work_dir} or return undef,$!;
-        $msg = "[" . $result{work_dir} . "]";
-    }
+    $msg = "[" . $result{work_dir} . "]" if($result{work_dir});
+
     return undef,"No results" unless($result{data});
     if(ref $result{data} eq 'SCALAR') {
         $result{data} = [$result{data}];
@@ -456,7 +481,7 @@ sub urlrule_do_action {
             return undef,$msg . "Ingored (File exists)...";
         }
         else {
-            open FO,">",$file or die("$!\n");
+            open FO,">:utf8",$file or die("$!\n");
             print FO @{$result{data}};
             close FO;
             return 1,$msg . "Action File ($file) OK.";

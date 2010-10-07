@@ -43,22 +43,24 @@ print VIMED <<'FUNC';
 
 =method1
 sub apply_rule {
-# return urlrule_quick_parse($_[0],$_[1],$data_exp,$data_map,$pass_exp,$pass_map,$charset);
-# return urlrule_parse_data($_[0],$_[1],$data_exp,$data_map,$charset);
-# return urlrule_parse_pass_data($_[0],$_[1],$pass_exp,$pass_map,$charset);
  return (
        '#use quick parse'=>1,
        'data_exp'=>undef,
        'data_map'=>undef,
        'pass_exp'=>undef,
        'pass_map'=>undef,
+       'pages_exp'=>undef,
+       'pages_map'=>undef,
+       'pages_pre'=>undef,
+       'pages_suf'=>undef,
+       'pages_start'=>undef,
        'charset'=>undef
  );
 }
 =cut
 
 =method2
-use MyPlace::HTTPGet;
+use MyPlace::Curl;
 #use MyPlace::HTML;
 
 sub _process {
@@ -81,7 +83,7 @@ sub _process {
 sub apply_rule {
     my $url = shift(@_);
     my $rule = shift(@_);
-    my $http = MyPlace::HTTPGet->new();
+    my $http = MyPlace::Curl->new();
     my (undef,$html) = $http->get($url);
     return &_process($url,$rule,$html,@_);
 }

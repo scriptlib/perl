@@ -12,8 +12,16 @@ use lib $ENV{XR_PERL_MODULE_DIR};
 use MyPlace::Script::ENV qw/$SRC_DIR/;
 use MyPlace::Script::Usage qw/help_even_empty/;
 exit 0 if help_even_empty($0,@ARGV);
-my $srcFile="$SRC_DIR/$ARGV[0].pl";
-my $dstFile="$SRC_DIR/$ARGV[1].pl";
+my $srcFile="$SRC_DIR/$ARGV[0]";
+my $dstFile;
+
+if(-f $srcFile) {
+    $dstFile = "$SRC_DIR/$ARGV[1]";
+}
+else {
+    $srcFile = "$SRC_DIR/$ARGV[0].pl";
+}
+$dstFile = "$SRC_DIR/$ARGV[1]";
 system("cp","-vi",$srcFile,$dstFile);
 system("sed","-i", "-e", "s/$ARGV[0]/$ARGV[1]/g","$dstFile");
 

@@ -25,6 +25,9 @@ my @CURL = qw{
             --create-dirs
             --connect-timeout 15
 };
+my $PROXY = '127.0.0.1:9050';
+my $BLOCKED_HOST = 'wretch\.cc|facebook\.com|fbcdn\.net';
+my $BLOCKED_EXP = qr/^[^\/]+:\/\/[^\/]*(?:$BLOCKED_HOST)(?:\/?|\/.*)$/;
 
 my %CURL_EXIT = (
     1=>'Unsupported protocol',
@@ -183,11 +186,24 @@ sub _build_cmd
 sub _run_curl 
 {
     my $self = shift;
-    my @cmds = (@CURL,$self->_build_cmd);
-    push @cmds,@_ if(@_);
-    open FI,"-|",@cmds;
+    my $decoder;
+    my @args;
+    foreach($self->_build_cmd,@_) {
+        next unless($_);
+        if(m/^charset:([^\s]+)/) {
+            use Encode;
+            $decoder = find_encoding($1);
+        }
+        else {
+            push @args,$_;
+        }
+    }
+    open FI,"-|",@CURL,@args;
     my $data = join("",<FI>);
     close FI;
+    if($decoder) {
+        $data = $decoder->decode($data);
+    }
     my $exit_code = $?;
     if($exit_code == 0) 
     {
@@ -206,7 +222,10 @@ sub _run_curl
 sub get {
     my $self = shift;
     my $url = shift;
-    return $self->_run_curl(@_,"--url",$url);
+    $url =~ s/&amp;/&/g;
+    my @args = (@_,"--url",$url);
+    push @args,'--socks5-hostname',$PROXY    if($url =~ $BLOCKED_EXP);
+    return $self->_run_curl(@args);
 }
 sub post {
     my $self = shift;
@@ -217,6 +236,7 @@ sub post {
 
 
     my @args = ("--url",$url);
+    push @args,'--socks5-hostname',$PROXY    if($url =~ $BLOCKED_EXP);
     push @args,"--referer",$referer if($referer);
     if(%posts) 
     {

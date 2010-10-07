@@ -78,7 +78,6 @@ sub load_database {
 sub check_database {
     my $url = shift;
     if($URL_DATABASE{$url}) {
-        app_warning("URL IN DATABASE,ignored.[$url]\n");
         return 1;
     }
     else {
@@ -180,7 +179,7 @@ sub inqueue {
 
     if($OPTS{"no-clobber"}) {
         if(-f $workdir . $filename) {
-            app_warning($curname . "Target exist, $URL\t[Ignored]\n");
+            app_warning($curname . "$URL\t[Ignored, TARGET EXISTS]\n");
             return undef;
         }
     }
@@ -229,7 +228,8 @@ if($cookie) {
     $cookie="download.cookie";
 }
 
-load_database() if($urlhist);
+load_database();
+#if($urlhist);
 para_init $muldown;
 my $no_urls_count=0;
 while(<STDIN>) {
@@ -251,7 +251,12 @@ while(<STDIN>) {
         $Local_Map{$_} =~ s/^(http|ftp|https):?\/*//gi;
         $Local_Map{$_} =~ s/[\/:,\?\*\\]/_/g;
     }
-    next if($urlhist and check_database($_));
+    my $is_old = check_database($_);
+    if($urlhist and $is_old) {
+        app_warning("$_\t[Ingored, IN DATABASE]\n");
+        next;
+    }
+    #check_database($_));
     push @URLS,$_;
     $count++;
     #if(0 and &para_isfree()) { # disable pre processing! (08/03/2010 xiaoranzzz@gmail.com)
@@ -282,7 +287,8 @@ foreach(@URLS) {
 chdir $PWD;
 #or die("$!\n");
 para_cleanup();
-save_database() if($urlhist);
+save_database();
+#if($urlhist);
 
 #print STDERR ("\n");
 #exit 0 unless($count);

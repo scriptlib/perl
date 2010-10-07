@@ -19,6 +19,9 @@ BEGIN {
 use LWP::UserAgent;
 use HTTP::Cookies;
 
+my $PROXY = '127.0.0.1:9050';
+my $BLOCKED_HOST = 'wretch\.cc|facebook\.com|fbcdn\.net';
+my $BLOCKED_EXP = qr/^[^\/]+:\/\/[^\/]*(?:$BLOCKED_HOST)(?:\/?|\/.*)$/;
 sub new {
     my $class=shift;
     my  $ua = LWP::UserAgent->new;

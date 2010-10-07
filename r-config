@@ -131,7 +131,7 @@ else {
         print_status($CONFIG->write($userdata,@target));
     }
     elsif($action eq 'delete') {
-        print_target("delete \"",($userdata ? "->$userdata\n" : "\"\n"),$CONFIG,@target);
+        print_target("delete \"",($userdata ? "->$userdata\"\n" : "\"\n"),$CONFIG,@target);
         print_status($CONFIG->delete($userdata,@target));
     }
     if($!) {

@@ -19,8 +19,8 @@ use constant {
 my $TASK_LOGGING    = 1;
 my $TASK_DATABASE   = "DATABASE.URL";
 my $HOST_DATABASE = get_rule_dir() . "/database/HOSTS.URL";
-my $U_DOWNLOADER = 'batchget -U -c -m 3 -f';
-my $S_DOWNLOADER = 'batchget -m 3 -f';
+my $U_DOWNLOADER = 'batchget --maxtime 600 -U -c -m 3 -f';
+my $S_DOWNLOADER = 'batchget --maxtime 600 -c -m 3 -f';
 my $TASK_WORKDIR = getcwd();;
 my $TASK_FILEHANDLE_LOG;
 use MyPlace::Config;
@@ -138,11 +138,11 @@ sub action_DOWNLOAD {
     $Names->write_plainfile($TASK_DATABASE);
     app_message("Processing $name/$host\n");
     &log("DOWNLOAD - $name/$host $url\[$level\]");
-    if($host =~ /sina\.com/) {
-        load_rule("$name/$hostname",$url,$level,$S_DOWNLOADER);
+    if($host =~ /google|baidu|yahoo|sogua/) {
+        load_rule("$name/$hostname",$url,$level,$U_DOWNLOADER);
     }
     else {
-        load_rule("$name/$hostname",$url,$level,$U_DOWNLOADER);
+        load_rule("$name/$hostname",$url,$level,$S_DOWNLOADER);
     }
     return 1;
 }

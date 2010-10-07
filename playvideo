@@ -1,0 +1,98 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+use List::Util qw(shuffle);
+
+my $dir = shift(@ARGV);
+$dir =  '.' unless($dir);
+my @videos;
+open FI,'-|','find','-L',$dir,'-type','f';
+while(<FI>) {
+    chomp;
+    push @videos,$_ if(/\.(?:rmvb|rm|avi|mkv|asf|3gp|flv|wmv|mp4)$/);
+}
+close FI;
+my $index = 0;
+my $count = @videos;
+foreach(shuffle @videos) {
+    $index++;
+    print STDERR ":[$index|$count] playing $_\n";
+    my $r = system("mplayer",'-really-quiet',$_);
+    if($r and ($r == 256 or $? == 256)) {
+        die ":Mplayer killed, Aborting\n";
+    }
+}
+
+__END__
+
+=pod
+
+=head1  NAME
+
+playvideo - PERL script
+
+=head1  SYNOPSIS
+
+playvideo [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-09-08  duel  <duel@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+duel <duel@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl

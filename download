@@ -17,7 +17,15 @@ use MyPlace::Script::Message;
 
 exit 0 if(help_even_empty($0,@ARGV));
 
-
+my $proxy = '127.0.0.1:9050';
+my $blocked_host = 'wretch\.cc|facebook\.com|fbcdn\.net';
+my $BLOCKED_EXP = qr/^[^\/]+:\/\/[^\/]*(?:$blocked_host)(?:\/?|\/.*)$/;
+my @WGET = qw{
+    wget --user-agent Mozilla/5.0 --connect-timeout 15 -q --progress bar
+};
+my @CURL = qw{
+        curl --fail --globoff --location --user-agent Mozilla/5.0 --progress-bar --create-dirs
+};
 sub log($$) {
     my $text=shift;
     my $fn=shift;
@@ -31,29 +39,26 @@ sub build_cmdline {
     return undef unless($url);
     my @result;
     if($name =~ /^wget$/i) {
-        push @result,"wget";
-        push @result,qw(--user-agent Mozilla/5.0);
-        push @result,"--connect-timeout",15;
+        push @result,@WGET;
         push @result,"--referer",$refer ? $refer : $url;
         push @result,"--output-document",$saveas if($saveas);
         push @result,"--load-cookie",$cookie if(-f $cookie);
         push @result,"--save-cookie",$cookie if($cookie);
         push @result,'--read-timeout',$maxtime if($maxtime);
-        #$verbose ? push @result,"--verbose" : push @result,"--no-verbose";
-        push @result,"-q";
-        push @result,"--progress","bar";
         push @result,$url;
     }
     else {
-        push @result,"curl";
-        push @result,qw(--fail --globoff --location --user-agent Mozilla/5.0 --progress-bar --create-dirs);
-        push @result,"--connect-timeout",15;
+        push @result,@CURL;
         push @result,"--url",$url;
         push @result,"--referer",$refer ? $refer : $url;
         push @result,"--output",$saveas if($saveas);
         push @result,"--cookie",$cookie if(-f $cookie);
         push @result,"--cookie-jar",$cookie if($cookie);
         push @result,"--max-time",$maxtime if($maxtime);
+        if($url =~ $BLOCKED_EXP) {
+            app_message "USE PROXY $proxy\n";
+            push @result,"--socks5-hostname",$proxy;
+        }
     }
     return @result;
 }
@@ -69,8 +74,10 @@ sub process {
         return 0 if($r==0);
         return 2 if($r==2); #/KILL,TERM,USERINT;
         $r = $r>>8;
-        return 2 if($r==2);
-        return $r if($r==22 || $r==52);
+        #2 =>
+        #22 => Request Error 404,403
+        #56 => Recv failure: Connection reset by peer
+        return $r if($r == 2 or $r == 22 or $r == 56 or $r == 28 or $r == 6);
         app_warning "\rdownload:error($r), wait 1 second,retry $taskname\n";
         sleep 1;
     }
