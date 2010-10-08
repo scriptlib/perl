@@ -28,21 +28,39 @@ use List::Util qw(shuffle);
 my $dir = shift(@ARGV);
 $dir =  '.' unless($dir);
 my @videos;
-open FI,'-|','find','-L',$dir,'-type','f';
+open FI,'-|','find','-L',$dir,'-type','f';#,'-printf','%P\n';
 while(<FI>) {
     chomp;
     push @videos,$_ if(/\.(?:rmvb|rm|avi|mkv|asf|3gp|flv|wmv|mp4)$/);
 }
 close FI;
 my $index = 0;
+@videos = shuffle(@videos);
 my $count = @videos;
-foreach(shuffle @videos) {
+
+my $player = `which smplayer`;
+if($player) {
+   chomp($player); 
+   require File::Temp;
+   my $fh = File::Temp->new(DIR=>'.',UNLINK=>1,SUFFIX=>'.m3u');
+   my $filename=$fh->filename();
+   print $fh join("\n",@videos),"\n";
+   close $fh;
+#   print STDERR "$filename\n";
+#   system('cat',$filename);
+   system("smplayer $filename&");
+   sleep 10;
+#   print STDERR "hello,\n";
+}
+else {
+foreach(@videos) {
     $index++;
     print STDERR ":[$index|$count] playing $_\n";
     my $r = system("mplayer",'-really-quiet',$_);
     if($r and ($r == 256 or $? == 256)) {
         die ":Mplayer killed, Aborting\n";
     }
+}
 }
 
 __END__

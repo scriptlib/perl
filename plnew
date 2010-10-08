@@ -1,5 +1,5 @@
 #!/usr/bin/perl -w
-# $Id: plnew 74 2010-06-06 17:32:58Z xiaoranzzz $
+# $Id$
 use strict;
 require v5.10.0;
 our $VERSION = 'v1.1';
