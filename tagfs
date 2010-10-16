@@ -57,13 +57,20 @@ if(! -d $saved_in) {
 @tags = split(/\s*,\s*/,$tags);
 die("Empty tag list!\n") unless(@tags);
 
-my $log_files=$root . "logs";
+my $log_files=$root . "tagfs.logs";
 open FO,">>$log_files";
-print FO scalar(localtime),":\n\ttagfs ",join(" ",@SAVE_ARGV),"\n";
-print STDERR scalar(localtime),":\n\ttagfs ",join(" ",@SAVE_ARGV),"\n";
+
+sub log_text {
+    print FO @_;
+    print STDERR @_;
+    1;
+}
+
+&log_text('[' . scalar(localtime) . "] tagfs " . join(" ",@SAVE_ARGV) . "\n");
 
 sub system_execute {
-    print STDERR "\t\t\t",join(" ",@_),"\n";
+    print STDERR "-- ",join(" ",@_),"\n";
+    return (system(@_) == 0);
     open FI,"-|",@_ or return undef;
     while(<FI>) 
     {
@@ -76,10 +83,9 @@ sub system_execute {
 }
 sub tag_files {
     foreach my $file (@_) {
-       print STDERR "\t\t",$file,"...\n";
-       print FO "\t\t",$file,"\n";
        my $basename = get_basename($file);
        next if($basename eq '.' or $basename eq '..');
+       &log_text("\t[" . join(',',@tags) . '] ' . $file . "\n");
        if(! -e "$saved_in/$basename") {
             system_execute("mv","-v",$file,$saved_in);
        }

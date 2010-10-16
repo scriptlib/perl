@@ -31,7 +31,7 @@ my @videos;
 open FI,'-|','find','-L',$dir,'-type','f';#,'-printf','%P\n';
 while(<FI>) {
     chomp;
-    push @videos,$_ if(/\.(?:rmvb|rm|avi|mkv|asf|3gp|flv|wmv|mp4)$/);
+    push @videos,$_ if(/\.(?:rmvb|rm|avi|mkv|asf|3gp|flv|wmv|mp4)$/i);
 }
 close FI;
 my $index = 0;

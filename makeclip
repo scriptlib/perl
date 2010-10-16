@@ -60,6 +60,7 @@ sub fix_time_arg {
 
 my @enarg;
 push @enarg,'-ss',fix_time_arg($start) if($start);
+$encoder = 'mencoder' if($profile =~ m/^avi$/i);
 if($encoder eq 'ffmpeg') {
     push @enarg,'-t',fix_time_arg($length) if($length);
     push @enarg,'-i',$input;

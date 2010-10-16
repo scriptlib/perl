@@ -206,6 +206,15 @@ sub urlrule_process_passdown {
     return 1;
 }
 
+sub delete_dup {
+    my %holder;
+    foreach(@_) {
+        $holder{$_} = 1;
+    }
+    return keys %holder;
+}
+
+
 use MyPlace::Curl;
 sub urlrule_quick_parse {
     my %args = @_;
@@ -273,6 +282,8 @@ sub urlrule_quick_parse {
             push @pass_data,$url;
         }
     }
+    @data = delete_dup(@data) if(@data);
+    @pass_data = delete_dup(@pass_data) if(@pass_data and (!@pass_name));
     return (
         count=>scalar(@data),
         data=>[@data],

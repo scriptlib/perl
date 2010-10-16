@@ -18,12 +18,17 @@ use MyPlace::Script::Usage qw/help_required help_even_empty/;
 exit 0 if(help_required($0,@ARGV));
 #exit 0 if(help_even_empty($0,@ARGV));
 
-my $action=shift;
-my $file=shift;
-my $income="$ENV{HOME}/public/videos/income";
-die("No action specified.\n") unless($action);
+my ($action,$name,$torrent,$file) = @ARGV;
+#=shift;
+#my $file=shift;
 
-my @msger = ("zenity","--title","RTorrent-action($action)");
+my $BT_DIR = "$ENV{HOME}/bittorrent";
+my $INCOME_DIR = "$BT_DIR/completed";
+my $TOR_DIR = "$BT_DIR/torrents";
+my $TOR_DELETED = "$TOR_DIR/deleted";
+my $TOR_COMPLETED = "$TOR_DIR/completed";
+
+my @msger = ("zenity","--title", $action ? "rTorrent-action($action)" : "rTorrent-action");
 sub message {
     return not system(@msger,"--info","--text",join(" ",@_));
 }
@@ -47,21 +52,46 @@ my %SELECT = (
     move=>"1.Move to income",
     delete=>"2.Delete!"
 );
+
+abort("No action specified.\n") unless($action);
+foreach($BT_DIR,$INCOME_DIR,$TOR_DIR,$TOR_DELETED,$TOR_COMPLETED) {
+    next if(-d $_);
+    system("mkdir","-vp",'--',$_) and abort("mkdir -vp $_ :\n$!");
+}
+
+my $date_prefix=`date "+%y%m%d%H%M%S"`;
+chop($date_prefix);
+
+my $name_suffix="";
+if($torrent and $torrent =~ m/\/([^\/]+)\.[^\.]+$/) {
+    $name_suffix = "_$1";
+}
+#message("action=$action\nname=$name\ntorrent=$torrent\nfile=$file\n");
+
+my $text_head = "";
+$text_head .= "$name\n" if($name);
+$text_head .= "$torrent\n" if($torrent);
+$text_head .= "$file\n" if($file);
+$text_head .= '=' x 20 . "\n";
+
+
 if($action eq "erase") {
-    &abort("No file specified!") unless($file); 
 AskErase:
-    my $answer = &select("--text","\n$file\n\nSelect action:",values %SELECT);
+    my $answer = &select("--text","$text_head" . "Select action:",values %SELECT);
     $answer = "" unless($answer);
     if($answer eq $SELECT{move}) {
-        if(&ask("Move file\n'$file'\n=>\n'$income'\n?")) {
-            system("mv","-fv","--",$file,$income);
+        if(&ask("$text_head" . "Move file to :\n$INCOME_DIR'\n?")) {
+            system("cp","-fv","--",$torrent,"$TOR_COMPLETED/${date_prefix}_${name}.torrent") if($torrent);
+            &abort("$text_head" . "No file specified!") unless($file); 
+            system("mv","-fv","--",$file,$INCOME_DIR);
         }
         else {
             goto AskErase;
         }
     }
     elsif($answer eq $SELECT{delete}) { 
-        if(&ask("Delete $file?\n")) {
+        if(&ask("${text_head}Delete file?\n")) {
+            system("cp","-fv","--",$torrent,"$TOR_DELETED/${date_prefix}_${name}.torrent" )if($torrent);
             &abort("file $file not exists!\n") unless(-e $file); 
             system("rm","-fdr","--",$file);
         }
