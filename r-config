@@ -17,7 +17,7 @@ use lib $ENV{XR_PERL_MODULE_DIR};
 use MyPlace::Script::Usage qw/help_required help_even_empty/;
 exit 0 if(help_required($0,@ARGV));
 #exit 0 if(help_even_empty($0,@ARGV));
-use MyPlace::Config;
+use MyPlace::XConfig;
 use Term::ANSIColor;
 
 sub print1 {
@@ -87,12 +87,18 @@ if($action eq 'add' and !$query) {
     print2 "Usage:\n\tr-config add keys...|values...\n";
     exit 1;
 }
-$CONFIG = MyPlace::Config->new();
+$CONFIG = MyPlace::XConfig->new();
 $CONFIG->read_plainfile($database);
 
 
 if($action eq 'list') {
     $query = '/.+/' unless($query);
+}
+elsif($action eq 'plain') {
+    $query = '-' unless($query);
+#    print STDERR "Write plain data to $query \n";
+    $CONFIG->write_plainfile($query,1);
+    exit 0;
 }
 
 if($action eq 'add') {
