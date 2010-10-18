@@ -25,10 +25,25 @@ if(@ARGV)
 }
 use List::Util qw(shuffle);
 
-my $dir = shift(@ARGV);
-$dir =  '.' unless($dir);
+my @dirs;
+my @options;
+while(@ARGV) {
+    $_ = shift @ARGV;
+    if(-d $_) {
+        push @dirs,$_;
+    }
+    else {
+        push @options,$_;
+        last;
+    }
+}
+push @options,@ARGV if(@ARGV);
+my $option = "";
+$option = join(" ",@options) if(@options);
+
+push @dirs,'.' unless(@dirs);
 my @videos;
-open FI,'-|','find','-L',$dir,'-type','f';#,'-printf','%P\n';
+open FI,'-|','find','-L',@dirs,'-type','f';#,'-printf','%P\n';
 while(<FI>) {
     chomp;
     push @videos,$_ if(/\.(?:rmvb|rm|avi|mkv|asf|3gp|flv|wmv|mp4)$/i);
@@ -48,7 +63,7 @@ if($player) {
    close $fh;
 #   print STDERR "$filename\n";
 #   system('cat',$filename);
-   system("smplayer $filename&");
+   system("smplayer $option $filename&");
    sleep 10;
 #   print STDERR "hello,\n";
 }
@@ -56,7 +71,7 @@ else {
 foreach(@videos) {
     $index++;
     print STDERR ":[$index|$count] playing $_\n";
-    my $r = system("mplayer",'-really-quiet',$_);
+    my $r = system("mplayer",'-really-quiet',@options,$_);
     if($r and ($r == 256 or $? == 256)) {
         die ":Mplayer killed, Aborting\n";
     }
