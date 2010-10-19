@@ -65,7 +65,6 @@ sub get {
     my $self = shift;
     my @args;
     my $charset;
-    my $decoder;
     foreach(@_) {
         next unless($_);
         if(m/^charset:([^\s]+)/) {
@@ -75,14 +74,15 @@ sub get {
             push @args,$_;
         }
     }
-    if($charset) {
-        use Encode;
-        $decoder = find_encoding($charset);
-    }
     my $req = HTTP::Request->new(GET => @args);
     my $res = $self->{ua}->request($req);
+    my $data = $res->content;
     if ($res->is_success) {
-        return $res->code,$decoder ? $decoder->decode($res->content) : $res->content;
+        if($charset) {
+            require Encode;
+            Encode::from_to($data,$charset,'utf8');
+        }
+        return $res->code,$data;
     }
     else {
         return $res->code,$res->status_line;

@@ -101,48 +101,48 @@ my %CURL_EXIT = (
     82=>'Could not load CRL file, missing or wrong format',
     83=>'Issuer check failed',
 );
-my %HTTP_STATUS = (
-    100=>'Continue',
-    101=>'Switching Protocols',
-    102=>'Processing (WebDAV) (RFC 2518)',
-    200=>'Successful',
-    201=>'Created',
-    202=>'Accepted',
-    203=>'Non-authoritative information',
-    204=>'No content',
-    205=>'Reset content',
-    206=>'Partial content',
-    300=>'Multiple choices',
-    301=>'Moved permanently',
-    302=>'Moved temporarily',
-    303=>'See other location',
-    304=>'Not modified',
-    305=>'Use proxy',
-    307=>'Temporary redirect',
-    400=>'Bad request',
-    401=>'Not authorized',
-    403=>'Forbidden',
-    404=>'Not found',
-    405=>'Method not allowed',
-    406=>'Not acceptable',
-    407=>'Proxy authentication required',
-    408=>'Request timeout',
-    409=>'Conflict',
-    410=>'Gone',
-    411=>'Length required',
-    412=>'Precondition failed',
-    413=>'Request entity too large',
-    414=>'Requested URI is too long',
-    415=>'Unsupported media type',
-    416=>'Requested range not satisfiable',
-    417=>'Expectation failed',
-    500=>'Internal server error',
-    501=>'Not implemented',
-    502=>'Bad gateway',
-    503=>'Service unavailable',
-    504=>'Gateway timeout',
-    505=>'HTTP version not supported',
-);
+#my %HTTP_STATUS = (
+#    100=>'Continue',
+#    101=>'Switching Protocols',
+#    102=>'Processing (WebDAV) (RFC 2518)',
+#    200=>'Successful',
+#    201=>'Created',
+#    202=>'Accepted',
+#    203=>'Non-authoritative information',
+#    204=>'No content',
+#    205=>'Reset content',
+#    206=>'Partial content',
+#    300=>'Multiple choices',
+#    301=>'Moved permanently',
+#    302=>'Moved temporarily',
+#    303=>'See other location',
+#    304=>'Not modified',
+#    305=>'Use proxy',
+#    307=>'Temporary redirect',
+#    400=>'Bad request',
+#    401=>'Not authorized',
+#    403=>'Forbidden',
+#    404=>'Not found',
+#    405=>'Method not allowed',
+#    406=>'Not acceptable',
+#    407=>'Proxy authentication required',
+#    408=>'Request timeout',
+#    409=>'Conflict',
+#    410=>'Gone',
+#    411=>'Length required',
+#    412=>'Precondition failed',
+#    413=>'Request entity too large',
+#    414=>'Requested URI is too long',
+#    415=>'Unsupported media type',
+#    416=>'Requested range not satisfiable',
+#    417=>'Expectation failed',
+#    500=>'Internal server error',
+#    501=>'Not implemented',
+#    502=>'Bad gateway',
+#    503=>'Service unavailable',
+#    504=>'Gateway timeout',
+#    505=>'HTTP version not supported',
+#);
 
 sub error_message
 {
@@ -191,8 +191,8 @@ sub _run_curl
     foreach($self->_build_cmd,@_) {
         next unless($_);
         if(m/^charset:([^\s]+)/) {
-            use Encode;
-            $decoder = find_encoding($1);
+            require Encode;
+            $decoder = $1;
         }
         else {
             push @args,$_;
@@ -202,7 +202,7 @@ sub _run_curl
     my $data = join("",<FI>);
     close FI;
     if($decoder) {
-        $data = $decoder->decode($data);
+        Encode::from_to($data,$decoder,'utf8');
     }
     my $exit_code = $?;
     if($exit_code == 0) 

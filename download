@@ -78,7 +78,7 @@ sub process {
         #2 =>
         #22 => Request Error 404,403
         #56 => Recv failure: Connection reset by peer
-        return $r if($r == 2 or $r == 22 or $r == 56 or $r == 28 or $r == 6);
+        return $r if($r == 2 or $r == 22 or $r == 56 or $r == 6);
         app_warning "\rdownload:error($r), wait 1 second,retry $taskname\n";
         sleep 1;
     }

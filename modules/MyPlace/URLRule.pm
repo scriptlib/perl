@@ -247,19 +247,19 @@ sub urlrule_quick_parse {
     if($title_exp) {
         $title_map = '$1' unless($title_map);
         if($html =~ m/$title_exp/g) {
-            eval('$title = ' . $title_map);
+            $title = eval($title_map);
         }
     }
     if($data_exp) {
         while($html =~ m/$data_exp/g) {
-            eval('push @data,' . $data_map);
+            push @data,eval($data_map);
         }
     }
     if($pass_exp) {
         while($html =~ m/$pass_exp/g) {
-            eval('push @pass_data,' . $pass_map);
+            push @pass_data,eval($pass_map);
             if($pass_name_exp) {
-                eval('push @pass_name,' . $pass_name_exp);
+                push @pass_name,eval($pass_name_exp);
             }
         }
     }
@@ -269,18 +269,16 @@ sub urlrule_quick_parse {
         my $pre = "";
         my $suf = "";
         while($html =~ m/$pages_exp/g) {
-            eval("
-                if($pages_map > \$last) {
-                    \$last = $pages_map;
-                    \$pre = $pages_pre if($pages_pre);
-                    \$suf = $pages_suf if($pages_suf);
-                }
-            ");
-            if($last >= $pages_start) {
-                @pass_data = map "$pre$_$suf",($pages_start .. $last);
+            if(eval($pages_map) > $last) {
+                    $last = eval($pages_map);
+                    $pre = eval($pages_pre) if($pages_pre);
+                    $suf = eval($pages_suf) if($pages_suf);
             }
-            push @pass_data,$url;
         }
+        if($last >= $pages_start) {
+            @pass_data = map "$pre$_$suf",($pages_start .. $last);
+        }
+        push @pass_data,$url;
     }
     @data = delete_dup(@data) if(@data);
     @pass_data = delete_dup(@pass_data) if(@pass_data and (!@pass_name));

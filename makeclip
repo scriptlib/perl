@@ -30,7 +30,6 @@ $profile="avi" unless($profile);
 my $ext = $profile;
 $ext = 'mp4' if($profile =~ m/^(?:milestone|ms)$/i);
 
-my $output;
 require MyPlace::Filename;
 my $basename=MyPlace::Filename::get_basename($input);
 unless($clip_name) {
@@ -54,7 +53,7 @@ die("Both encoder \"ffmpeg\" and \"mencoder\" not installed!\n") unless(`which "
 sub fix_time_arg {
     my $time = shift;
     $time = '0:0:0:' . $time;
-    $time =~ s/^.+(\d+:\d+:\d+)$/\1/;
+    $time =~ s/^.+(\d+:\d+:\d+)$/$1/;
     return $time;
 }
 
