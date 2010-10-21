@@ -496,6 +496,12 @@ sub urlrule_do_action {
             return 1,$msg . "Action File ($file) OK.";
         }
     }
+    elsif($action and $action eq 'dump') {
+        use Data::Dumper;
+        local $Data::Dumper::Purity = 1; 
+        print Data::Dumper->Dump([$result_ref],qw/*result_ref/);
+        return 1, $msg . "Action DUMP OK.";
+    }
     elsif($pipeto) {
         $pipeto .= ' "' . join('" "',@args) . '"' if(@args);
         open FO,"|-",$pipeto;
@@ -512,7 +518,7 @@ sub urlrule_do_action {
             $index ++;
             my @msg = ref $line ? @{$line} : ($line);
             $line = &make_url($line,$result{base}) if($result{base});
-            process_data($line,\%result);
+            &process_data($line,\%result);
         }
         return 1,$msg . "Action Hook OK.";
     }

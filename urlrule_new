@@ -24,7 +24,7 @@ my $source=$rule{source};
 
 if(-f $source) {
     app_message("Rule for $url exists,opened for editing instead\n");
-    system("r-vim",$source);
+    system("r-vim \"$source\"&");
     exit 0;
 }
 

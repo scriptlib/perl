@@ -1,14 +1,13 @@
 #!/usr/bin/perl -w
 package MyPlace::HTML;
 use strict;
-use Encode qw/decode/;
 
 BEGIN {
     use Exporter;
     our @ISA=qw(Exporter);
     our @EXPORT=qw(&get_title &get_prop &get_props &get_href &get_hrefs &read_html &get_text);
 }
-binmode STDOUT,'utf8';
+#binmode STDOUT,'utf8';
 sub read_html {
     my $fh = shift;
     my @data;my $charset;
@@ -18,12 +17,14 @@ sub read_html {
         push @data,$_;
         if(!$charset && /charset\s*=[\s'"]*([^\/\\\s<>"']+)/) {
             $charset=$1;
-            $charset="utf8" if($charset =~ /utf/);
             $charset="gbk" if($charset =~ /^\s*gb/);
+            #$charset=undef if($charset =~ /utf/i);
         }
     }
-#    print STDERR "HTML Charset = $charset\n" if($charset);
-    @data = map {$_=decode($charset,$_);} @data if($charset);
+    if($charset and $charset !~ /[Uu][Tt][Ff]/) {
+        require Encode;
+        @data = map {Encode::from_decode($_,$charset,'utf8');$_} @data;
+    }
     return @data;
 }
 
@@ -59,7 +60,7 @@ sub get_text {
 		my $text = $1;
 		print STDERR "\ntext:$text\n";
 		$text =~ s/\<[^\<\>]+\>//g;
-		$text =~ s/&[^;]+;//g;
+		$text =~ s/&[^&#!;]+;//g;
 		push @result,$text if($text);
 	}
 	return join("",@result);

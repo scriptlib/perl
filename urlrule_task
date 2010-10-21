@@ -95,7 +95,7 @@ sub action_DUMP {
     my($status,$rule,$result,@msg) = urlrule_process_args(undef,$url,$level);
     if($status) {
         use Data::Dumper;
-        print STDERR Data::Dumper->Dump([$result],['*result']);
+        print Data::Dumper->Dump([$result],['*result']);
         return 1;
     }
     else {

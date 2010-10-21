@@ -1,16 +1,18 @@
 #!/usr/bin/perl -w
 use strict;
-if(@ARGV) {
-    my $action = uc($ARGV[0]);
-    if($action =~ /^(?:DOWNLOAD|DUMP|ECHO)$/) {
+my $action = uc($ARGV[0]) if(@ARGV);
+if($action and $action =~ /^(?:DOWNLOAD|DUMP|ECHO)$/) {
         shift @ARGV;
         exec('urlrule_task',$action,@ARGV);
         exit 0;
-    }
-    elsif($action =~ /^(?:ADD)$/) {
-        push @ARGV,'newly',unless ($ARGV[$#ARGV] eq 'newly');
-    }
 }
 
 my $TASK_DATABASE   = "DATABASE.URL";
+open FO,">>","urlrule_database.log";
+print FO scalar(localtime),": urlrule_database ",(map "\"$_\" ",@ARGV),"\n";
+close FO;
+
+if($action and $action =~ /^(?:ADD)$/) {
+        push @ARGV,'newly',unless ($ARGV[$#ARGV] eq 'newly');
+}
 exec 'r-config','-f',$TASK_DATABASE,@ARGV;

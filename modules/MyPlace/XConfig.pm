@@ -74,9 +74,9 @@ sub _deep_search {
             }
         }
     }
-    else {
-        push @r,[$root];
-    }
+#    elsif($root) {
+#        push @r,[$root];
+#    }
     return @r;
 }
 
@@ -173,11 +173,11 @@ sub _get_query {
                 $text= $text . ',' . $1;
             }
             else {
-                $text = $text . ',' . '/.+/';
+                $text = $text . ',' . '/.*/';
             }
         }
         $text =~ s/^,+//;
-        $text =~ s/(,\/\.\+\/)+$//;
+        $text =~ s/(,\/\.\*\/)+$//;
         $query = $text;
 #        print STDERR $text;
     }

@@ -31,11 +31,12 @@ sub print3 {
 }
 
 sub print_path {
-    my ($pre,$path,$suf) = @_;
+    my ($pre,$path,$suf,$sep) = @_;
+    $sep = '->' unless($sep);
     if(@{$path}) {
         $pre = "" unless($pre);
         $suf = "" unless($suf);
-        print1 $pre,join("->",@{$path}),$suf;
+        print1 $pre,join($sep,@{$path}),$suf;
     }
 }
 
@@ -78,7 +79,12 @@ else {
 my $action = shift @ARGV;
 my $query = shift @ARGV;
 my $userdata = shift @ARGV;
+
 $action = 'list' unless($action);
+if((!$query) and $action !~ m/^(?:list|add|plain|read|write|print|query)$/) {
+    $query = $action;
+    $action = 'query';
+}
 
 
 
@@ -91,7 +97,7 @@ $CONFIG = MyPlace::XConfig->new();
 $CONFIG->read_plainfile($database);
 
 
-if($action eq 'list') {
+if(($action eq 'list') or ($action eq 'query')) {
     $query = '/.+/' unless($query);
 }
 elsif($action eq 'plain') {
@@ -140,8 +146,15 @@ else {
         print_target("delete \"",($userdata ? "->$userdata\"\n" : "\"\n"),$CONFIG,@target);
         print_status($CONFIG->delete($userdata,@target));
     }
+    elsif($action eq 'query') {
+        my @records = $CONFIG->get_records(@target);
+        foreach(@records) {
+            print_path('',$_,"\n","->");
+        }
+    }
+    
     if($!) {
-        print3 $!,"\n";
+        print3 "$!\n";
         exit 1;
     }
 }
