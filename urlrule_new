@@ -49,11 +49,14 @@ sub apply_rule {
        'data_map'=>undef,
        'pass_exp'=>undef,
        'pass_map'=>undef,
+       'pass_name_map'=>undef,
        'pages_exp'=>undef,
        'pages_map'=>undef,
        'pages_pre'=>undef,
        'pages_suf'=>undef,
        'pages_start'=>undef,
+       'title_exp'=>undef,
+       'title_map'=>undef,
        'charset'=>undef
  );
 }

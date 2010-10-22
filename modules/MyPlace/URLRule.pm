@@ -222,7 +222,7 @@ sub urlrule_quick_parse {
     die("Error 'url=>undef'\n") unless($url);
     my $title;
 #    my %rule = %{$args{rule}};
-    my ($title_exp,$title_map,$data_exp,$data_map,$pass_exp,$pass_map,$pass_name_exp,$pages_exp,$pages_map,$pages_pre,$pages_suf,$pages_start,$charset) = @args{qw/
+    my ($title_exp,$title_map,$data_exp,$data_map,$pass_exp,$pass_map,$pass_name_exp,$pass_name_map,$pages_exp,$pages_map,$pages_pre,$pages_suf,$pages_start,$charset) = @args{qw/
         title_exp
         title_map
         data_exp
@@ -230,6 +230,7 @@ sub urlrule_quick_parse {
         pass_exp
         pass_map
         pass_name_exp
+        pass_name_map
         pages_exp
         pages_map
         pages_pre
@@ -244,6 +245,7 @@ sub urlrule_quick_parse {
     my @pass_name;
     $data_map = '$1' unless($data_map);
     $pass_map = '$1' unless($pass_map);
+    $pass_name_map = $pass_name_exp unless($pass_name_map);
     if($title_exp) {
         $title_map = '$1' unless($title_map);
         if($html =~ m/$title_exp/g) {
@@ -258,8 +260,8 @@ sub urlrule_quick_parse {
     if($pass_exp) {
         while($html =~ m/$pass_exp/g) {
             push @pass_data,eval($pass_map);
-            if($pass_name_exp) {
-                push @pass_name,eval($pass_name_exp);
+            if($pass_name_map) {
+                push @pass_name,eval($pass_name_map);
             }
         }
     }

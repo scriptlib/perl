@@ -51,10 +51,13 @@ sub add {
     my($self,@keys) = @_;
     my $p=$self->{data};
     foreach(@keys) {
-        $p ->{$_} = {} unless($p->{$_});
+        print STDERR "Add $_\n";
+        $p->{$_} = {} unless($p->{$_});
         $p = $p->{$_};
     }
 #    $p->{$value}={};
+    use Data::Dumper;
+    print Data::Dumper->Dump([$self->{data}->{"Rebecca Ramos"}],['hello']);
     $self->{dirty}=1;
     return $p;
 }
@@ -314,7 +317,7 @@ sub read_plainfile {
         if($text[0] =~ '^XConfig') {
             $self->{base64} = 1;
             shift @text;
-            @text = map {decode_base64($_);} @text;
+            @text = split("\n",decode_base64(join("\n",@text)));
         }
         $self->{data} = text_to_hash(0,$PLAIN_LEVEL_MARK_EXP,\@text);
     }
@@ -342,9 +345,9 @@ sub write_plainfile {
         }
         else {
             print $fh "XConfig\n";
-            foreach(hash_to_text(0,$PLAIN_LEVEL_MARK,$self->{data})) {
-                print $fh encode_base64("$_\n");
-            }
+            my @text = hash_to_text(0,$PLAIN_LEVEL_MARK,$self->{data});
+            print $fh encode_base64(join("\n",@text));
+            #"$_\n");
         }
         close $fh unless($file eq '-');
         return 1;
