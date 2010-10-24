@@ -51,13 +51,13 @@ sub add {
     my($self,@keys) = @_;
     my $p=$self->{data};
     foreach(@keys) {
-        print STDERR "Add $_\n";
+#        print STDERR "Add $_\n";
         $p->{$_} = {} unless($p->{$_});
         $p = $p->{$_};
     }
 #    $p->{$value}={};
     use Data::Dumper;
-    print Data::Dumper->Dump([$self->{data}->{"Rebecca Ramos"}],['hello']);
+#    print Data::Dumper->Dump([$self->{data}->{"Rebecca Ramos"}],['hello']);
     $self->{dirty}=1;
     return $p;
 }

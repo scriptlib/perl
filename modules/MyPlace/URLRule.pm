@@ -325,10 +325,13 @@ sub urlrule_process_args
         return undef;
     }
     app_message($msghd,"Applying it...\n");
+    {
+    no warnings "all";
     unless(my $do_exit = do $source) { 
         die("couldn't parse $source:\n$@") if($@);
         #die("couldn't do $source:$!") unless defined $do_exit;
         #die("couldn't run $source") unless $do_exit;
+    }
     }
     my %result = &apply_rule($url,$rule);
     if($result{"#use quick parse"}) {
@@ -349,13 +352,14 @@ sub execute_rule {
         return undef,"File not found: $source";
     }
 #    $! = undef;
+    {
     no warnings 'all';
     unless(my $do_exit = do $source) { 
         return undef,"couldn't parse $source:\n$@" if($@);
         #die("couldn't do $source:$!") unless defined $do_exit;
         #die("couldn't run $source") unless $do_exit;
     }
-    use warnings;
+    }
     my %result = &apply_rule($url,\%rule);
     if($result{"#use quick parse"}) {
         %result = &urlrule_quick_parse('url'=>$url,%result);
