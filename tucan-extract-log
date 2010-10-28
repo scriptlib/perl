@@ -1,0 +1,103 @@
+#!/usr/bin/perl -w
+# $Id: script_template 17 2010-10-08 17:47:31Z xiaoranzzz $
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+my @logfile;
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+    @logfile = @ARGV;
+}
+else
+{
+    @logfile = ( $ENV{HOME} . "/.tucan/tucan.log*");
+}
+
+my %URLS;
+foreach(@logfile) {
+    #print STDERR "$_:\n";
+    foreach my $file (glob($_)) {
+        #print STDERR "\t$file\n";
+        if(-f $file) {
+            open FI,"<",$file or die("$!\n");
+            while(<FI>) {
+                chomp;
+                if(m/:\s+(http:\/\/[^\s]+)/) {
+                    $URLS{$1} = 1;
+                }
+            }
+            close FI;
+        }
+    }
+}
+
+print join("\n",keys %URLS),"\n";
+
+__END__
+
+=pod
+
+=head1  NAME
+
+tucan-extract-log - PERL script
+
+=head1  SYNOPSIS
+
+tucan-extract-log [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-10-26  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl

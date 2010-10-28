@@ -109,6 +109,9 @@ if(-f $fname)
         print STDERR "$fname modified.\n";
         print STDERR "make it executable.\n";
         chmod(0775,$fname) or print STDERR "$!\n";
+        if($ENV{XR_PERL_BINARY_DIR}) {
+            system("ln","-sfv",$fname,"$ENV{XR_PERL_BINARY_DIR}/$NAME");
+        }
     }
     else {
         print STDERR "$fname remain the same.\nunlink it.\n";

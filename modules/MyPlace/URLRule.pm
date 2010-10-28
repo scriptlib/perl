@@ -15,7 +15,11 @@ BEGIN {
 }
 
 #my $URLRULE_DIRECTORY = "$ENV{XR_PERL_SOURCE_DIR}/urlrule";
+
+
+our $USER_URLRULE_DIRECTORY = "$ENV{HOME}/.urlrule";
 our $URLRULE_DIRECTORY = "$ENV{XR_PERL_SOURCE_DIR}/urlrule";
+
 sub strnum($$) {
     my $num=shift;
     my $len=shift;
@@ -84,10 +88,13 @@ sub parse_rule(@) {
     do 
     {
         for my $directory (
+            "$USER_URLRULE_DIRECTORY/$r{level}",
+            "$USER_URLRULE_DIRECTORY/common",
             "$URLRULE_DIRECTORY/$r{level}",
             "$URLRULE_DIRECTORY/common",
             )
         {
+            next unless(-d $directory);
             for my $basename 
                     (
                         $domain,
@@ -107,7 +114,7 @@ sub parse_rule(@) {
         }
     } while($domain =~ s/^[^\.]*\.// and !$r{source});
     $r{source} 
-        = "$URLRULE_DIRECTORY/$r{level}/$r{domain}" unless($r{source});
+        = "$USER_URLRULE_DIRECTORY/$r{level}/$r{domain}" unless($r{source});
     return \%r;
 }
 

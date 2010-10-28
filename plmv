@@ -17,36 +17,76 @@ use MyPlace::Script::Usage qw/help_required help_even_empty/;
 #exit 0 if(help_required($0,@ARGV));
 exit 0 if(help_even_empty($0,@ARGV));
 
-my $fname=shift;
-my $nname=shift;
-unless($nname) {
+my $OLDNAME=shift;
+my $NEWNAME=shift;
+unless($NEWNAME) {
     help_even_empty($0);
     exit 0;
 }
-die("$fname == $nname\n") if($fname eq $nname);
+die("$OLDNAME == $NEWNAME\n") if($OLDNAME eq $NEWNAME);
 
 my $PLDIR=$ENV{XR_PERL_SOURCE_DIR};
 die("\$XR_PERL_SOURCE_DIR not set or not valid\n") unless(-d $PLDIR);
 
-my $fsrc="$PLDIR/$fname.pl";
-my $nsrc="$PLDIR/$nname.pl";
 
-my $SHDIR=$ENV{XR_PERL_BINARY_DIR};
-die("\$XR_PERL_BINARY_DIR not set or not valid\n") unless(-d $SHDIR);
-my $flnk="$SHDIR/$fname";
-my $nlnk="$SHDIR/$nname";
+my $BINDIR=$ENV{XR_PERL_BINARY_DIR};
+die("\$XR_PERL_BINARY_DIR not set or not valid\n") unless(-d $BINDIR);
 
-die("$fsrc not exist\n") unless(-f $fsrc);
 
-open FI,"<",$fsrc or die("$!\n");
-open FO,">",$nsrc or die("$!\n");
-while(<FI>) {
-    s/$fname/$nname/g;
-    print FO $_;
+
+
+my $fsrc;
+my $nsrc;
+my $flnk;
+my $nlnk;
+
+my $base_old_name = $OLDNAME;
+$base_old_name =~ s/\.[^\.]+$//;
+my $base_new_name = $NEWNAME;
+$base_new_name =~ s/\.[^\.]+$//;
+
+my %NAME_MAP = (
+    $OLDNAME=>$NEWNAME,
+    $OLDNAME . ".pl" =>$NEWNAME . ".pl",
+    $base_old_name => $base_new_name,
+    $base_old_name . ".pl" =>$base_new_name . ".pl",
+);
+
+foreach my $fn ($OLDNAME,$OLDNAME . ".pl",$base_old_name,$base_old_name . ".pl") {
+    if (-f "$PLDIR/$fn" ) {
+        $fsrc = "$PLDIR/$fn";
+        $nsrc = "$PLDIR/" . $NAME_MAP{$fn};
+    }
 }
-close FI;
-close FO;
-#system("mv","-v","--",$fsrc,$nsrc);
+foreach my $fn ($OLDNAME,$OLDNAME . ".pl",$base_old_name,$base_old_name . ".pl") {
+    if (-f "$BINDIR/$fn" ) {
+        $flnk = "$BINDIR/$fn";
+        $nlnk = "$BINDIR/" . $NAME_MAP{$fn};
+    }
+}
+if(!$fsrc) {
+    $fsrc = "$PLDIR/$OLDNAME";
+    $nsrc = "$PLDIR/$NEWNAME";
+}
+if(!$flnk) {
+    $flnk = "$BINDIR/$OLDNAME";
+    $nlnk = "$BINDIR/$NEWNAME";
+}
+
+#die(join("\n",($fsrc,$nsrc,$flnk,$nlnk)));
+die("\"$fsrc\" not exist\n") unless(-f $fsrc);
+#print STDERR "converting \"$fsrc\" to \"$nsrc\"...";
+#open FI,"<",$fsrc or die("$!\n");
+#open FO,">",$nsrc or die("$!\n");
+#while(<FI>) {
+#    s/$OLDNAME/$NEWNAME/g;
+#    print FO $_;
+#}
+#close FI;
+#close FO;
+#print STDERR "\n";
+#system("rm","-v","--",$fsrc);
+system("mv","-v","--",$fsrc,$nsrc);
 system("rm","-v","--",$flnk) if(-l $flnk);
 system("ln","-vfs",$nsrc,$nlnk);
 
