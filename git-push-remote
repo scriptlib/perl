@@ -1,0 +1,43 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+sub push_remote {
+    my @remotes;
+    open FI,"-|",qw/git remote/;
+    while(<FI>) {
+        chomp;
+        push @remotes,$_ if($_);
+    }
+    close FI;
+    if(@remotes) {
+        my $idx=0;
+        my $count=@remotes;
+        foreach(@remotes) {
+            $idx++;
+            print "[$idx/$count]pushing to $_ ...\n";
+            if(system(qw/git push/,$_,@_)==0) {
+                return 1;
+            }
+            else {
+                print "[$idx/$count]pushing to $_ failed\n";
+                return undef;
+            }
+        }
+        return 1;
+    }
+    else {
+       print "NO remotes found, stop pushing\n";
+       return undef;
+    }
+}
+
+if(push_remote(@ARGV)) {
+    exit 0;
+}
+else {
+    exit 1;
+}
+

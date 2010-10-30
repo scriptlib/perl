@@ -1,0 +1,3 @@
+#!/usr/bin/perl
+print "git branch -av\n";
+exec(qw/git branch -av/);

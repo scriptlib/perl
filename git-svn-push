@@ -1,0 +1,109 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+sub push_remote {
+    my @remotes;
+    open FI,"-|","git remote";
+    while(<FI>) {
+        chomp;
+        push @remotes,$_ if($_);
+    }
+    close FI;
+    if(@remotes) {
+        foreach(@remotes) {
+            print "pushing to $_ ...\n";
+            if(system(qw/git push --all/,$_)==0) {
+                return 1;
+            }
+            else {
+                print "pushing to $_ failed\n";
+                return undef;
+            }
+        }
+        return 1;
+    }
+    else {
+       print "NO remotes found, stop pushing\n";
+       return undef;
+    }
+}
+
+print "[1/3] git commit ", (@ARGV ? join(" ",@ARGV) : ""), "\n";
+if (system(qw/git commit/,@ARGV) == 0) {
+    print "[2/3] git svn dcommit\n";
+    if(system(qw/git svn dcommit/) == 0) {
+        print "[3/3] git push --all [remotes]\n";
+        if(push_remote()) {
+            exit 0;
+        }
+        else {
+            print "[3/3] git push --all [remotes] failed\n";
+            exit 0;
+        }
+    }
+    else {
+        print "[2/3] git svn dcommit failed\n";
+        exit 2;
+    }
+}
+else {
+    print "[1/3] git commit failed","\n";
+    exit 1;
+}
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+git-svn-push - PERL script
+
+=head1  SYNOPSIS
+
+git-svn-push [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-10-31  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl
