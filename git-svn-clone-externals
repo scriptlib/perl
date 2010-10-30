@@ -1,0 +1,22 @@
+#!/usr/bin/perl -w
+
+my %repos;
+
+open FI,"-|",'git svn propget svn:externals';
+while(<FI>) {
+    chomp;
+    next unless($_);
+    next if(m/^\s*#/);
+    print $_,"\n";
+    if(m/^\s*(.+?)\s+((:?http|https|svn|file):\/\/[^\s]+)\s*$/i) {
+        $repos{$1} = $2;
+        $repos{$1} =~ s/trunk\/?$//;
+    }
+}
+close FI;
+
+foreach my $dir (keys %repos) {
+    my $url = $repos{$dir};
+    print join(" ",(qw/git svn clone -A .gitauthors -s/,$url,$dir)),"\n";
+    system(qw/git svn clone -A .gitauthors -s/,$url,$dir);
+}

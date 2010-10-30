@@ -5,12 +5,16 @@ require v5.10.0;
 our $VERSION = 'v1.1';
 BEGIN
 {
-    our $PROGRAM_DIR;
-    $PROGRAM_DIR = $0;
-    $PROGRAM_DIR =~ s/[^\/\\]+$//;
-    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/(.)\/+$/$1/;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
+#    $PROGRAM_DIR = $PROGRAM_DIR . "/" unless($PROGRAM_DIR =~ m/\/$/);
     unshift @INC, 
-        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
 }
 my %OPTS;
 my @OPTIONS = qw/help|h|? version|ver edit-me manual|man simple|s read|r/;
