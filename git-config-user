@@ -1,0 +1,96 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+
+sub run {
+    print STDERR join(" ",@_),"\n";
+    return system(@_) == 0;
+}
+
+my $u = shift;
+if($u and "eotect" =~ m/^$u/) {
+    run(qw/git config user.name eotect/);
+    run(qw/git config user.email eotect@gmail.com/);
+}
+elsif((!$u) or "xiaoranzzz" =~ m/^$u/) {
+    run(qw/git config user.name xiaoranzzz/);
+    run(qw/git config user.email xiaoranzzz@gmail.com/);
+}
+else {
+    print STDERR "Can't not found user\n";
+}
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+git-config-user - PERL script
+
+=head1  SYNOPSIS
+
+git-config-user [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-10-31  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl
