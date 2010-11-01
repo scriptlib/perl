@@ -31,28 +31,40 @@ sub push_remote {
     }
 }
 
-print "[1/3] git commit ", (@ARGV ? join(" ",@ARGV) : ""), "\n";
-if (system(qw/git commit/,@ARGV) == 0) {
-    print "[2/3] git svn dcommit\n";
-    if(system(qw/git svn dcommit/) == 0) {
-        print "[3/3] git push --all [remotes]\n";
-        if(push_remote()) {
-            exit 0;
-        }
-        else {
-            print "[3/3] git push --all [remotes] failed\n";
-            exit 0;
-        }
-    }
-    else {
-        print "[2/3] git svn dcommit failed\n";
-        exit 2;
+my $NEED_COMMIT = `git diff`;
+chomp($NEED_COMMIT);
+my $idx = 1;
+my $total = 3;
+#$NEED_COMMIT ? 3 : 2;
+
+print "[$idx/$total] git commit ", (@ARGV ? join(" ",@ARGV) : ""), "\n";
+if($NEED_COMMIT) {
+    if (system(qw/git commit/,@ARGV) != 0) {
+        die "[$idx/$total] git commit failed\n";
     }
 }
 else {
-    print "[1/3] git commit failed","\n";
-    exit 1;
+    system(qw/git commit/,@ARGV);
 }
+$idx++;
+
+
+print "[$idx/$total] git svn dcommit\n";
+if(system(qw/git svn dcommit/) != 0) {
+    die "[$idx/$total] git svn dcommit failed\n";
+}
+$idx++;
+
+
+print "[$idx/$total] git push --all [remotes]\n";
+system(qw/git remote -v/);
+if(!push_remote()) {
+    die "[$idx/$total] git push --all [remotes] failed\n";
+}
+$idx++;
+
+
+exit 0;
 
 
 

@@ -1,0 +1,7 @@
+#!/usr/bin/perl
+my $p = shift;
+my $sub = shift;
+my $n = shift;
+my @cmd = ('svn','checkout',@ARGV,"https://$p.googlecode.com/svn" . ($sub ? "/$sub/trunk" : "/trunk") , $n || "");
+print STDERR join(" ",@cmd),"\n";
+exec @cmd;
