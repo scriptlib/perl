@@ -54,6 +54,9 @@ sub parse_project {
             next;
         }
         my @data = (split(/\s*\|\s*/,$_),'','','','','','','');
+        foreach(@data) {
+            s/^\s+|\s+$//;
+        }
         next unless($data[0]);
         if($data[3] =~ m/.+\/.+/) {
             $project{$data[0]} = [@data[1,2,3,4]];
