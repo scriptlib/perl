@@ -1,0 +1,222 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver  manual|man dump|d/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+
+sub run {
+    my $head = shift;
+    print "[$head] ",join(" ",@_),"\n";
+    system(@_) == 0;
+}
+
+sub run_or_die {
+    my $head = shift;
+    die("[$head] fatal: ",join(" ",@_)," failed!\n") unless(run($head,@_));
+}
+
+sub pull_remote {
+    my($name,$url) = @_;
+    run(qw/git remote add/,$name,$url);
+    print "fetch [$name]$url ...\n";
+    run_or_die(qw/git fetch -v/,$name);
+}
+
+sub cat_file {
+    my $file = shift;
+    open FI,"<",$file or return undef;
+    print <FI>;
+    close FI;
+    return 1;
+}
+
+sub parse_config {
+    my $MACRO = shift;
+    my %config;
+    foreach(@_) {
+        chomp;
+        if($MACRO) {
+            foreach my $m_from (keys %{$MACRO}) {
+                my $m_to = $MACRO->{$m_from};
+                s/$m_from/$m_to/g;
+            }
+        }
+        s/^\s+|\s+$//g;
+        next unless($_);
+        next if(m/^#/);
+        if(m/^([^.=]+)\.([^=]+?)\s*=\s*(.+)$/) {
+            $config{$1}->{$2} = $3;
+            if($1 eq 'v') {
+                $MACRO->{"\\\$$2\\\$"} = $3;
+            }
+        }
+        elsif(m/^([^=]+?)\s*=\s*(.+)$/) {
+            $config{$1} = $2;
+        }
+        else {
+            $config{$_} = 1;
+        }
+    }
+    $config{MACRO} = $MACRO;
+    return %config;
+}
+
+my $F_DUMP = $OPTS{dump};
+
+my $REPO_FILE = ".repos";
+my $REPO_PROP = "gsvn:repos";
+my $AUTHOR_FILE = ".authors";
+
+
+sub process {
+    my $target = shift;
+    $target =~ s/\/+$//;
+    $target =~ s/^.+\///;
+    $target = "." unless($target); 
+
+    print "[$target] init project repos...\n";
+
+    my @CONFIG_DATA;
+    if (-f $REPO_FILE) {
+        open FI,"<",$REPO_FILE or die("$!\n");
+        @CONFIG_DATA = <FI>;
+        close FI;
+    }
+    elsif(-d ".svn" or -d ".SVN") {
+        print STDERR "[$target] reading $REPO_PROP...\n";
+        @CONFIG_DATA = split("\n",qx/git svn propget gsvn:repos ./);
+    }
+    
+    my %CONFIG = parse_config({'\$target\$'=>$target},@CONFIG_DATA);
+    if($F_DUMP) {
+        use Data::Dumper;
+        print Data::Dumper->Dump([\%CONFIG],['*CONFIG']);
+        exit 0;
+    }
+    elsif(!%CONFIG) {
+        print "[$target] init stopped, no repos config data found\n";
+    }
+    else {
+        if($CONFIG{user} and $CONFIG{user} =~ m/\s*([^<]+)\s*<([^>]+)>/) {
+            my($name,$email) = ($1,$2);
+            run_or_die($target,qw/git config user.name/,$name);
+            $email =~ s/#/@/;
+            run_or_die($target,qw/git config user.email/,$email);
+        }
+        if($CONFIG{authors}) {
+            print "[$target] writting $AUTHOR_FILE ...\n";
+            open FO,">",$AUTHOR_FILE or die("$!\n");
+            foreach my $id (keys %{$CONFIG{authors}}) {
+                my $mapto = $CONFIG{authors}->{$id};
+                $mapto =~ s/#/@/;
+                print FO "$id = $mapto\n";
+            }
+            close FO;
+#            cat_file($AUTHOR_FILE);
+#            print "[$target] add $AUTHOR_FILE to .gitignore ...\n";
+#            open FO,">>",".gitignore" or die("$!\n");
+#            print FO $AUTHOR_FILE,"\n";
+#            close FO;
+#            cat_file(".gitignore");
+            run_or_die($target,qw/git config svn.authorsfile/,$AUTHOR_FILE);
+        }
+        if($CONFIG{git}) {
+            print "[$target] fetching git repositories ...\n";
+            foreach my $reponame (keys %{$CONFIG{git}}) {
+                my $url = $CONFIG{git}->{$reponame};
+                run($target,qw/git remote add/,$reponame,$url);
+                print "[$target] fetching [$reponame] $url ...\n";
+                run_or_die($target,qw/git fetch/,$reponame);
+            }
+        }
+    }
+}    
+
+
+use Cwd qw/getcwd/;
+my $cwd = getcwd();
+
+if(@ARGV) {
+    foreach my $wd (@ARGV) {
+        chdir $wd or die("$!: $wd\n");
+        process($wd);
+        chdir $cwd;
+    }
+}
+else {
+    process($cwd);
+}
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+gsvn-pull-remote - PERL script
+
+=head1  SYNOPSIS
+
+gsvn-pull-remote [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-11-02  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl

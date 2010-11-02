@@ -1,0 +1,113 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
+my $url = shift;
+my $target = shift;
+if(!$target) {
+    die("Usage: $0 svn_repo_url target\n");
+}
+
+my $authors;
+foreach my $fn ("authors",".authors","~/gsvn/authors","~/.authors") {
+    if( -f $fn) {
+        $authors = $fn;
+        last;
+    }
+    elsif(-f "$fn.txt") {
+        $authors = "$fn.txt";
+        last;
+    }
+}
+
+if(!($authors and -f $authors)) {
+    die("NO authors file found\n");
+}
+print "[1/2] cloning $url to [$target] ...\n";
+if(system(qw/git svn clone -s -A/,$authors,$url,$target) != 0) {
+    die("fatal: while clone $url to [$target]\n");
+}
+print "[2/2] init repos of [$target] ...\n";
+if(system("gsvn-init-repos",$target)!=0) {
+    die("fatal: while init repos of [$target]\n");
+}
+exit 0;
+
+__END__
+
+=pod
+
+=head1  NAME
+
+gsvn-clone - PERL script
+
+=head1  SYNOPSIS
+
+gsvn-clone [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-11-02  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl
