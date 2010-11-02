@@ -17,21 +17,20 @@ sub push_remote {
         my $count=@remotes;
         foreach(@remotes) {
             $idx++;
-            print "[$idx/$count]pushing to $_ ...\n";
-            if(system(qw/git push/,$_,@_)==0) {
-                return 1;
-            }
-            else {
-                print "[$idx/$count]pushing to $_ failed\n";
+            my $url = `git config --get "remote.$_.url"`;
+            chomp($url);
+            print "[$idx/$count]pushing to [$_] $url ...\n";
+            if(system(qw/git push/,$_,@_)!=0) {
+                print "[$idx/$count]pushing to [$_] failed\n";
                 return undef;
             }
         }
-        return 1;
     }
     else {
        print "NO remotes found, stop pushing\n";
        return undef;
     }
+    return 1;
 }
 
 if(push_remote(@ARGV)) {

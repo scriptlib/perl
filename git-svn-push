@@ -14,9 +14,11 @@ sub push_remote {
     close FI;
     if(@remotes) {
         foreach(@remotes) {
-            print "pushing to $_ ...\n";
+            my $url = `git config --get "remote.$_.url"`;
+            chomp($url);
+            print "pushing to [$_] $url ...\n";
             if(system(qw/git push --all/,$_)==0) {
-                return 1;
+#                return 1;
             }
             else {
                 print "pushing to $_ failed\n";
@@ -57,7 +59,7 @@ $idx++;
 
 
 print "[$idx/$total] git push --all [remotes]\n";
-system(qw/git remote -v/);
+#system(qw/git remote -v/);
 if(!push_remote()) {
     die "[$idx/$total] git push --all [remotes] failed\n";
 }
