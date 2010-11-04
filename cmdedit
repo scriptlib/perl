@@ -28,7 +28,7 @@ print("Location:\t",$location,"\n");
 print("  LinkTo:\t",readlink($location),"\n")if( -l $location);
 
 if ($info =~ m/$support/) {
-    exec($editor,$location);
+    exec($editor,"-b",$location);
 }
 else {
     print("Not supported type!Edit it anyway?(y/n)");

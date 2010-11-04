@@ -51,7 +51,7 @@ if(!($authors and -f $authors)) {
     die("NO authors file found\n");
 }
 print "[1/2] cloning $url to [$target] ...\n";
-if(system(qw/git svn clone -s -A/,$authors,$url,$target) != 0) {
+if(system(qw/git svn clone -s -A/,$authors,$url,$target,@ARGV) != 0) {
     die("fatal: while clone $url to [$target]\n");
 }
 print "[2/2] init repos of [$target] ...\n";
@@ -70,7 +70,7 @@ gsvn-clone - PERL script
 
 =head1  SYNOPSIS
 
-gsvn-clone [options] ...
+gsvn-clone [options] <svn repo url> [target directory] [git svn clone options...]
 
 =head1  OPTIONS
 
@@ -103,6 +103,9 @@ ___DESC___
     2010-11-02  xiaoranzzz  <xiaoranzzz@myplace.hell>
         
         * file created.
+
+    2010-11-03  xiaoranzzz <xiaoranzzz@myplace.hell>
+        * add usage information
 
 =head1  AUTHOR
 
