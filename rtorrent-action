@@ -22,7 +22,8 @@ my ($action,$name,$torrent,$file) = @ARGV;
 #=shift;
 #my $file=shift;
 
-my $BT_DIR = "$ENV{HOME}/bittorrent";
+my $BT_DIR = "$ENV{HOME}/bt";
+
 my $INCOME_DIR = "$BT_DIR/completed";
 my $TOR_DIR = "$BT_DIR/torrents";
 my $TOR_DELETED = "$TOR_DIR/deleted";
