@@ -31,7 +31,7 @@ sub run {
 
 my $u = shift;
 if($u and "eotect" =~ m/^$u/) {
-    run(qw/git config user.name eotect/);
+    run(qw/git config user.name/,"Nahn Eotect"/);
     run(qw/git config user.email eotect@gmail.com/);
 }
 elsif((!$u) or "xiaoranzzz" =~ m/^$u/) {
