@@ -1,0 +1,111 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+use List::Util qw(shuffle);
+
+my @dirs;
+my @options;
+while(@ARGV) {
+    $_ = shift @ARGV;
+    if(-d $_) {
+        push @dirs,$_;
+    }
+    else {
+        push @options,$_;
+        last;
+    }
+}
+push @options,@ARGV if(@ARGV);
+my $option = "";
+$option = join(" ",@options) if(@options);
+
+push @dirs,'.' unless(@dirs);
+my @videos;
+open FI,'-|','find','-L',@dirs,'-type','f';#,'-printf','%P\n';
+while(<FI>) {
+    chomp;
+    push @videos,$_ if(/\.(?:rmvb|rm|avi|mkv|asf|3gp|flv|wmv|mp4)$/i);
+}
+close FI;
+my $index = 0;
+@videos = shuffle(@videos);
+my $count = @videos;
+foreach(@videos) {
+    $index++;
+    print STDERR ":[$index|$count] $_\n";
+    print $_,"\n";
+}
+
+__END__
+
+=pod
+
+=head1  NAME
+
+playvideo - PERL script
+
+=head1  SYNOPSIS
+
+playvideo [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-09-08  duel  <duel@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+duel <duel@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl
