@@ -2,22 +2,21 @@
 # $Id$
 use strict;
 require v5.10.0;
-our $VERSION = 'v1.1';
+our $VERSION = 'v1.2';
 BEGIN
 {
     our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
     unless($PROGRAM_DIR) {
         $PROGRAM_DIR = $0;
         $PROGRAM_DIR =~ s/[^\/\\]+$//;
-        $PROGRAM_DIR =~ s/(.)\/+$/$1/;
+        $PROGRAM_DIR =~ s/\/+$//;
         $PROGRAM_DIR = "." unless($PROGRAM_DIR);
     }
-#    $PROGRAM_DIR = $PROGRAM_DIR . "/" unless($PROGRAM_DIR =~ m/\/$/);
     unshift @INC, 
         map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
 }
 my %OPTS;
-my @OPTIONS = qw/help|h|? version|ver edit-me manual|man simple|s read|r/;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man simple|s stdin|i stdout|o/;
 if(@ARGV)
 {
     require Getopt::Long;
@@ -31,32 +30,26 @@ else
     MyPlace::Usage::PrintHelp();
 }
 
-use Env qw(USER HOSTNAME);
 our $PROGRAM_DIR;
-my $pldir=$PROGRAM_DIR;#$ENV{XR_PERL_SOURCE_DIR};
-die "Can't not locate script directory.\n" if(!$pldir);
-die "Direcoty not exists:\"$pldir\"\n" if (! -d $pldir);
+my $source_directory=$PROGRAM_DIR;#$ENV{XR_PERL_SOURCE_DIR};
 
-my $OPT_READ = $OPTS{'read'};
-my $OPT_SIMPLE = $OPTS{'simple'};
-my $NAME = shift @ARGV;
+my $NAME = shift;
 die("Invalid usage.\n") unless($NAME);
 
-print STDERR "Using source directory:$pldir\n";
 my $fname = $NAME;
 
-if(-f "$pldir/$fname") {
-    $fname="$pldir/$fname";
+if(-f "$source_directory/$fname") {
+    $fname="$source_directory/$fname";
 }
-elsif(-f "$pldir/$fname.pl") {
-    $fname="$pldir/$fname.pl";
+elsif(-f "$source_directory/$fname.pl") {
+    $fname="$source_directory/$fname.pl";
 }
 elsif( $fname =~ /\.[^\.]*$/) {
-    $fname="$pldir/$fname";
+    $fname="$source_directory/$fname";
 }
 else {
-    #$fname=$pldir . "/" . $fname . ".pl";
-    $fname=$pldir . "/" . $fname;
+    #$fname=$source_directory . "/" . $fname . ".pl";
+    $fname=$source_directory . "/" . $fname;
 }
 
 
@@ -68,41 +61,42 @@ if (-f $fname) {
     exec $editor,$fname;
     exit 0;
 }
-
-open PIPE,">:utf8",$fname or die("$!\n");
-
-use POSIX qw/strftime/;
-my $DATE= strftime("%Y-%m-%d",localtime());
-$USER="xiaoranzzz" unless($USER);
-my $EMAIL="$USER\@" . (defined $HOSTNAME ? $HOSTNAME : "myplace.hell");
-
-if($OPT_SIMPLE) {
-    print PIPE "#!/usr/bin/perl\n";
+if($OPTS{stdout}) {
+    open PIPE,">&STDOUT" or die("fatal: can't dupilicate STDOUT\n");
 }
 else {
-    my $template=$pldir . "/" .  "script_template";
-    if(-f $template) {
-        open TEMPDATA,'<',$template;
-        while(<TEMPDATA>) {
-            s/___EMAIL___/$EMAIL/g;
-            s/___AUTHOR___/$USER/g;
-            s/___NAME___/$NAME/g;
-            s/___DATE___/$DATE/g;
-            print(PIPE);
-        }
-        close(TEMPDATA);
-    }
+    die "Can't not locate script directory.\n" if(!$source_directory);
+    die "Direcoty not exists:\"$source_directory\"\n" if (! -d $source_directory);
+    open PIPE,">:utf8",$fname or die("$!\n");
 }
-if($OPT_READ) {
-    while(<STDIN>) {
-        s/___EMAIL___/$EMAIL/g;
-        s/___AUTHOR___/$USER/;
-        s/___NAME___/$NAME/;
-        s/___DATE___/$DATE/;
-        print(PIPE);
-    }
+
+my @TEXT;
+if($OPTS{simple}) {
+    @TEXT = ("#!/usr/bin/perl -w\n","use strict;\n");
 }
-close(PIPE);
+elsif($OPTS{stdin}) {
+    @TEXT=<STDIN>;
+}
+elsif(open FI,"<",$source_directory  . "/perl_script.template") {
+    @TEXT=<FI>;
+    close FI;
+}
+
+    use Env qw(USER HOSTNAME);
+    use POSIX qw/strftime/;
+    my $DATE= strftime("%Y-%m-%d %H:%M",localtime());
+    $USER="xiaoranzzz" unless($USER);
+    my $EMAIL="$USER\@" . (defined $HOSTNAME ? $HOSTNAME : "myplace.hell");
+foreach(@TEXT) {
+    s/___EMAIL___/$EMAIL/g;
+    s/___AUTHOR___/$USER/g;
+    s/___NAME___/$NAME/g;
+    s/___DATE___/$DATE/g;
+    print PIPE $_;
+}
+close PIPE;
+
+
 if(-f $fname)
 {
     use File::stat;
@@ -130,23 +124,27 @@ __END__
 
 =head1  NAME
 
-plnew2 - PERL script
+plnew - create new script
 
 =head1  SYNOPSIS
 
-plnew2 [options] ...
+plnew [options] <script name>
 
 =head1  OPTIONS
 
 =over 12
 
+=item B<-i>,B<--stdin>
+
+Read template from STDIN
+
+=item B<-o>,B<--stdout>
+
+Write to STDOUT
+
 =item B<-s>,B<--simple>
 
 Disable using template.
-
-=item B<-r>,B<--read>
-
-Read template from STDIN
 
 =item B<--version>
 
@@ -166,9 +164,22 @@ Invoke 'editor' against the source
 
 =back
 
+=head1  FILES
+
+=item B<$XR_PERL_SOURCE_DIR>
+
+    Output directory environment variable
+
+=item $XR_PERL_SOURCE_DIR\B<perl_script.template>
+
+    Script template file
+
+=back
+
 =head1  DESCRIPTION
 
-___DESC___
+create new perl script with custumized template. By 
+default, script will be saved in $XR_PERL_SOURCE_DIR
 
 =head1  CHANGELOG
 
@@ -176,6 +187,11 @@ ___DESC___
         
         * recreated from new template
         * set version 1.1
+
+    2010-11-09  21:47 xiaoranzzz <xiaoranzzz@myplace.hell>
+
+        * rewrote
+        * set version 1.2
 
 =head1  AUTHOR
 

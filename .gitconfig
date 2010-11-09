@@ -5,9 +5,9 @@
 	logallrefupdates = true
 [svn-remote "svn"]
 	url = https://xrzperl.googlecode.com/svn
-	fetch = trunk:refs/remotes/trunk
-	branches = branches/*:refs/remotes/*
-	tags = tags/*:refs/remotes/tags/*
+	fetch = trunk:refs/remotes/googlecode/trunk
+	branches = branches/*:refs/remotes/googlecode/*
+	tags = tags/*:refs/remotes/googlecode/tags/*
 [svn]
 	authorsfile = /myplace/workspace/authors.txt
 
@@ -17,3 +17,9 @@
 [remote "gitorious"]
 	url = git@gitorious.org:eotect/perl.git
 	fetch = +refs/heads/*:refs/remotes/gitorious/*
+[branch "master"]
+	remote = local
+	merge = refs/heads/master
+[remote "local"]
+	url = /myplace/repos/perl.git
+	fetch = +refs/heads/*:refs/remotes/local/*

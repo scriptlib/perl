@@ -1,0 +1,44 @@
+use strict;
+use warnings;
+require v5.10.0;
+
+BEGIN {
+    require Exporter;
+    our ($VERSION,@ISA,@EXPORT,@EXPORT_OK,%EXPORT_TAGS);
+    $VERSION        = 'v0.1';
+    @ISA            = qw(Exporter);
+    @EXPORT         = qw();
+    @EXPORT_OK      = qw();
+}
+
+#sub new { my $class = shift;return bless {@_},$class;}
+
+1;
+
+__END__
+=pod
+
+=head1  NAME
+
+___NAME___ - PERL Module
+
+=head1  SYNOPSIS
+
+use ___NAME___;
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    ___DATE___  ___AUTHOR___  <___EMAIL___>
+        
+        * file created.
+
+=head1  AUTHOR
+
+___AUTHOR___ <___EMAIL___>
+
+=cut
+# vim:filetype=perl

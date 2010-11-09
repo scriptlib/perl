@@ -6,11 +6,15 @@ our $VERSION = 'v0.1';
 
 BEGIN
 {
-    my $PROGRAM_DIR = $0;
-    $PROGRAM_DIR =~ s/[^\/\\]+$//;
-    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/\/+$//;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
     unshift @INC, 
-        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
 }
 
 my %OPTS;
@@ -27,6 +31,7 @@ else
 {
     require MyPlace::Usage;
     MyPlace::Usage::PrintHelp();
+    exit 0;
 }
 
 
