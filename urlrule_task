@@ -103,6 +103,10 @@ sub convert_records {
             next unless($name);
             next unless($id);
             next unless($host);
+            if($host =~ m/^#/) {
+                push @r,[$name,$id,$host];
+                next;
+            }
             my $hostname = $host;
             if($hostname =~ m/^([^\|]+)\|(.*)$/) {
                 $hostname = $1;
@@ -131,7 +135,13 @@ sub action_ECHO {
     my $task = shift;
     my($name,$id,$host,$url,$level) = @{$task};
     $level=0 unless($level);
-    app_message("$name/$host [$level]$url\n");
+    if($host =~ m/^#(.*)$/) {
+        app_message("$name/$1 = \'$id\'\n");
+        #app_message("$name/$1 $id\n");
+    }
+    else {
+        app_message("$name/$host [$level]$url\n");
+    }
     return;
 }
 
@@ -157,6 +167,10 @@ sub action_DOWNLOAD {
     if($host =~ /^[^\|]+\|(.+)$/)
     {
         $hostname = $1;
+    }
+    elsif($host =~ m/^#(.+)$/) {
+        app_message("$name/$1 = \'$id\'\n");
+        return 1;
     }
     else
     {

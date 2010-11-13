@@ -13,6 +13,6 @@ print FO scalar(localtime),": urlrule_database ",(map "\"$_\" ",@ARGV),"\n";
 close FO;
 
 if($action and $action =~ /^(?:ADD)$/) {
-        push @ARGV,'newly',unless ($ARGV[$#ARGV] eq 'newly');
+        push @ARGV,'newly',unless ($ARGV[$#ARGV] eq 'newly' or $ARGV[$#ARGV] =~ m/^#/);
 }
 exec 'r-config','-f',$TASK_DATABASE,@ARGV;
