@@ -28,6 +28,52 @@ use MyPlace::XConfig;
 my $Names = MyPlace::XConfig->new();
 $Names->read_plainfile($TASK_DATABASE);
 
+sub change_directory {
+    my $path = shift;
+    return 1 unless($path);
+    if(! -d $path) {
+        app_message("Creating directory $path...");
+        if(mkdir $path) {
+            print STDERR "\t[OK]\n";
+        }
+        else {
+            print STDERR "\t[Failed]\n";
+            return undef;
+        }
+    }
+    app_message("Changing working directory to $path...");
+    if(chdir $path) {
+        print STDERR "\t[OK]\n";
+    }
+    else {
+        print STDERR "\t[Failed]\n";
+        return undef;
+    }
+    return 1;
+}
+
+### NOT FINISHED
+sub urlrule_process_task {
+    my $task = shift;
+    return 1 unless($task);
+    return 1 unless(ref $task);
+    my $do_dir = shift;
+    if($do_dir and $task->{work_dir}) { 
+        return undef unless(change_directory($task->{work_dir}));
+    }
+    my $task_wd = getcwd();
+    if($task->{pass_data}) {
+        my $idx = 0;
+        foreach my $url (@{$task->{pass_data}}) {
+            if($task->{pass_name} and @{$task->{pass_name}}) {
+                my $sub_wd = $task->{pass_name}->[$idx];
+                next unless(change_directory($sub_wd));
+            }
+        }
+    }
+    return 1;
+}
+
 
 sub load_rule {
     my $CWD = getcwd;
