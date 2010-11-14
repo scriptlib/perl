@@ -20,20 +20,23 @@ use MyPlace::URLRule;
 use MyPlace::ReEnterable;
 use Cwd qw/getcwd/;
 
+urlrule_set_callback('process_passdown',\&process_passdown);
 
 my $RESUME_FILE = '.urlrule_resume';
 my $phnd = MyPlace::ReEnterable->new('main');
 
-
-
-no warnings;
-
-my %cached_rule;
-my @prompt;
-sub code_message {
-    my $code = shift;
-    print STDERR @_;
-    return $code;
+sub process_passdown {
+    my ($count,@passdown) = urlrule_get_passdown(@_);
+    my $cwd = getcwd();
+    if($count) {
+        app_message("Get $count rules to pass down\n");
+    }
+    else {
+        return undef;
+    }
+    foreach(@passdown) {
+        $phnd->push($cwd,'load_rule',@{$_});
+    }
 }
 
 sub load_rule {
@@ -66,7 +69,7 @@ sub sig_killed {
     exit 1;
 }
 
-
+#exit process_args(undef,@ARGV);
 
 if(@ARGV) {
     $phnd->push($cwd,'load_rule',undef,@ARGV);

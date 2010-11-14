@@ -14,7 +14,7 @@ use MyPlace::Script::Usage qw/help_even_empty/;
 exit 0 if(help_even_empty($0,@ARGV));
 
 use MyPlace::ColorPrint;
-use MyPlace::URLRule;
+use MyPlace::URLRule qw/parse_rule/;
 
 my %rule = %{parse_rule(@ARGV)};
 my $url=$rule{url};

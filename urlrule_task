@@ -19,7 +19,7 @@ use constant {
 
 my $TASK_LOGGING    = 1;
 my $TASK_DATABASE   = "DATABASE.URL";
-my $HOST_DATABASE = get_rule_dir() . "/database/HOSTS.URL";
+my $HOST_DATABASE = $URLRULE_DIRECTORY . "/database/HOSTS.URL";
 my $U_DOWNLOADER = 'batchget --maxtime 600 -U -c -m 3 -f';
 my $S_DOWNLOADER = 'batchget --maxtime 600 -c -m 3 -f';
 my $TASK_WORKDIR = getcwd();;
