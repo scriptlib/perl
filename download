@@ -7,7 +7,7 @@
 ###APPDESC:	A downloader,nothing else.
 ###APPUSAGE:	[options] URL
 ###APPEXAMPLE:	download www.google.com/index.html
-###APPOPTION:	-v:Verbose Output|-u:URL to download|-s:Filename for output|-d:Create directories|-n:Task name|-r:Referer URL|-b:cookie file|-l:Enable Logging|-a:Auto rename if file exists|-p:Downloader - wget or curl-m:Max time for downloading
+###APPOPTION:	-v:Verbose Output|-u:URL to download|-s:Filename for output|-d:Create directories|-n:Task name|-r:Referer URL|-b:cookie file|-l:Enable Logging|-a:Auto rename if file exists|-p:Downloader - wget or curl-m:Max time for downloading|-f:Force over writting
 use strict;
 use lib $ENV{XR_PERL_MODULE_DIR};
 
@@ -86,7 +86,7 @@ sub process {
 }
 
 
-my $OptFlag='m:lvu:s:dn:r:b:ap:';
+my $OptFlag='m:lvu:s:dn:r:b:ap:f';
 my %OPT;
 getopts($OptFlag,\%OPT);
 
@@ -100,6 +100,7 @@ my $cookie= $OPT{b} ? $OPT{b} : "";
 my $logging= $OPT{l} ? $OPT{l} : "";
 my $autorename = $OPT{a} ? $OPT{a} : "";
 my $maxtime = $OPT{m} ? $OPT{m} : undef;
+my $force = $OPT{f} ? $OPT{f} : undef;
 #my $downloader = $OPT{p} ? $OPT{p} : "wget";
 my $downloader = $OPT{p} ? $OPT{p} : "curl";
 my $FAILLOG="download.failed";
@@ -149,7 +150,7 @@ else {
     app_message "$name$url\t[starting]\n";
 }
 
-if ( -f "$saveas" ) {
+if ((!$force) and -f "$saveas" ) {
     app_warning "$saveas exists\t[canceled]\n";
     exit 0;
 }
@@ -170,6 +171,7 @@ my @cmdline = build_cmdline($downloader,$url,$saveas_temp,$refer,$cookie,$verbos
 my $r=process("$name$url",\@cmdline,2);
 
 if($r==0 and -f $saveas_temp) {
+    unlink ($saveas) if(-f $saveas);
     rename($saveas_temp,$saveas) or die("$!\n");
     &log("$url->$saveas\n","$DOWNLOADLOG") if($logging);;
     app_ok "$name$saveas\t[completed]\n";
