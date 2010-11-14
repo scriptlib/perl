@@ -113,6 +113,9 @@ __END__
 # urlrule_quick_parse($url,$rule,$data_exp,$data_map,$pass_exp,$pass_map,$charset)
 # urlrule_parse_data($url,$rule,$data_exp,$data_map,$charset)
 # urlrule_parse_pass_data($url,$rule,$pass_exp,$pass_map,$charset)
+# 
+# $result{same_level}    : Keep same rule level for passing down
+# $result{level}         : Specify rule level for passing down
 #================================================================
 
 #       vim:filetype=perl
