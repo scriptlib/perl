@@ -5,21 +5,14 @@
 	logallrefupdates = true
 [svn-remote "svn"]
 	url = https://xrzperl.googlecode.com/svn
-	fetch = trunk:refs/remotes/googlecode/trunk
-	branches = branches/*:refs/remotes/googlecode/*
-	tags = tags/*:refs/remotes/googlecode/tags/*
+	fetch = trunk:refs/remotes/trunk
+	branches = branches/*:refs/remotes/*
+	tags = tags/*:refs/remotes/tags/*
 [svn]
-	authorsfile = /myplace/workspace/authors.txt
-
-[remote "github"]
-	url = git@github.com:eotect/perl.git
-	fetch = +refs/heads/*:refs/remotes/github/*
+	authorsfile = /myplace/workspace/gsbridge/authors.txt
 [remote "gitorious"]
 	url = git@gitorious.org:eotect/perl.git
 	fetch = +refs/heads/*:refs/remotes/gitorious/*
-[branch "master"]
-	remote = local
-	merge = refs/heads/master
-[remote "local"]
-	url = /myplace/repos/perl.git
-	fetch = +refs/heads/*:refs/remotes/local/*
+[remote "github"]
+	url = git@github.com:eotect/perl.git
+	fetch = +refs/heads/*:refs/remotes/github/*
