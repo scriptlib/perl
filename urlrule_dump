@@ -14,8 +14,24 @@ use MyPlace::Script::Usage qw/help_even_empty/;
 exit 0 if(help_even_empty($0,@ARGV));
 
 use MyPlace::Script::Message;
-use MyPlace::URLRule qw/parse_rule apply_rule/;
+use MyPlace::URLRule qw/parse_rule apply_rule urlrule_set_callback/;
 use Data::Dumper;
+
+
+sub process_passdown {
+    print STDERR Data::Dumper->Dump([$_[1]],['*callback_passdown']);
+}
+
+sub process_data {
+    print STDERR Data::Dumper->Dump([$_[1]],['*callback_result']);
+}
+
+sub process_result {
+    print STDERR Data::Dumper->Dump([$_[1]],['*callback_data']);
+}
+urlrule_set_callback("process_passdown",\&process_passdown);
+urlrule_set_callback("process_data",\&process_data);
+urlrule_set_callback("process_result",\&process_result);
 
 my $rule = parse_rule(@ARGV);
 print STDERR Data::Dumper->Dump([$rule],['*rule']);

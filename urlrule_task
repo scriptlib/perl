@@ -75,12 +75,10 @@ sub urlrule_process_task {
 }
 
 
-sub load_rule {
-    my $CWD = getcwd;
-    my ($status1,$rule,$result) = urlrule_process_args(@_);
-    if($status1) {
+urlrule_set_callback('process_passdown',\&process_passdown_task);
+sub process_passdown_task {
         my($status2,$pass_count,@passdown)
-            = urlrule_process_result($rule,$result);
+            = urlrule_process_result(@_);
         if($status2 and $pass_count and $pass_count>0) {
             my $CWD = getcwd;
             foreach(@passdown) {
@@ -89,9 +87,16 @@ sub load_rule {
                     $phnd->push($CWD,'load_rule',$cwd,@args);
                 }
             }
+            chdir $CWD;
         }
-        chdir $CWD;
+}
+sub load_rule {
+    my $CWD = getcwd;
+    my ($status1,$rule,$result) = urlrule_process_args(@_);
+    if($status1) {
+        process_passdown_task($rule,$result);
     }
+    chdir $CWD;
 }
 
 sub convert_records {
