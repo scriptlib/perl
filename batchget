@@ -24,8 +24,9 @@ my @OPTIONS = qw/
 
 if(@ARGV)
 {
-    use Getopt::Long qw(:config no_ignore_case);
+    require Getopt::Long;
     require MyPlace::Usage;
+    Getopt::Long::Configure('no_ignore_case');
     Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
     MyPlace::Usage::Process(\%OPTS,$VERSION);
 }
@@ -78,6 +79,9 @@ sub load_database {
 sub check_database {
     my $url = shift;
     if($URL_DATABASE{$url}) {
+#        use Data::Dumper;
+#        print STDERR Data::Dumper->Dump([\%URL_DATABASE],['*URL_DATABASE']),"\n";
+#        die($url);
         return 1;
     }
     else {
@@ -228,8 +232,7 @@ if($cookie) {
     $cookie="download.cookie";
 }
 
-load_database();
-#if($urlhist);
+load_database() if($urlhist);
 para_init $muldown;
 my $no_urls_count=0;
 while(<STDIN>) {
@@ -251,11 +254,19 @@ while(<STDIN>) {
         $Local_Map{$_} =~ s/^(http|ftp|https):?\/*//gi;
         $Local_Map{$_} =~ s/[\/:,\?\*\\]/_/g;
     }
-    my $is_old = check_database($_);
-    if($urlhist and $is_old) {
-        app_warning("$_\t[Ingored, IN DATABASE]\n");
+
+    if(check_database($_)) {
+        app_warning("[Ignored, In DATABASE]$_\n");
         next;
     }
+    #if($urlhist) {
+    #    next if $is_old;
+    #};
+    #my $is_old = check_database($_);
+    #if($urlhist and $is_old) {
+    #     app_warning("$_\t[Ingored, IN DATABASE]\n");
+    #    next;
+    #}
     #check_database($_));
     push @URLS,$_;
     $count++;
@@ -287,8 +298,7 @@ foreach(@URLS) {
 chdir $PWD;
 #or die("$!\n");
 para_cleanup();
-save_database();
-#if($urlhist);
+save_database() if($urlhist);
 
 #print STDERR ("\n");
 #exit 0 unless($count);
