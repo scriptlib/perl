@@ -3,22 +3,27 @@
 use strict;
 require v5.10.0;
 our $VERSION = 'v0.1';
-print "[1/2] git commit ", (@ARGV ? join(" ",@ARGV) : ""), "\n";
-if (system(qw/git commit/,@ARGV) == 0) {
-    print "[2/2] git svn dcommit\n";
-    if(system(qw/git svn dcommit/) == 0) {
-        exit 0;
-    }
-    else {
-        print "[2/2] git svn dcommit failed\n";
-        exit 2;
+
+my $idx = 1;
+my $total = 3;
+
+print "[$idx/$total] git commit ", (@ARGV ? join(" ",@ARGV) : ""), "\n";
+my $NEED_COMMIT = `git diff`;
+chomp($NEED_COMMIT);
+if($NEED_COMMIT) {
+    if (system(qw/git commit/,@ARGV) != 0) {
+        die "[$idx/$total] git commit failed\n";
     }
 }
 else {
-    print "[1/2] git commit failed","\n";
-    exit 1;
+    system(qw/git commit/,@ARGV);
 }
-
+$idx++;
+print "[$idx/$total] git svn dcommit\n";
+if(system(qw/git svn dcommit/) != 0) {
+    die "[$idx/$total] git svn dcommit failed\n";
+}
+exit 0;
 
 
 __END__
