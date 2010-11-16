@@ -1,0 +1,70 @@
+#!/usr/bin/perl -w
+use Cwd qw/getcwd/;
+use File::Glob qw/bsd_glob/;
+use strict;
+use version '5.8';
+
+sub glob_git {
+    my $dir = shift;
+ #   print STDERR "glob in $dir\n";
+    my @gits;
+    foreach(bsd_glob("$dir/.*"),bsd_glob("$dir/*")) {
+        if(m/(?:^|[\/\\])\.+$/) {
+            next;
+        }
+        elsif(-d $_) {
+            if(m/\.git$/) {
+                push @gits,$_;
+            }
+            else {
+                my @r_git = &glob_git($_);
+                push @gits,@r_git if(@r_git);
+            }
+        }
+    }
+    return @gits;
+}
+
+sub pack_bundle {
+	my $project = shift;
+	$project =~ s/\/+$//;
+    my $name = $project;
+    my $cwd = getcwd();
+    my $parent = $cwd;
+	if($project =~ m/^(.+)\/([^\/]+)$/) {
+        $name = $2;
+        $parent = $1;
+    }
+
+    chdir $project;
+    my @gits = glob_git(".");
+    my @repos;
+    foreach(@gits) {
+        s/^.[\/\\]+//;
+        my $repo = {rel=>$_};
+        $repo->{abs}="$project/$_";
+        $repo->{tree}= $repo->{abs};
+        $repo->{tree} =~ s/\.git$//;
+        push @repos,$repo;
+    }
+    print STDERR "Found git databases in $project:\n",join("\n",map {$_->{abs}} @repos),"\n";
+    foreach my $repo (@repos) {
+        print STDERR "Updating repository $repo->{abs} ...\n";
+        my @git_cmd = ("git","--git-dir",$repo->{abs},"--work-tree",$repo->{tree});
+#        system(@git_cmd,"status");
+#        system(@git_cmd,"branch","-av");
+        system(@git_cmd,"svn","fetch");
+        system(@git_cmd,"fetch","--all");
+        system(@git_cmd,"log","--oneline","-n",5);
+        system(@git_cmd,"gc");
+    }
+    print STDERR "Packing $project as $cwd/$name.tar\n"; 
+    system("tar","-cf","$cwd/$name.tar",map {$_->{rel}} @repos);
+    chdir $cwd;
+}
+my $action = shift;
+if($action eq 'pack') {
+    pack_bundle($_) foreach(@ARGV);
+}
+
+
