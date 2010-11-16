@@ -4,6 +4,10 @@ use File::Glob qw/bsd_glob/;
 use strict;
 use version '5.8';
 
+sub run {
+	print STDERR join(" ",@_),"\n";
+	return system(@_)==0;
+}
 sub glob_git {
     my $dir = shift;
  #   print STDERR "glob in $dir\n";
@@ -51,15 +55,15 @@ sub pack_bundle {
     foreach my $repo (@repos) {
         print STDERR "Updating repository $repo->{abs} ...\n";
         my @git_cmd = ("git","--git-dir",$repo->{abs},"--work-tree",$repo->{tree});
-#        system(@git_cmd,"status");
-#        system(@git_cmd,"branch","-av");
-        system(@git_cmd,"svn","fetch");
-        system(@git_cmd,"fetch","--all");
-        system(@git_cmd,"log","--oneline","-n",5);
-        system(@git_cmd,"gc");
+#        run(@git_cmd,"status");
+#        run(@git_cmd,"branch","-av");
+        run(@git_cmd,"svn","fetch");
+        run(@git_cmd,"fetch","--all");
+        run(@git_cmd,"log","--oneline","-n",5);
+        run(@git_cmd,"gc");
     }
     print STDERR "Packing $project as $cwd/$name.tar\n"; 
-    system("tar","-cf","$cwd/$name.tar",map {$_->{rel}} @repos);
+    run("tar","-cf","$cwd/$name.tar",map {$_->{rel}} @repos);
     chdir $cwd;
 }
 my $action = shift;
