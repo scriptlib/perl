@@ -42,7 +42,7 @@ sub tee {
 }
 sub t_run {
     my $fh = shift;
-    tee($fh,join(" ",@_),"\n");
+    print STDERR join(" ",@_),"\n";
     open FI,"-|",@_;
     tee($fh,$_) while(<FI>);
     close FI;
@@ -81,10 +81,13 @@ sub pack_bundle {
 #        run(@git_cmd,"branch","-av");
         t_run($FTEE,@git_cmd,"svn","fetch");
         t_run($FTEE,@git_cmd,"fetch","--all");
+        &tee($FTEE, "Lastest 5 commits from repository are:\n");
         t_run($FTEE,@git_cmd,"log","--oneline","-n",5);
+        &tee($FTEE,'=' x 79,"\n");
         t_run($FTEE,@git_cmd,"gc");
     }
     &tee($FTEE,"Packing $project as $cwd/$name.tar\n"); 
+    &tee($FTEE,"Archive content:\n");
     t_run($FTEE,"tar","-cvf","$cwd/$name.tar",map {$_->{rel}} @repos);
     &tee($FTEE,'=' x 79,"\n");
     &tee($FTEE,scalar(localtime),"\nFinished packing bundle from [$project] as [$name]\n");

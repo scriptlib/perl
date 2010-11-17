@@ -5,7 +5,7 @@ require v5.10.0;
 our $VERSION = 'v0.1';
 
 my $idx = 1;
-my $total = 3;
+my $total = 2;
 
 print "[$idx/$total] git commit ", (@ARGV ? join(" ",@ARGV) : ""), "\n";
 my $NEED_COMMIT = `git diff`;
