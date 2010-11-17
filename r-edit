@@ -1,6 +1,27 @@
 #!/usr/bin/perl
-use ENV qw/XAUTHORITY DISPLAY/;
+use ENV qw/OS XAUTHORITY DISPLAY/;
+my @w=qw/notepad++.bat/;
 my @g=qw/gvim -f/;
 my @c=qw/vim/;
-exec ((($XAUTHORITY or $DISPLAY) ? @g : @c), @ARGV);
+my @editor;
+
+if($ENV{OS} =~ m/Windows/i) {
+	@editor= @w;
+    shift @ARGV if(@ARGV and $ARGV[0] eq '-b');
+    if(-f "/bin/cygpath.exe") {
+        foreach(@ARGV) {
+            #die("cygpath $_");
+            $_ = `cygpath -w "$_"`;
+#            if(m/^\//);
+        }
+    }
+}
+elsif($XAUTHORITY or $DISPLAY) {
+	@editor= @g;
+}
+else{
+	@editor = @c;
+}
+print STDERR join(" ",@editor,@ARGV),"\n";
+exec @editor,@ARGV;
 
