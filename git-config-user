@@ -29,14 +29,23 @@ sub run {
     return system(@_) == 0;
 }
 
-my $u = shift;
-if($u and "eotect" =~ m/^$u/) {
-    run(qw/git config user.name/,"Nahn Eotect");
-    run(qw/git config user.email eotect@gmail.com/);
+sub mm {
+    return "$_[0]\@gmail.com";
 }
-elsif((!$u) or "xiaoranzzz" =~ m/^$u/) {
+
+my $u = shift;
+die("Usage: $0 <username>\n") unless($u);
+if("eotect" =~ m/^$u/) {
+    run(qw/git config user.name/,"Nahn Eotect");
+    run(qw/git config user.email/,mm('eotect'));
+}
+elsif("xiaoranzzz" =~ m/^$u/) {
     run(qw/git config user.name xiaoranzzz/);
-    run(qw/git config user.email xiaoranzzz@gmail.com/);
+    run(qw/git config user.email/,mm("xiaoranzzz"));
+}
+elsif("nahncm" =~ m/^$u/) {
+    run(qw/git config user.name/,"Coding Machine");
+    run(qw/git config user.email/,mm("nahncm"));
 }
 else {
     print STDERR "Can't not found user\n";

@@ -1,0 +1,158 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/\/+$//;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
+    unshift @INC, 
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+    exit 0;
+}
+
+sub run {
+    my $exit = system(@_);
+    die("fatal error: $! while executing [",join(" ",@_),"]\n") if($exit);
+    return 1;
+}
+
+my $SOURCE = shift;
+my $DEST = shift;
+my $source_user = shift;
+my $sync_user = shift;
+use Cwd qw/getcwd/;
+my $is_localsource = 1;
+my $is_localdest = 1;
+
+my $cwd = getcwd;
+if(!$DEST) {
+    $DEST = $cwd;
+}
+elsif($DEST =~ m/:\/\//) {
+    $is_localdest = undef;
+}
+elsif($DEST =~ m/\//) {
+}
+else {
+    $DEST = $cwd . '/' . $DEST;
+}
+if($SOURCE =~ m/:\/\//) {
+    $is_localsource = undef;
+}
+elsif($SOURCE =~ m/\//) {
+}
+else {
+    $SOURCE = $cwd . '/' . $SOURCE;
+}
+
+my $SOURCE_URL = $is_localsource ? 'file://' .  $SOURCE : $SOURCE;
+my $DEST_URL;
+if($is_localdest) {
+    $DEST_URL = 'file://' . $DEST;
+    if(! -d $DEST) {
+        print STDERR "creating local repository $DEST...\n";
+        run(qw/svnadmin create/,$DEST);
+        my $hook = "$DEST/hooks/pre-revprop-change";
+        print STDERR "creating pre-revprop-change hook in $DEST...\n";
+        open FO,'>',$hook or die("fatal error\n");
+        print FO "#!/bin/sh\nexit 0\n";
+        close FO;
+        run(qw/chmod a+x/,$hook);
+    }
+}
+
+my @svnsync;
+if($source_user and $sync_user) {
+    @svnsync = ('svnsync','--source-username',$source_user,'--sync-username',$sync_user);
+}
+elsif($source_user) {
+    @svnsync = ('svnsync','--username',$source_user);
+}
+else {
+    @svnsync = ('svnsync');
+}
+print STDERR "initializing svnsync...\n";
+print STDERR "from\t$SOURCE\n";
+print STDERR "to  \t$DEST\n";
+run(@svnsync,'init','file://' . $DEST,$SOURCE);
+print STDERR "start syncing...\n";
+run(@svnsync,'sync','file://' . $DEST);
+exit 0;
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+svn-clone - clone subversion repository
+
+=head1  SYNOPSIS
+
+svn-clone [options] <SOURCE_REPO> [DEST_REPO]
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-11-19 03:13  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl

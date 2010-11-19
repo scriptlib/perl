@@ -9,7 +9,13 @@
 	branches = branches/*:refs/remotes/*
 	tags = tags/*:refs/remotes/tags/*
 [svn]
-	authorsfile = /myplace/workspace/gsbridge/authors.txt
+	authorsfile = /myplace/workspace/authors.txt
+[remote "local"]
+	url = /myplace/repos/perl.git
+	fetch = +refs/heads/*:refs/remotes/local/*
+[user]
+	name = Nahn Eotect
+	email = eotect@gmail.com
 [remote "gitorious"]
 	url = git@gitorious.org:eotect/perl.git
 	fetch = +refs/heads/*:refs/remotes/gitorious/*

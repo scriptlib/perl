@@ -1,0 +1,58 @@
+#!/usr/bin/perl -w
+
+use Cwd qw/getcwd/;
+sub run {
+    #print STDERR join(" ",@_),"\n";
+    return system(@_) == 0;
+}
+sub process {
+    my $dir = shift;
+    my $exp = shift;
+    if((!$dir) or (!-d $dir)) {
+        print STDERR "[ignored] path note exists $dir\n";
+        return undef;
+    }
+    if(! -d "$dir/.git") {
+        print STDERR "[ignored] $dir not a git working tree\n";
+        return undef;
+    }
+    print STDERR "processing $dir (s/$exp/g) \n";
+    my $cwd = getcwd();
+    chdir $dir or die("$!\n");
+    my %remotes;
+    open FI,"-|",qw/git remote/,"-v" or die("$!\n");
+        foreach(<FI>){
+            chomp;
+            if(m/^\s*([^\s]+)\s+([^\s]+)\s+\(fetch\)\s*$/) {
+                $remotes{$1} = $2;
+            }
+        }
+    close FI;
+    print STDERR "Get remotes [",scalar(keys %remotes), "]:\n";
+    print STDERR join("\n",map {"$_ = $remotes{$_}"} keys %remotes),"\n";
+    foreach my $host (keys %remotes) {
+        my $_ = $remotes{$host};
+        eval("s/$exp/g");
+        if($_ eq $remotes{$host}) {
+            print STDERR "[$host] doesn't change\n";
+        }
+        else {
+            print STDERR "[$host] => $_\n";
+            run('git','remote','rm',$host);
+            run('git','remote','add',$host,$_);
+            run('git','fetch',$host,'--verbose');
+        }
+    }
+    chdir $cwd;
+}
+if(@ARGV) {
+    my $exp = shift;
+    push @ARGV,"." unless(@ARGV);
+    foreach(@ARGV) {
+        &process($_,$exp);
+    }
+}
+else {
+    print STDERR "Usage:\n$0 <text/replacement> git_working_tree [git_working_tree...]\n"
+}
+
