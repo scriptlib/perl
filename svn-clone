@@ -84,6 +84,9 @@ if($is_localdest) {
         run(qw/chmod a+x/,$hook);
     }
 }
+else {
+    $DEST_URL = $DEST;
+}
 
 my @svnsync;
 if($source_user and $sync_user) {
@@ -96,11 +99,11 @@ else {
     @svnsync = ('svnsync');
 }
 print STDERR "initializing svnsync...\n";
-print STDERR "from\t$SOURCE\n";
-print STDERR "to  \t$DEST\n";
-run(@svnsync,'init','file://' . $DEST,$SOURCE);
+print STDERR "from\t$SOURCE_URL\n";
+print STDERR "to  \t$DEST_URL\n";
+run(@svnsync,'init',$DEST_URL,$SOURCE_URL);
 print STDERR "start syncing...\n";
-run(@svnsync,'sync','file://' . $DEST);
+run(@svnsync,'sync',$DEST_URL);
 exit 0;
 
 
