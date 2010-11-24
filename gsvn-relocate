@@ -1,0 +1,137 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/\/+$//;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
+    unshift @INC, 
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+    exit 0;
+}
+
+my $url = shift;
+my $svn_name = shift or "svn";
+
+my $old_url = `git config --get svn-remote.$svn_name.url`;
+chomp($old_url) if($old_url);
+unless($old_url) {
+	print STDERR "Error: No svn-remote.$svn_name found!\n";
+	exit 1;
+}
+
+my $new_url_exp = $new_url;
+my $old_url_exp = $old_url;
+
+$new_url_exp =~ s/([\\\/\.\?\+])/\\$1/g;
+$old_url_exp =~ s/([\\\/\.\?\+])/\\$1/g;
+
+sub run {
+	if(system(@_) == 0) {
+		print STDERR "\t[OK]\n";
+		return 1;
+	}
+	else {
+		print STDERR "\t[Failed]\n";
+		return undef;
+	}
+	return 1;	
+}
+
+my $filter="sed \"s|^git-svn-id: $old_url_exp|git-svn-id: $new_url_exp|g\""
+print STDERR "Rewritting commit messages...\n";
+run(qw/git filter-branch --msg-filter/,$filter,qw/-- --all/) 
+	or exit 2;
+
+
+print STDERR "Setting svn-remote.$svn_name.url :\n\t$new_url\n";
+run(qw/git config/,"svn-remote.$svn_name.url",$new_url) 
+	or exit 3;
+
+print STDERR "Deleting old meta-data...\n";
+run(qw/rm -rf/,".git/svn")
+	or exit 4;
+
+print STDERR "Updating repository...\n";
+run(qw/git svn fetch --verbose/)
+	or exit 5;
+
+exit 0;
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+gsvn-relocate - relocate git-svn url
+
+=head1  SYNOPSIS
+
+gsvn-relocate [options] <new URL> [svn_remote_name]
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-11-25 00:06  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl

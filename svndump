@@ -39,40 +39,8 @@ sub run {
     die("fatal error: $! while executing [",join(" ",@_),"]\n") if($exit);
     return 1;
 }
-
-my $SOURCE = shift;
-my $DEST = shift;
-my $source_user = shift;
-my $sync_user = shift;
-use Cwd qw/getcwd/;
-my $is_localsource = 1;
-my $is_localdest = 1;
-
-my $cwd = getcwd;
-if(!$DEST) {
-    $DEST = $cwd;
-}
-elsif($DEST =~ m/:\/\//) {
-    $is_localdest = undef;
-}
-elsif($DEST =~ m/^\//) {
-}
-else {
-    $DEST = $cwd . '/' . $DEST;
-}
-if($SOURCE =~ m/:\/\//) {
-    $is_localsource = undef;
-}
-elsif($SOURCE =~ m/\//) {
-}
-else {
-    $SOURCE = $cwd . '/' . $SOURCE;
-}
-
-my $SOURCE_URL = $is_localsource ? 'file://' .  $SOURCE : $SOURCE;
-my $DEST_URL;
-if($is_localdest) {
-    $DEST_URL = 'file://' . $DEST;
+sub create_repo {
+    my $DEST = shift;
     if(! -d $DEST) {
         print STDERR "creating local repository $DEST...\n";
         run(qw/svnadmin create/,$DEST);
@@ -84,27 +52,22 @@ if($is_localdest) {
         run(qw/chmod a+x/,$hook);
     }
 }
-else {
-    $DEST_URL = $DEST;
+
+
+my $action = shift;
+my $dst = shift;
+unless($dst) {
+    $dst = $action;
+    $action = 'load';
 }
 
-my @svnsync;
-if($source_user and $sync_user) {
-    @svnsync = ('svnsync','--source-username',$source_user,'--sync-username',$sync_user);
-}
-elsif($source_user) {
-    @svnsync = ('svnsync','--username',$source_user);
+if($action eq 'load') {
+    create_repo($dst);
+    run('svnadmin','load',$dst);
 }
 else {
-    @svnsync = ('svnsync');
+    run('svnadmin',$action,$dst,@ARGV);
 }
-print STDERR "initializing svnsync...\n";
-print STDERR "from\t$SOURCE_URL\n";
-print STDERR "to  \t$DEST_URL\n";
-run(@svnsync,'init',$DEST_URL,$SOURCE_URL);
-print STDERR "start syncing...\n";
-run(@svnsync,'sync',$DEST_URL);
-exit 0;
 
 
 
@@ -114,11 +77,11 @@ __END__
 
 =head1  NAME
 
-svn-clone - clone subversion repository
+svndump - PERL script
 
 =head1  SYNOPSIS
 
-svn-clone [options] <SOURCE_REPO> [DEST_REPO]
+svndump [options] ...
 
 =head1  OPTIONS
 
@@ -148,7 +111,7 @@ ___DESC___
 
 =head1  CHANGELOG
 
-    2010-11-19 03:13  xiaoranzzz  <xiaoranzzz@myplace.hell>
+    2010-11-21 03:48  xiaoranzzz  <xiaoranzzz@myplace.hell>
         
         * file created.
 

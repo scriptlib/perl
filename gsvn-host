@@ -1,0 +1,75 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v0.1';
+
+my $url = `git config --get svn-remote.svn.url`;
+chomp($url) if($url);
+my $fetch = `git config --get svn-remote.svn.fetch`;
+chomp($fetch) if($fetch);
+
+die("No svn-remote.svn.url found!\n") unless($url);
+if($fetch) {
+	$fetch =~ s/:.+$//;
+	$fetch =~ s/\/trunk\/?$//;
+}
+else {
+	$fetch = "";
+}
+
+print STDERR "svn-remote: ";
+print "$url/$fetch\n";
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+gsvn-host - PERL script
+
+=head1  SYNOPSIS
+
+gsvn-host [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-11-23 23:30  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl

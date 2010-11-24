@@ -1,0 +1,580 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.10.0;
+our $VERSION = 'v1.0';
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? manual|m test|t project|p dump|d dump-config|dc dump-data|dd check|c list|l pull reset|r/;
+if(@ARGV)
+{
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+}
+else {
+    $OPTS{help} = 1;
+}
+
+
+#START	//map options to actions
+my $have_opts;
+foreach(keys %OPTS) {
+	if($OPTS{$_}) {
+		$have_opts = 1;
+		last;
+	}
+}
+unless($have_opts) {
+	my $first_arg = shift;
+	if($first_arg and $first_arg =~ m/^(help|manual|test|project|dump|dump-config|dump-data|check|list|pull|reset)$/) {
+		$OPTS{$first_arg} = 1;
+	}
+	else {
+		unshift @ARGV,$first_arg;
+		$OPTS{pull} = 1;
+	}
+}
+#END	//map options to actions
+
+if($OPTS{help}) {
+    require Pod::Usage;
+    Pod::Usage::pod2usage(-exitval=>0,-verbose => 1);
+    exit 0;
+}
+elsif($OPTS{manual}) {
+    require Pod::Usage;
+    Pod::Usage::pod2usage(-exitval=>0,-verbose => 2);
+    exit 0;
+}
+
+use Cwd qw/getcwd/;
+
+my $F_TEST = $OPTS{test};
+
+my %CONFIG;
+$CONFIG{svn} = "https://#1.googlecode.com/svn/#2";
+$CONFIG{'git:github'} = "git\@github.com:#1/#2.git";
+$CONFIG{'git:gitorious'} = "git\@gitorious.org:#1/#2.git";
+$CONFIG{authors} = 'authors';
+my %MACRO;
+
+my %project;
+my %sub_project;
+
+sub run {
+    print join(" ",@_),"\n";
+    return 1 if($F_TEST);
+    return system(@_) == 0;
+}
+sub error {
+    print STDERR @_;
+    return undef;
+}
+
+sub parse_query {
+	my $query = shift;
+	if($query =~ m/^([^:]+):(.*)$/) {
+		return $1,$2;
+	}
+	else {
+		return $query;
+	}
+}
+
+sub get_project_data {
+	my ($name,undef) = parse_query(@_);
+	return $name,($project{$name} ? $project{$name} : $sub_project{$name});
+}
+
+sub parse_project_data {
+    foreach my $line (@_) {
+        $_ = $line;
+        chomp;
+        #print STDERR "[1]",$_,"\n";
+        foreach my $v_name (keys %MACRO) {
+            s/#$v_name#/$MACRO{$v_name}/g;
+        }
+        #print STDERR "[2]",$_,"\n";
+        if(m/^\s*#([^#]+)#\s*=\s*(.+?)\s*$/) {
+            my $name = $1;
+            my $value = $2;
+            next unless($value);
+            if($name =~ m/^(?:authors|user|username|email|svn|svn:.+|git|git:.+)$/) {
+                $CONFIG{$name} = $value;
+            }
+            $MACRO{$name} = $value;
+            next;
+        }
+        my @data = (split(/\s*\|\s*/,$_),'','','','','','','');
+        foreach(@data) {
+            s/^\s+|\s+$//;
+        }
+        next unless($data[0]);
+        my $name = shift @data;
+        if($data[0] =~ m/.+\/.+/) {
+            $sub_project{$name} = \@data;
+        }
+        else {
+            $project{$name} = \@data;
+        }
+    }
+}
+
+sub translate_url {
+    my $url = shift;
+    my $path = shift;
+    if($path =~ m/^([^\/]+)\/(.+)$/) {
+        my $a = $1;
+        my $b = $2;
+        $url =~ s/#1/$a/g;
+        $url =~ s/#2/$b/g;
+    }
+    else {
+        $url =~ s/#1/$path/g;
+        $url =~ s/#2//g;
+    }
+    $url =~ s/\/+$//;
+    return $url;
+}
+
+sub get_repo {
+    my ($query_name,$target,$user,@repo_data) = @_;
+    my %r;
+	my ($name,$new_target) = parse_query($query_name);
+    $r{name} = $name;
+	if($new_target) {
+		$r{_target} = $target ? $target : $name;
+		$r{target} = $new_target;
+	}
+	else {
+	    $r{target} = $target ? $target : $name;
+	}
+    $r{user} = $user ? $user : $CONFIG{user};
+    @repo_data = ("svn/$name","git/$name") unless(@repo_data);
+    foreach my $url (@repo_data) {
+        next unless($url);
+        if($url =~ m/^(svn|git):([^\/]+)\/(.*)$/i) {
+            my $template = $CONFIG{"$1:$2"} ? $CONFIG{"$1:$2"} : "$2/$3";
+            $url = translate_url($template,$3 ? $3 : $name);
+            push @{$r{$1}},$url;
+        }
+        elsif($url =~ m/^(svn|git)\/(.*)$/){
+            my $template = $CONFIG{$1} ? $CONFIG{$1} : "$2";
+            $url = translate_url($template,$2 ? $2 : $name);
+            push @{$r{$1}},$url;
+        }
+        elsif($url =~ m/^(svn|git):([^\/]+)$/i) {
+            push @{$r{$1}},$2;
+        }
+        else {
+            push @{$r{svn}},$url;
+        }
+    }
+    if($r{user} and $r{user} =~ m/(.+)\s+<([^\@]+\@[^\@]+)>\s*$/) {
+        $r{username} = $1;
+        $r{email} = $2;
+    }
+    $r{username} = $CONFIG{username} unless($r{username});
+    $r{email}   = $CONFIG{email} unless($r{email});
+    if($r{svn} and @{$r{svn}}) {
+        my @svns = @{$r{svn}};
+        $r{svn_main} = shift @svns;
+        $r{svn} = \@svns;
+    }
+    elsif($r{git} and @{$r{git}}) {
+        my @gits = @{$r{git}};
+        $r{git_main} = shift @gits;
+        $r{git} = \@gits;
+    }
+    return \%r;
+}
+
+
+sub check_repo {
+    run('git','status') or return undef;
+    run('git','branch','-av') or return undef;
+    run('git','remote','-v') or return undef;
+    return 1;
+}
+sub reset_repo {
+	my $repo = shift;
+	if($repo->{svn_main}) {
+		init_svn_repo('svn',$repo->{svn_main});	
+	}
+	if($repo->{git_main}) {
+		init_git_repo(undef,$repo->{git_main});		
+	}
+	update_repo($repo);
+}
+sub clone_repo {
+    my $repo = shift;
+    my @cmd;
+    if($repo->{svn_main}) {
+        my $user_file = $CONFIG{authors} . ".txt";
+#        if(! -f $user_file) {
+#            open FO,">",$user_file;
+#            print FO "$repo->{user} = $repo->{username} <$repo->{email}>\n";
+#            close FO;
+#        }
+        @cmd = qw/git svn clone/;
+        push @cmd,'-A',$user_file if(-f $user_file);
+        push @cmd,'-s',$repo->{svn_main};
+    }
+    elsif($repo->{git_main}) {
+        @cmd = qw/git clone/;
+        push @cmd,$repo->{git_main};
+    }
+    else {
+        return error("fatal: no main subversion or git repository found!\n");
+    }
+    unless(run(@cmd,$repo->{target})) {
+        return error("fatal: while pulling $repo->{name}, ABORT!\n");
+    }
+    return 1;
+}
+
+sub init_svn_repo {
+    my ($name,$url) = @_;
+    run(qw/git svn -R/,$name,qw/init -s/,$url) 
+        or return error("fatal: while git svn init [$name] $url\n");
+    run(qw/git svn -R/,$name,"fetch")
+        or return error("fatal: while git svn fetch $name\n");
+    return 1;
+}
+sub init_git_repo {
+    my ($name,$url) = @_;
+    if(!$name) {
+        if($url =~ m/^\//) {
+            $name = "local";
+        }
+        elsif($url =~ m/^git\@([^:\/]+)/) {
+            $name = $1;
+            $name =~ s/[^\.]+\.([^.]+\.[^\.]+)/$1/;
+            $name =~ s/\.(?:com|org|net)$//;
+        }
+        elsif($url =~ m/([^\/:]+)[\/:]/) {
+            $name = $1;
+        }
+        else {
+            $name = $url;
+        }
+    }
+	run(qw/git remote rm/,$name);
+    run(qw/git remote add/,$name,$url); 
+#        or return error("fatal: while git remote add [$name] $url\n");
+    run(qw/git fetch/,$name) 
+        or return error("fatal: while git fetch $name\n");
+    return 1;    
+}
+sub update_repo {
+    my $repo = shift;
+    if($repo->{username}) {
+        run(qw/git config user.name/,$repo->{username}) or return error("fatal: while git config\n");
+    }
+    if($repo->{email}) {
+        run(qw/git config user.email/,$repo->{email}) or return error("fatal: while git config\n");
+    }
+    if($repo->{svn} and @{$repo->{svn}}) {
+        foreach my $host (@{$repo->{svn}}) {
+            unless(init_svn_repo(undef,$host)) {
+				error("fatal: while init svn repo [$host]\n");
+				next;
+			}
+        }
+    }
+    if($repo->{git} and @{$repo->{git}}) {
+        foreach my $host (@{$repo->{git}}) {
+            unless(init_git_repo(undef,$host)) {
+				error("fatal: while init git repo [$host]\n");
+				next;
+			}
+        }
+    }
+    run(qw/git branch -av/) or return error("fatal: while git branch\n");
+    return 1;
+}
+
+
+my $PROGRAM_DIR = $0;
+$PROGRAM_DIR =~ s/[^\/\\]+$//;
+my $cwd = getcwd();
+my $PROJECT_FILE;
+
+foreach my $fn (".PROJECTS","$PROGRAM_DIR/.PROJECTS","~/git-svn/.PROJECTS") {
+    if(-f $fn) {
+        $PROJECT_FILE = $fn;
+        last;
+    }
+}
+if($PROJECT_FILE) {
+    if(-f $PROJECT_FILE) {
+        print STDERR "reading \"$PROJECT_FILE\"... ";
+        open FI,"<".$PROJECT_FILE;
+        parse_project_data(<FI>);
+        close FI;
+    }
+}
+
+if(not (@ARGV or $PROJECT_FILE)) {
+    print STDERR "input projects data line by line\n";
+    print STDERR "separate fields by \"|\".\n";
+    print STDERR "name|svn_name|git_name|target_dir|username\n";
+    print STDERR "----|--------|--------|----------|--------\n";
+    parse_project_data(<STDIN>);
+}
+if($OPTS{project}) {
+	my $name = shift;
+	parse_project_data(join('|',@ARGV),"\n");
+	push @ARGV,$name;
+}
+
+
+my $total = scalar(keys %project) + scalar(keys %sub_project);
+print STDERR "$total", $total > 1 ? " projects" : " project", ".\n";
+
+#my $QUERY_NAME=shift;
+#my @query = $QUERY_NAME ? ($QUERY_NAME) : (keys %project,keys %sub_project);
+#my $count = $QUERY_NAME ? 1 : $total;
+my @query = @ARGV ? @ARGV : (keys %project,keys %sub_project);
+
+
+if($OPTS{'list'}) {
+    $OPTS{'dump-data'} = 1;
+}
+
+if($OPTS{'dump'}) {
+    $OPTS{'dump-config'} = 1;
+    $OPTS{'dump-data'} = 1;
+}
+
+if($OPTS{'dump-config'}) {
+    use Data::Dumper;
+    print Data::Dumper->Dump([\%CONFIG],["*CONFIG"]);
+}
+
+if($OPTS{'dump-data'}) {
+    use Data::Dumper;
+#    my @query = $QUERY_NAME ? ($QUERY_NAME) : (keys %project,keys %sub_project);
+    foreach my $query_text (@query) {
+        my ($name,$pdata) = get_project_data($query_text);
+        my $repo = get_repo($query_text,@{$pdata});
+        print Data::Dumper->Dump([$repo],["*$name"]);
+    }
+}
+if($OPTS{'dump-config'} or $OPTS{'dump-data'}) {
+    exit 0;
+}
+
+my $idx = 0;
+my $count = scalar(@query);
+
+if($OPTS{check}) {
+    print STDERR "ready to check $count ", $count > 1 ? "projects" : "project", " ...\n";
+    foreach my $query_text (@query) {
+        $idx++;
+		my ($name,$pdata) = get_project_data($query_text);
+        print STDERR "[$idx/$count] checking project $name...\n";
+    	if((!$pdata) or (!ref $pdata)) {
+    		print STDERR "[$idx/$count] project $name not defined.\n";
+    		next;
+    	}
+        my $repo = get_repo($query_text,@{$pdata});
+		print STDERR "[$idx/$count] $name -> $repo->{target}\n";
+        unless($F_TEST or -d $repo->{target}) {
+            error("[$idx/$count] target not exists: $repo->{target}\n");
+            next;
+            }
+        unless($F_TEST) {
+            unless(chdir($repo->{target})) {
+                error("[$idx/$count] error while chdir to $repo->{target}\n");
+                next;
+            }
+        }
+        unless(check_repo($repo)) {
+            error("[$idx/$count] error while checking $name\n");
+            next;
+        }
+        unless($F_TEST) {
+            unless(chdir($cwd)) {
+                die ("$!\n");
+            }
+        }        
+        print STDERR "\n";
+    }
+}
+elsif($OPTS{reset}) {
+    print STDERR "ready to reset $count ", $count > 1 ? "projects" : "project", " ...\n";
+    foreach my $query_text (@query) {
+        $idx++;
+		my ($name,$pdata) = get_project_data($query_text);
+        print STDERR "[$idx/$count] resetting project $name...\n";
+    	if((!$pdata) or (!ref $pdata)) {
+    		print STDERR "[$idx/$count] project $name not defined.\n";
+    		next;
+    	}
+        my $repo = get_repo($query_text,@{$pdata});
+		print STDERR "[$idx/$count] $name -> $repo->{target}\n";
+        unless($F_TEST or -d $repo->{target}) {
+            error("[$idx/$count] target not exists: $repo->{target}\n");
+            next;
+            }
+        unless($F_TEST) {
+            unless(chdir($repo->{target})) {
+                error("[$idx/$count] error while chdir to $repo->{target}\n");
+                next;
+            }
+        }
+        unless(reset_repo($repo)) {
+            error("[$idx/$count] error while resetting $name\n");
+            next;
+        }
+        unless($F_TEST) {
+            unless(chdir($cwd)) {
+                die ("$!\n");
+            }
+        }        
+        print STDERR "\n";
+    }
+}
+else {
+    print STDERR "pulling $count ", $count > 1 ? "projects" : "project", " ...\n";
+    foreach my $query_text (@query) {
+        $idx++;
+		my ($name,$pdata) = get_project_data($query_text);
+        print STDERR "[$idx/$count] pulling project [$name]...\n";
+    	if((!$pdata) or (!ref $pdata)) {
+    		print STDERR "[$idx/$count] project $name not defined.\n";
+    		next;
+    	}
+        my $repo = get_repo($query_text,@{$pdata});
+        unless($F_TEST or -d $repo->{target}) {
+            if(system("mkdir","-p",$repo->{target}) != 0) {
+                error("fatal: while create directory " . $repo->{target});
+                next;
+            }
+        }
+        unless(clone_repo($repo)) {
+            error("fatal: while clone repo\n");
+        }
+        unless($F_TEST) {
+            unless(chdir($repo->{target})) {
+                error("$!\n");
+                next;
+            }
+        }
+        unless(update_repo($repo)) {
+            error("fatal: while update repo\n");
+            next;
+        }
+        unless($F_TEST) {
+            unless(chdir($cwd)) {
+                return error("$!\n");
+                next;
+            }
+        }        
+        print STDERR "\n";
+    }
+
+}
+
+exit 0;
+
+__END__
+
+=pod
+
+=head1  NAME
+
+gsbridge - git-svn projects manager
+
+=head1  SYNOPSIS
+
+gsbridge [options] [action] [project_name|project_name:target]...
+	gsbridge --pull firefox
+	gsbridge pull firefox
+	gsbirdge pull firefox:test_firefox
+	gsbridge firefox:test_firefox
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<-r>,B<--reset>
+
+Re-configure projects
+
+=item B<-c>,B<--check>
+
+Check projects status
+
+=item B<-p>,B<--project>
+
+Target and define project from command line
+
+=item B<-t>,B<--test>
+
+Testing mode
+
+=item B<--dump>
+
+Dump CONFIG and DATA
+
+=item B<--dump-config>
+
+Dump CONFIG
+
+=item B<--dump-data>
+
+Dump DATA
+
+=item B<-l>,B<--list>
+
+List projects
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=back
+
+=head1  FILES
+
+=item B<./.PROJECTS>
+
+Default projects definition file, one line a project, 
+echo field separated by |.
+
+=back
+
+=head1 PROJECTS FILE FORMAT
+#MACRO1#=....
+#MACRO2#=....
+name	|[target]	|[user]	|repo1	|repo2	|repo3...
+
+=head1  DESCRIPTION
+
+git-svn projects manager
+
+=head1  CHANGELOG
+
+    2010-11-01  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+	
+	2010-11-25	xiaoranzzz	<xiaoranzzz@myplace.hell>
+		
+		* updated projects definition format
+		* added two actions: checking and resetting
+		* version 1.0
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl

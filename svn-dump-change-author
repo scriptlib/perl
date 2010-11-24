@@ -1,0 +1,60 @@
+#!/usr/bin/perl -w
+
+use strict;
+use warnings;
+
+my $old_exp = shift;
+my $new_exp = shift;
+if(!$new_exp) {
+    print STDERR "Usage:$0 <old_author_exp> <new_author_exp> [svn_dump_file]\n";
+    exit 0;
+}
+
+while (<>) {
+    print;
+    next unless /^Revision-number:\s+\d+$/;
+
+    # Grab the content lengths. Examples:
+    # Prop-content-length: 139
+    # Content-length: 139
+    my $plen_line = <>;
+    my $clen_line = <>;
+
+    unless ( $plen_line =~ /^Prop-content-length:\s+\d+$/ ) {
+        # Nothing we want to change.
+        print $plen_line, $clen_line;
+        next;
+    }
+
+    my @lines;
+    while ( <> ) {
+        if ( /^PROPS-END$/ ) {
+            # finish.
+            print $plen_line, $clen_line, @lines, $_;
+            last;
+        }
+
+        push @lines, $_;
+
+        if ( /^svn:author$/ ) {
+            # Grab the author content length. Example:
+            # V 6
+            my $alen_line = <>;
+
+            # Grab the author name.
+            my $auth = <>;
+            my $old_length = length($auth);
+            print STDERR '<',"$auth\n";
+            if ( $auth =~ s/$old_exp/$new_exp/ ) {
+                my $new_length = length($auth);
+                # Adjust the content lengths.
+                for my $line ( $plen_line, $clen_line, $alen_line ) {
+                    $line =~ s/(\d+)$/$1 + $new_length - $old_length/e;
+                }
+                print STDERR '>',"$auth\n";
+            }
+            print $plen_line, $clen_line, @lines, $alen_line, $auth;
+            last;
+        }
+    }
+}
