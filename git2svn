@@ -1,0 +1,547 @@
+#!/usr/bin/perl
+#
+# git2svn, converts a git branch to a svn ditto
+#
+# Copyright (c) 2008 Love Hörnquist Åstrand
+# All rights reserved. 
+# 
+# Redistribution and use in source and binary forms, with or without 
+# modification, are permitted provided that the following conditions 
+# are met: 
+# 
+# 1. Redistributions of source code must retain the above copyright 
+#    notice, this list of conditions and the following disclaimer. 
+# 
+# 2. Redistributions in binary form must reproduce the above copyright 
+#    notice, this list of conditions and the following disclaimer in the 
+#    documentation and/or other materials provided with the distribution. 
+# 
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND 
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE 
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL 
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS 
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) 
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY 
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
+# SUCH DAMAGE. 
+
+use strict;
+use POSIX qw(strftime);
+use Getopt::Long qw/:config gnu_getopt no_ignore_case auto_abbrev/;
+use Pod::Usage;
+
+my $IN;
+my $OUT;
+
+my ($help, $verbose, $keeplogs, $no_load);
+
+# svn
+my $svntree = "repro";
+my $basedir = "trunk";
+my $revision = 1;
+
+# git
+my $branch = "master";
+my $syncname;
+my $masterrev;
+my $fexport;
+
+my %blob;
+my %paths;
+
+sub read_data
+{
+    my ($IN, $next, $length, $data, $l) = (shift, shift);
+    unless($next =~ m/^data (\d+)/) { die "missing data: $next" ; }
+    $length = $1;
+    
+    $l = read(IN, $data, $length);
+    unless ($l == $length) { die "failed to read data $l != $length"; }
+    $data = "" if ($length == 0);
+    return $data;
+}
+
+sub prop
+{
+    my ($key, $value) = (shift, shift);
+    "K " . length($key) . "\n$key\nV " . length($value) . "\n$value\n";
+}
+
+sub parse_svn_tree
+{
+    my $url = shift;
+    my ($SVN, $type, $name);
+
+    open(SVN, "svn ls -R $url|") or die "failed to open svn ls -R $url";
+    while (<SVN>) {
+	chomp;
+	if (m@/?(.*)/$@) {
+	    $type = 1;
+	    $name = "$1";
+	} else {
+	    $type = 2;
+	    $name = "$_";
+	}
+	$paths{$name} = $type;
+    }
+    close SVN;
+
+    open(SVN, "svn info $url|") or die "failed to open svn info $url";
+    while (<SVN>) {
+	chomp;
+	if ($revision eq 1 && /^Revision: (\d+)/) {
+	    $revision = $1 + 1;
+	}
+    }
+    close SVN;
+}
+
+sub find_branch_id
+{
+    my ($gittree, $name) = (shift, shift);
+
+    my $GIT;
+
+    open FOO, "cd $gittree ".
+	"&& git rev-parse $name 2>/dev/null|" or
+	die "git rev-parse $name failed";
+    
+    my $id = <FOO>;
+    close GIT;
+    chomp($id);
+    $id = "" if ($id eq $name);
+    return $id;
+}
+
+sub parse_git_tree
+{
+    my ($gittree, $branch, $shortbranch) = (shift, shift, shift);
+
+    $syncname = "git2svn-syncpoint-${shortbranch}";
+    print STDERR "syncname tag: $syncname\n" if ($verbose);
+
+    $masterrev = find_branch_id($gittree, $branch);
+    die "No head found for ${branch}" if ($masterrev eq "");
+
+    my $oldmasterrev = find_branch_id($gittree, $syncname);
+
+    if ($oldmasterrev ne "") {
+
+	die "no $svntree, but incremental (have synctag) ?\n".
+	    "(\"cd $gittree && git tag -d $syncname\" to remove)" 
+	    unless ( -d $svntree);
+
+	if (${oldmasterrev} eq $masterrev) {
+	    print STDERR "nothing to sync, $syncname matches $branch\n" 
+		if ($verbose);
+	    exit 0;
+	}
+
+	$fexport = "$oldmasterrev..$masterrev";
+    } else {
+	$fexport="$masterrev";
+
+	system("svnadmin create ./$svntree") unless (-d $svntree);
+    }
+}
+
+
+sub checkdirs
+{
+    my $path = shift;
+    my $base = "";
+
+    # pick first dir, create, take next dir, continue until we reached basename
+    while ($path =~ m@^([^/]+)/(.*)$@) {
+	my $first = $base . $1;
+	$path = $2;
+	$base = $first . "/";
+	next if ($paths{$first});
+
+	$paths{$first} = 1;
+
+	printf OUT "Node-path: $first\n";
+	printf OUT "Node-kind: dir\n";
+	printf OUT "Node-action: add\n";
+	printf OUT "Prop-content-length: 0\n";
+	printf OUT "Content-length: 0\n";
+	printf OUT "\n";
+    }
+}
+
+sub next_line
+{
+    my $IN = shift;
+    my $next = <IN>;
+    chomp $next;
+    return $next;
+}
+
+#
+# This is to allow setting props for a path, XXX add configuration
+# file/options for this.
+#
+
+sub auto_props
+{
+    my $path = shift;
+    ### given path, return prop("prop", "value")
+    return "";
+}
+
+
+$|= 1;
+
+my $result;
+$result = GetOptions ("git-branch=s" => \$branch,
+		      "svn-prefix=s" => \$basedir,
+		      "keep-logs" => \$keeplogs,
+		      "no-load" => \$no_load,
+		      "verbose+" => \$verbose,
+		      "help" => \$help) or pod2usage(2);
+
+pod2usage(0) if ($help);
+
+die "to few arguments" if ($#ARGV < 1);
+
+mkdir ".data" unless (-d ".data");
+
+die "cant find branch name" unless ($branch =~ m@/?([^/]+)$@);
+my $shortbranch = $1;
+
+my $gittree = $ARGV[0];
+$svntree = $ARGV[1];
+
+# create an identifier by replacing path separators
+# (i.e. "/", ":" and "\") with underscores
+my $svntree_id = $svntree;
+$svntree_id =~ s/[\/:\\]/_/g;
+
+my $gitdump = ".data/git.dump-${svntree_id}-${shortbranch}";
+my $svndump = ".data/svn.dump-${svntree_id}-${shortbranch}";
+my $log = ".data/log-${svntree_id}-${shortbranch}";
+
+parse_git_tree($gittree, $branch, $shortbranch);
+
+my $cwd = `pwd`;
+chomp($cwd);
+parse_svn_tree("file://" . $cwd ."/". $svntree);
+
+system(">$log");
+
+print STDERR "git fast-export $branch ($fexport)\n" if ($verbose);
+
+system("(cd $gittree && git fast-export $fexport) > $gitdump 2>$log") == 0 or
+    die "git fast-export: $!";
+
+open IN, "$gitdump" or
+    die "failed to open $gitdump";
+
+open OUT, ">$svndump" or 
+    die "failed to open $svndump";
+
+print STDERR "creating svn dump from revision $revision...\n" if ($verbose);
+
+print OUT "SVN-fs-dump-format-version: 3\n";
+
+my $next = next_line();
+COMMAND: while (!eof(IN)) {
+    if ($next eq "") {
+	$next = next_line($IN);
+	next COMMAND;
+    } elsif ($next =~ /^commit (.*)/) {
+
+	my %commit;
+
+	$next = next_line($IN);
+	if ($next =~ m/mark +(.*)/) {
+	    $commit{Mark} = $1;
+	    $next = next_line($IN);
+	}
+	if ($next =~ m/author +(.*)/) {
+	    $commit{Author} = $1;
+	    $next = next_line($IN);
+	}
+	unless ($next =~ m/committer +(.+) +<([^>]+)> +(\d+) +[+-](\d+)$/) {
+	    die "missing comitter: $_";
+	}
+
+	$commit{CommitterName} = $1;
+	$commit{CommitterEmail} = $2;
+	$commit{CommitterWhen} = $3;
+	$commit{CommitterTZ} = $4;
+
+	$next = next_line($IN);
+	my $log = read_data($IN, $next);
+
+	$next = next_line($IN);
+	if ($next =~ m/from (.*)/) {
+	    $commit{From} = $1;
+	    $next = next_line($IN);
+	}
+	if ($next =~ m/merge (.*)/) {
+	    $commit{Merge} = $1;
+	    $next = next_line($IN);
+	}
+
+	my $date = 
+	    strftime("%Y-%m-%dT%H:%M:%S.000000Z", 
+		     gmtime($commit{CommitterWhen}));
+
+	my $author = "(no author)";
+	if ($commit{CommitterEmail} =~ m/([^@]+)/) {
+	    $author = $1;
+	}
+	$author = "git2svn-dump" if ($author eq "(no author)");
+
+	my $props = "";
+	$props .= prop("svn:author", $author);
+	$props .= prop("svn:log", $log);
+	$props .= prop("svn:date", $date);
+	$props .= "PROPS-END";
+
+	# push out svn info
+
+	printf OUT "Revision-number: $revision\n"; $revision++;
+	printf OUT "Prop-content-length: ". length($props) . "\n";
+	printf OUT "Content-length: " . length($props) . "\n";
+	printf OUT "\n";
+	print OUT "$props\n";
+
+	while (1) {
+	    if ($next =~ m/M (\d+) (\S+) (.*)$/) {
+		my ($mode, $dataref, $path) = (oct $1, $2, $3);
+		my $content;
+		if ($dataref eq "inline") {
+		    $next = next_line($IN);
+		    $content = read_data($IN, $next);
+		} else {
+		    if (defined $blob{$dataref}) {
+		    	$content = $blob{$dataref};
+		    } else {
+				# Submodules cannot be converted
+				print STDERR "Ignored line, please check if this is a submodule: $next\n" if ($verbose);
+				$next = next_line($IN);
+				next;
+		    }
+		    # here we really want to delete $blob{$dataref},
+		    # but it might be referenced in the future. To
+		    # avoid keepig everything in memory for larger
+		    # repositories this must be written out to disk
+		    # and removed when done.
+		}
+
+		$path = "$basedir/$path";
+		checkdirs($path);
+
+		my $action = "add";
+
+		my $type = $mode & 0777000;
+
+		if ($paths{$path}) {
+		    if (($paths{$path} != 2) && ($type != 0120000)) {
+				die "file was a dir";
+		    } elsif (($paths{$path} != 2) && ($type == 0120000)) {
+				print STDERR "Dir is now a symlink, deleting: $path\n" if ($verbose);
+			    foreach ( keys( %paths ) ) {
+    	        	delete $paths{$_} if ( /^$path\// );
+				}
+				# This is now a file and not a path anymore
+				$paths{$path} = 2;
+				printf OUT "Node-path: $path\nNode-action: delete\n\n";
+		    } else {
+		      $action = "change";
+		    }
+		} else {
+		    $paths{$path} = 2;
+		}
+
+
+		my $kind = "";
+		$kind = "file" if ($type == 0100000);
+		$kind = "symlink" if ($type == 0120000);
+		die "$type unknown" if ($kind eq "");
+
+		$props = "";
+		$props .= prop("svn:executable", "on") if ($mode & 0111);
+		$props .= prop("svn:special", "*") if ($kind eq "symlink");
+		$props .= auto_props($path);
+		$props .= "PROPS-END\n" if ($props ne "");
+
+		$content = "link $content\n" if ($kind eq "symlink");
+
+		my $plen = length($props);
+		my $clen = length($content);
+
+		printf OUT "Node-path: $path\n";
+		printf OUT "Node-kind: file\n";
+		printf OUT "Node-action: $action\n";
+		printf OUT "Text-content-length: $clen\n";
+		printf OUT "Content-length: " . ($clen + $plen) . "\n";
+		printf OUT "Prop-content-length: $plen\n" if ($plen);
+		printf OUT "\n";
+		
+		print OUT "$props" if ($plen);
+
+		print OUT $content;
+		printf OUT "\n";
+	    } elsif ($next =~ m/D (.*)/) {
+		my $path = $basedir . "/". $1;
+
+		if ($paths{$path}) {
+		    delete $paths{$path};
+		    foreach ( keys( %paths ) ) {
+            	delete $paths{$_} if ( /^$path\// );
+			}
+		    
+		    printf OUT "Node-path: $path\n";
+		    printf OUT "Node-action: delete\n";
+		    printf OUT "\n";
+		} elsif ($verbose) {
+		    print STDERR "deleting non existing object: $path\n";
+		}
+
+	    } elsif ($next =~ m/^C (.*)/) {
+		die "file copy ?";
+	    } elsif ($next =~ m/^R (.*)/) {
+		die "file rename ?";
+	    } elsif ($next =~ m/^filedeleteall$/) {
+		die "file delete all ?";
+	    } else {
+		next COMMAND;
+	    }
+	    $next = next_line($IN);
+	}
+
+    } elsif ($next =~ /^tag .*/) {
+    } elsif ($next =~ /^reset .*/) {
+    } elsif ($next =~ /^blob/) {
+	my $mark = undef;
+	$next = next_line($IN);
+	if ($next =~ m/mark (.*)/) {
+	    $mark = $1;
+	    $next = next_line($IN);
+	}
+	my $data = read_data($IN, $next);
+	$blob{$mark} = $data if (defined $mark);
+    } elsif ($next =~ /^checkpoint .*/) {
+    } elsif ($next =~ /^progress (.*)/) {
+	print STDERR "progress: $1\n" if ($verbose);
+    } else {
+	die "unknown command $next";
+    }
+    $next = next_line($IN);
+}
+
+close IN;
+close OUT;
+
+print STDERR "...dumped to revision $revision\n" if ($verbose);
+print STDERR "(re-)setting sync-tag to new master\n" if ($verbose);
+
+unless ($no_load) {
+    system("cd $gittree && ".
+	   "git tag -m \"sync $(date)\" -a -f ${syncname} ${masterrev}");
+}
+
+print STDERR "loading dump into svn\n" if ($verbose);
+
+unless ($no_load) {
+    system("svnadmin load $svntree < $svndump >>$log 2>&1") == 0 or 
+	die "svnadmin load";
+}
+
+unlink $svndump, $gitdump, $log unless ($keeplogs);
+
+exit 0;
+
+
+__END__
+
+=head1 NAME
+
+B<git2svn> - converts a git branch to a svn ditto
+
+=head1 SYNOPSIS
+
+B<git2svn> [options] git-repro svn-repro
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--git-branch>
+
+The git branch to export. The default is branch is master.
+
+=item B<--svn-prefix>
+
+The svn prefix where the branch is import. The default is trunk to
+match the default GIT branch (master).
+
+=item B<--no-load>
+
+Don't load the svn repository or update the syncpoint tagname.
+
+=item B<--keep-logs>
+
+Don't delete the logs in $CWD/.data on success.
+
+=item B<--verbose>
+
+More verbose output, can be give more then once to increase the verbosity.
+
+=item B<--help>
+
+Print a brief help message and exits.
+
+=back
+
+=head1 DESCRIPTION
+
+B<git2svn> will convert a git branch to a svn ditto, it also
+support incremantal updates.
+
+B<git2svn> takes a git fast-export dump and converts it into a
+svn dump that is feed into svnadmin load.
+
+B<git2svn> assumes its the only process that writes into the svn
+repository. This is because of the race between getting the to svn
+Revsion number from the svn, creating the dump with correct Revsions,
+and do the svnadmin load.
+
+B<git2svn> also support incremental updates from a git branch to
+a svn reprositry. Its does this by setting a git tag
+(git2svn-syncpoint-<branchname>) where the last update was pulled
+from.
+
+B<git2svn> was created as a hack over a weekend to support a
+smoother migration away from svn and allow users access to tools to
+browse and search code (fisheye) and use anonymouns svn servers.
+
+=head1 EXAMPLES
+
+	B<git2svn> ~/src/heimdal svn-repro
+
+	B<git2svn> --git-branch heimdal-1-0-branch \
+             --svn-prefix branches/heimdal-1-0-branch \
+	     ~/src/heimdal svn-repro
+
+=head1 DOWNLOAD
+
+B<git2svn> is avaible from repo.or.cz
+
+	git clone git://repo.or.cz/git2svn.git
+
+=head1 AUTHORS
+
+	Love Hörnquist Åstrand <lha@kth.se>
+
+=head1 BUGS
+
+	Send bug reports to lha@kth.se
+
+=cut

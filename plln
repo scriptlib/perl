@@ -13,7 +13,8 @@ my $PERL_SRC_DIR=$ENV{XR_PERL_SOURCE_DIR};
 my $PERL_BIN_DIR=$ENV{XR_PERL_BINARY_DIR};
 my $name=$ARGV[0];
 $name =~ s/\.pl$//;
-my $src=$PERL_SRC_DIR . "/" . $name . ".pl";
+my $src=$PERL_SRC_DIR . "/" . $name;
+$src .= ".pl" unless(-f $src);
 my $bin=$PERL_BIN_DIR . "/" . $name;
 
 die("File not exist:$src\n") unless(-f "$src");
