@@ -12,7 +12,15 @@ open FO,">>","urlrule_database.log";
 print FO scalar(localtime),": urlrule_database ",(map "\"$_\" ",@ARGV),"\n";
 close FO;
 
-if($action and $action =~ /^(?:ADD)$/) {
+if(!$action) {
+}
+elsif($action =~ /^(?:ADD)$/) {
         push @ARGV,'newly',unless ($ARGV[$#ARGV] eq 'newly' or $ARGV[$#ARGV] =~ m/^#/);
+}
+elsif($action =~ /^(?:READD)$/) {
+	shift @ARGV;
+	system($0,'delete',@ARGV);
+	exec($0,"add",@ARGV);
+	exit 0;
 }
 exec 'r-config','-f',$TASK_DATABASE,@ARGV;

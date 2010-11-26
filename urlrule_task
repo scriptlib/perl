@@ -24,8 +24,8 @@ my $U_DOWNLOADER = 'batchget --maxtime 600 -U -c -m 3 -f';
 my $S_DOWNLOADER = 'batchget --maxtime 600 -c -m 3 -f';
 my $TASK_WORKDIR = getcwd();;
 my $TASK_FILEHANDLE_LOG;
-use MyPlace::XConfig;
-my $Names = MyPlace::XConfig->new();
+use MyPlace::Config;
+my $Names = MyPlace::Config->new();
 $Names->read_plainfile($TASK_DATABASE);
 
 sub change_directory {
@@ -197,7 +197,7 @@ sub action_DOWNLOAD {
         app_error("Can't access $name/$hostname!\n");
         return undef;
     }
-    my $Names = MyPlace::XConfig->new();
+    my $Names = MyPlace::Config->new();
     $Names->read_plainfile($TASK_DATABASE);
     $Names->propset(scalar(localtime),$name,$id,$host,"last");
     print STDERR "Saving $TASK_DATABASE...\n";
@@ -253,7 +253,7 @@ if(@ARGV) {
         $query = $action;
         $action = 'ECHO';
     }
-    my $Hosts = MyPlace::XConfig->new();
+    my $Hosts = MyPlace::Config->new();
     $Hosts->read_plainfile($HOST_DATABASE);
     my @targets =  $Names->query($query);
     if(!@targets) {
