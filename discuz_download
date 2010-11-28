@@ -180,7 +180,7 @@ sub save_attachment {
     print STDERR "\n";
     foreach(@{$subpage->{attachment}}) 
     {
-        my $attachment_filename = "$dst/" . $_->[1];
+        my $attachment_filename = build_dir($dst,$_->[0] . '_' . $_->[1]);
         app_message "Downloading $attachment_filename ...";
         if( -f $attachment_filename) 
         {
