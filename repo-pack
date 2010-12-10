@@ -1,0 +1,195 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+use version '5.8';
+use Cwd qw/getcwd/;
+use File::Glob qw/bsd_glob/;
+use POSIX qw/strftime/;
+our $VERSION = 'v1.0';
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? manual|m recursive|r/;
+if(@ARGV)
+{
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+}
+else {
+    $OPTS{help} = 1;
+}
+
+my $TIMESTAMP = strftime('%Y%m%d_%H%M%S_%s',gmtime);
+my $CWD=getcwd;
+my $BUNDLES="$CWD/bundles";
+
+sub run {
+	print STDERR join(" ",@_),"\n";
+	return system(@_)==0;
+}
+sub glob_git {
+    my $opt = shift; 
+    my $dir = shift;
+    if($opt eq '-l') {
+    }
+    else {
+        $dir = $opt;
+        return if(-l $dir);
+    }
+ #   print STDERR "glob in $dir\n";
+    my @gits;
+    foreach(bsd_glob("$dir/.*"),bsd_glob("$dir/*")) {
+        if(m/(?:^|[\/\\])\.+$/) {
+            next;
+        }
+        elsif(-d $_) {
+            if(m/\.git$/) {
+                push @gits,$_;
+            }
+            elsif($OPTS{recursive}) {
+                my @r_git = &glob_git($_);
+                push @gits,@r_git if(@r_git);
+            }
+        }
+    }
+    return @gits;
+}
+sub tee {
+    my $HD = shift;
+    print STDERR @_;
+    print $HD @_;
+}
+sub t_run {
+    my $fh = shift;
+    print STDERR join(" ",@_),"\n";
+    open FI,"-|",@_;
+    tee($fh,$_) while(<FI>);
+    close FI;
+}
+sub pack_bundle {
+	my $project = shift;
+	my $name = shift;
+	$project =~ s/\/+$//;
+    my $parent = $CWD;
+	if($project =~ m/^(.+)\/([^\/]+)$/) {
+        $name = $2 unless($name);
+        $parent = $1;
+    }
+    $name = $project unless($name);
+	my $dst = "$BUNDLES/$name" . "_$TIMESTAMP.tar";
+	if(! -d $BUNDLES) {
+		mkdir($BUNDLES) or die("created [$BUNDLES] failed!\n");
+		print STDERR "created [$BUNDLES]\n";
+	}
+    open my $FTEE,">","$CWD/$name.log";
+    chdir $project;
+    my @gits = glob_git("-l",".");
+    my @repos;
+    foreach(@gits) {
+        s/^.[\/\\]+//;
+        my $repo = {rel=>$_};
+        $repo->{abs}="$project/$_";
+        $repo->{tree}= $repo->{abs};
+        $repo->{tree} =~ s/\.git$//;
+        push @repos,$repo;
+    }
+
+    &tee($FTEE,scalar(localtime),"\nStart packing bundle from [$project] as [$dst]\n");
+    &tee($FTEE,'=' x 79,"\n");
+    &tee($FTEE,"Found git databases in $project:\n",join("\n",map {$_->{abs}} @repos),"\n");
+    foreach my $repo (@repos) {
+        &tee($FTEE,"Updating repository $repo->{abs} ...\n");
+        my @git_cmd = ("git","--git-dir",$repo->{abs},"--work-tree",$repo->{tree});
+#        run(@git_cmd,"status");
+#        run(@git_cmd,"branch","-av");
+        t_run($FTEE,@git_cmd,"svn","fetch");
+        t_run($FTEE,@git_cmd,"fetch","--all");
+        &tee($FTEE, "Lastest 5 commits from repository are:\n");
+        t_run($FTEE,@git_cmd,"log","--oneline","-n",5);
+        &tee($FTEE,'=' x 79,"\n");
+        t_run($FTEE,@git_cmd,"gc");
+    }
+    &tee($FTEE,"Packing $project as $dst\n"); 
+    &tee($FTEE,"Archive content:\n");
+    t_run($FTEE,"tar","-cvf",$dst,map {$_->{rel}} @repos);
+    &tee($FTEE,'=' x 79,"\n");
+    &tee($FTEE,scalar(localtime),"\nFinished packing bundle from [$project] as [$dst]\n");
+    close $FTEE;
+}
+
+
+if($OPTS{help}) {
+    require Pod::Usage;
+    Pod::Usage::pod2usage(-exitval=>0,-verbose => 1);
+    exit 0;
+}
+elsif($OPTS{manual}) {
+    require Pod::Usage;
+    Pod::Usage::pod2usage(-exitval=>0,-verbose => 2);
+    exit 0;
+}
+open my $LOG,">>repo-pack.log";
+foreach(@ARGV) {
+	tee($LOG,scalar(localtime),": packing bundle from $_\n");
+	if($_ =~ m/(.+):([^:]+)$/) {
+		pack_bundle($1,$2);
+	}
+	else {
+		pack_bundle($_);	
+	}
+	chdir($CWD);
+}
+close $LOG;
+
+exit 0;
+
+__END__
+
+=pod
+
+=head1  NAME
+
+repo-pack - pack git repositories
+
+=head1  SYNOPSIS
+
+repo-pack [options] path1 [path2...]...
+
+repo-pack -r ../perl 
+
+repo-pack /myplace/workspace
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<-r>,B<--recursive>
+
+Pack repository recursively
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=back
+
+=head1  CHANGELOG
+
+    2010-11-01  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+	
+	2010-12-10	xiaoranzzz	<xiaoranzzz@myplace.hell>
+		
+		* version 1.0
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl
