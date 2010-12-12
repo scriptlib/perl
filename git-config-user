@@ -36,7 +36,7 @@ sub mm {
 my $u = shift;
 die("Usage: $0 <username>\n") unless($u);
 if("eotect" =~ m/^$u/) {
-    run(qw/git config user.name/,"Nahn Eotect");
+    run(qw/git config user.name/,"Eotect Nahn");
     run(qw/git config user.email/,mm('eotect'));
 }
 elsif("xiaoranzzz" =~ m/^$u/) {
