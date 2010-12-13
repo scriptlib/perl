@@ -5,7 +5,7 @@ require v5.10.0;
 our $VERSION = 'v1.0';
 
 my %OPTS;
-my @OPTIONS = qw/help|h|? manual|m test|t project|p dump|d dump-config|dc dump-data|dd check|c list|l pull reset|r/;
+my @OPTIONS = qw/help|h|? manual|m debug test|t project|p dump|d dump-config|dc dump-data|dd check|c list|l pull reset|r no-git|ng no-svn|ns push/;
 if(@ARGV)
 {
     require Getopt::Long;
@@ -26,7 +26,7 @@ foreach(keys %OPTS) {
 }
 unless($have_opts) {
 	my $first_arg = shift;
-	if($first_arg and $first_arg =~ m/^(help|manual|test|project|dump|dump-config|dump-data|check|list|pull|reset)$/) {
+	if($first_arg and $first_arg =~ m/^(help|manual|test|project|dump|dump-config|dump-data|check|list|pull|reset|push)$/) {
 		$OPTS{$first_arg} = 1;
 	}
 	else {
@@ -63,7 +63,7 @@ my %project;
 my %sub_project;
 
 sub run {
-    print join(" ",@_),"\n";
+    print "[",getcwd(),"] ",join(" ",@_),"\n";
     return 1 if($F_TEST);
     return system(@_) == 0;
 }
@@ -106,6 +106,9 @@ sub parse_project_data {
             $MACRO{$name} = $value;
             next;
         }
+		elsif(m/^\s*#/) {
+			next;
+		}
         my @data = (split(/\s*\|\s*/,$_),'','','','','','','');
         foreach(@data) {
             s/^\s+|\s+$//;
@@ -124,20 +127,60 @@ sub parse_project_data {
 sub translate_url {
     my $url = shift;
     my $path = shift;
-    if($path =~ m/^([^\/]+)\/(.+)$/) {
+	print STDERR "translate_url> $url + $path\n" if($OPTS{debug});
+    if($url =~ m/#3/ and $path =~ m/^([^\/]+)\/([^\/]+)\/(.+)$/) {
         my $a = $1;
         my $b = $2;
-        $url =~ s/#1/$a/g;
-        $url =~ s/#2/$b/g;
+		my $c = $3;
+        $url =~ s{#1}{$a}g;
+        $url =~ s{#2}{$b}g;
+		$url =~ s{#3}{$c}g;
+    }
+    elsif($url =~ m/#2/ and $path =~ m/^([^\/]+)\/(.+)$/) {
+        my $a = $1;
+        my $b = $2;
+        $url =~ s{#1}{$a}g;
+        $url =~ s{#2}{$b}g;
     }
     else {
-        $url =~ s/#1/$path/g;
-        $url =~ s/#2//g;
+        $url =~ s{#1}{$path}g;
     }
+	$url =~ s/#\d//g;
+	$url =~ s/\/{2,}/\//g;
+	$url =~ s/:\/([^\/])/:\/\/$1/;
     $url =~ s/\/+$//;
+	print STDERR "translate_url>=$url\n" if($OPTS{debug});
     return $url;
 }
 
+sub push_remote {
+    my @remotes;
+    open FI,"-|",qw/git remote/;
+    while(<FI>) {
+        chomp;
+        push @remotes,$_ if($_);
+    }
+    close FI;
+    if(@remotes) {
+        my $idx=0;
+        my $count=@remotes;
+        foreach(@remotes) {
+            $idx++;
+            my $url = `git config --get "remote.$_.url"`;
+            chomp($url);
+            print "[$idx/$count]pushing to [$_] $url ...\n";
+            if(system(qw/git push/,$_,@_)!=0) {
+                print "[$idx/$count]pushing to [$_] failed\n";
+                return undef;
+            }
+        }
+    }
+    else {
+       print "NO remotes found, stop pushing\n";
+       return undef;
+    }
+    return 1;
+}
 sub get_repo {
     my ($query_name,$target,$user,@repo_data) = @_;
     my %r;
@@ -154,20 +197,27 @@ sub get_repo {
     @repo_data = ("svn/$name","git/$name") unless(@repo_data);
     foreach my $url (@repo_data) {
         next unless($url);
+		print STDERR "get_repo>  $url\n" if($OPTS{debug});
         if($url =~ m/^(svn|git):([^\/]+)\/(.*)$/i) {
             my $template = $CONFIG{"$1:$2"} ? $CONFIG{"$1:$2"} : "$2/$3";
 			my $subname = $3;
 			my $type = $1;
 			if($subname and $subname =~ m/\/$/) {
 				$subname = $subname . $name;
+				print STDERR "get_repo> fixed name to $subname\n" if($OPTS{debug});
 			}
 			$url = translate_url($template,$subname ? $subname : $name);
             push @{$r{$type}},$url;
         }
         elsif($url =~ m/^(svn|git)\/(.*)$/){
             my $template = $CONFIG{$1} ? $CONFIG{$1} : "$2";
-            $url = translate_url($template,$2 ? $2 : $name);
-            push @{$r{$1}},$url;
+			my $subname = $2;
+			my $type = $1;
+			if($subname and $subname =~ m/\/$/) {
+				$subname = $subname . $name;
+			}
+            $url = translate_url($template,$subname ? $subname : $name);
+            push @{$r{$type}},$url;
         }
         elsif($url =~ m/^(svn|git):([^\/]+)$/i) {
             push @{$r{$1}},$2;
@@ -175,6 +225,7 @@ sub get_repo {
         else {
             push @{$r{svn}},$url;
         }
+		print STDERR "get_repo>- $url\n" if($OPTS{debug});
     }
     if($r{user} and $r{user} =~ m/(.+)\s+<([^\@]+\@[^\@]+)>\s*$/) {
         $r{username} = $1;
@@ -187,14 +238,26 @@ sub get_repo {
         $r{svn_main} = shift @svns;
         $r{svn} = \@svns;
     }
-    elsif($r{git} and @{$r{git}}) {
+    if($r{git} and @{$r{git}}) {
         my @gits = @{$r{git}};
         $r{git_main} = shift @gits;
         $r{git} = \@gits;
     }
     return \%r;
 }
-
+sub config_repo {
+	my $repo = shift;
+    if($repo->{username}) {
+        run(qw/git config user.name/,$repo->{username}) or return error("fatal: while git config\n");
+    }
+    if($repo->{email}) {
+        run(qw/git config user.email/,$repo->{email}) or return error("fatal: while git config\n");
+    }
+    my $user_file = $CONFIG{GS_DIR} . "/" . $CONFIG{authors} . ".txt";
+	if(-f $user_file) {
+		run(qw/git config svn.authorsfile/,$user_file);
+	}
+}
 
 sub check_repo {
     run('git','status') or return undef;
@@ -204,19 +267,29 @@ sub check_repo {
 }
 sub reset_repo {
 	my $repo = shift;
-	system('rm',"-v",".git/config");
+#	system('rm',"-v",".git/config");
 	system("rm","-fvr",".git/refs/remotes");
-	if($repo->{svn_main}) {
+	system("rm","-fvr",".git/svn");
+	config_repo($repo);
+	if($repo->{svn_main} and !$OPTS{'no-svn'}) {
+		unshift @{$repo->{git}},$repo->{git_main} if($repo->{git_main});
+		$repo->{git_main} = undef;
 		init_svn_repo('svn',$repo->{svn_main});	
 	}
-	if($repo->{git_main}) {
+	if($repo->{git_main} and !$OPTS{'no-git'}) {
+		unshift @{$repo->{svn}},$repo->{svn_main} if($repo->{svn_main});
+		$repo->{svn_main}=undef;
 		init_git_repo($repo->{git_main});		
 	}
 	update_repo($repo);
 }
 sub init_repo {
     my $repo = shift;
-    if($repo->{svn_main}) {
+	config_repo($repo);
+
+    if($repo->{svn_main} and !$OPTS{'no-svn'}) {
+		unshift @{$repo->{git}},$repo->{git_main} if($repo->{git_main});
+		$repo->{git_main} = undef;
         my $user_file = $CONFIG{GS_DIR} . "/" . $CONFIG{authors} . ".txt";
 		$user_file = undef unless(-f $user_file);
 		run(qw/git config --remove-section/,"svn-remote.svn");
@@ -225,9 +298,15 @@ sub init_repo {
 		#init_svn_repo('svn',$repo->{svn_main},$user_file) 
 			#or return error("fatal: while initializing $repo->{svn_main}\n");
     }
-    elsif($repo->{git_main}) {
-		init_git_repo($repo->{git_main}) 
-			or return error("fatal: while initializing $repo->{git_main}\n");
+    if($repo->{git_main} and !$OPTS{'no-git'}) {
+		unshift @{$repo->{svn}},$repo->{svn_main} if($repo->{svn_main});
+		$repo->{svn_main}=undef;
+		run(qw/git remote rm origin/);
+		run(qw/git remote add origin/,$repo->{git_main});
+		run(qw/git config branch.master.remote origin/);
+		run(qw/git config branch.master.merge/,"refs/heads/master");
+		run(qw/git pull/) or
+			return error("fatal: while initializing $repo->{git_main}\n");
 	}
     return 1;
 }
@@ -288,13 +367,7 @@ sub init_git_repo {
 }
 sub update_repo {
     my $repo = shift;
-    if($repo->{username}) {
-        run(qw/git config user.name/,$repo->{username}) or return error("fatal: while git config\n");
-    }
-    if($repo->{email}) {
-        run(qw/git config user.email/,$repo->{email}) or return error("fatal: while git config\n");
-    }
-    if($repo->{svn} and @{$repo->{svn}}) {
+    if($repo->{svn} and @{$repo->{svn}} and !$OPTS{'no-svn'}) {
         foreach my $host (@{$repo->{svn}}) {
             unless(init_svn_repo(undef,$host)) {
 				error("fatal: while init svn repo [$host]\n");
@@ -302,7 +375,7 @@ sub update_repo {
 			}
         }
     }
-    if($repo->{git} and @{$repo->{git}}) {
+    if($repo->{git} and @{$repo->{git}} and !$OPTS{'no-git'}) {
         unless(init_git_repo(@{$repo->{git}})) {
 			error("fatal: while init git repo\n");
 			next;
@@ -454,6 +527,31 @@ elsif($OPTS{reset}) {
         print STDERR "\n";
     }
 }
+elsif($OPTS{push}) {
+    print STDERR "pushing $count ", $count > 1 ? "projects" : "project", " ...\n";
+    foreach my $query_text (@query) {
+        $idx++;
+		my ($name,$pdata) = get_project_data($query_text);
+        print STDERR "[$idx/$count] push project [$name]...\n";
+    	if((!$pdata) or (!ref $pdata)) {
+    		print STDERR "[$idx/$count] project $name not defined.\n";
+    		next;
+    	}
+        my $repo = get_repo($query_text,@{$pdata});
+		if(! -d $repo->{target}) {
+			print STDERR "[$idx/$count] project $name target not exists\n";
+			next;
+		}
+		chdir($repo->{target}) or die("$!\n");
+		if(!$OPTS{test}) {
+			push_remote('--all','--force');
+		}
+		else {
+			push_remote('--all','--force','--dry-run');
+		}
+		chdir($cwd) or die("$!\n");
+	}
+}
 else {
     print STDERR "pulling $count ", $count > 1 ? "projects" : "project", " ...\n";
     foreach my $query_text (@query) {
@@ -517,6 +615,14 @@ gsbridge [options] [action] [project_name|project_name:target]...
 =head1  OPTIONS
 
 =over 12
+
+=item B<-ng>,B<--no-git>
+
+Disable git repositories
+
+=item B<-ns>,B<--no-svn>
+
+Disable subversion repositories
 
 =item B<-r>,B<--reset>
 
