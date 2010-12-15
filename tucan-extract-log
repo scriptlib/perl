@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # $Id: script_template 17 2010-10-08 17:47:31Z xiaoranzzz $
 use strict;
-require v5.10.0;
+require v5.8.0;
 our $VERSION = 'v0.1';
 
 BEGIN

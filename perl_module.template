@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-require v5.10.0;
+require v5.8.0;
 
 BEGIN {
     require Exporter;

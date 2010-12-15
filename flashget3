@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 # $Id$
 use strict;
-require v5.10.0;
+require v5.8.0;
 our $VERSION = 'v0.1';
 
 BEGIN
