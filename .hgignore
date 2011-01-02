@@ -3,4 +3,4 @@ badluck/
 modules/MyPlace/
 .authors
 urlrule/
-.hg/
+.git/
