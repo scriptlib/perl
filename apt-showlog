@@ -1,0 +1,71 @@
+#!/usr/bin/perl -w
+###APPNAME:     apt-log-show
+###APPAUTHOR:   xiaoranzzz
+###APPDATE:	Wed Apr  2 00:42:39 2008
+###APPVER:	0.1
+###APPDESC:	
+###APPUSAGE:	
+###APPEXAMPLE:	
+###APPOPTION:	
+use strict;
+
+sub sudo_system {
+    print STDERR ("[sudo:]",join(" ",@_),"\n");
+    if ($>==0) {
+        return (system(@_)==0);
+    }
+    else {
+        return (system("sudo",@_)==0);
+    }
+}
+
+@ARGV = ("/var/log/apt/term.log") unless(@ARGV);
+
+foreach my $logfile (@ARGV) {
+	my $log_h;
+	if($logfile && -f $logfile) {
+	    if(!open $log_h,"<",$logfile) {
+	        print STDERR "Open $logfile for reading error:$!\n";
+	        print STDERR "Trying sudo...\n";
+	        open $log_h,"-|","sudo cat '$logfile'" or die("$!\n");
+	    }
+	}
+	else {
+	    $log_h = \*STDIN;
+	}
+	my %logs;
+	my $date;
+	my $filters=qr/^\s*(:?Setting up|Removing|dpkg)\b/;
+	while(<$log_h>) {
+	    chomp;
+	    if(!$date) {
+	        next unless(/^Log started:\s+(.*)\s+(.*)\s*$/);
+	        $date=$1;
+	#        $logs{$date}=() unless(exists $logs{$date});
+	    }
+	    elsif(/^Log ended:/){
+	        $date=undef;
+	    }
+	    else {
+	        push(@{$logs{$date}},$_) if(m/$filters/);
+	    }
+	}
+	close $log_h;
+	
+	
+	#use Term::ANSIColor qw/:constants/;
+	use constant {RESET=>"",GREEN=>"",YELLOW=>""};
+	sub CL {
+	    print @_,RESET,"\n";
+	}
+	print $logfile,":\n";		
+	foreach my $title (sort keys %logs) {
+	    CL(GREEN,$title,":");
+	    my @items = @{$logs{$title}};
+	    foreach(@items) {
+	        CL(YELLOW,"\t",$_);
+	    }
+	}
+}
+
+

@@ -1,0 +1,98 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.8.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/\/+$//;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
+    unshift @INC, 
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+
+my $HOST='shell.sourceforge.net';
+my @args=('ssh','-t',$HOST);
+my $login;
+foreach(@ARGV) {
+	if(m/^(.+)\@(.*)$/) {
+		$login = $1;
+		push @args,'-l',$1;	
+		push @args,$2 if($2);
+	}
+	else {
+		push @args,$_;
+	}
+}
+print STDERR join(" ",@args),"\n";
+print "\033]2;",($login ? "$login\@" : ""),"$HOST\007";
+exec(@args);
+
+__END__
+
+=pod
+
+=head1  NAME
+
+ssh-sf.net - PERL script
+
+=head1  SYNOPSIS
+
+ssh-sf.net [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-12-17 19:25  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl
