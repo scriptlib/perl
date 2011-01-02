@@ -1,5 +1,4 @@
-#!/usr/bin/perl -w
-# $Id$
+#!/usr/bin/env perl
 use strict;
 require v5.8.0;
 our $VERSION = 'v0.1';
@@ -18,7 +17,7 @@ BEGIN
 }
 
 my %OPTS;
-my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man bz2 gz verbose|v/;
 
 if(@ARGV)
 {
@@ -34,42 +33,66 @@ else
     exit 0;
 }
 
+use Cwd qw/getcwd/;
+my $cwd = getcwd;
+
 sub run {
     my $exit = system(@_);
     die("fatal error: $! while executing [",join(" ",@_),"]\n") if($exit);
     return 1;
 }
-sub create_repo {
-    my $DEST = shift;
-    if(! -d $DEST) {
-        print STDERR "creating local repository $DEST...\n";
-        run(qw/svnadmin create/,$DEST);
-        my $hook = "$DEST/hooks/pre-revprop-change";
-        print STDERR "creating pre-revprop-change hook in $DEST...\n";
-        open FO,'>',$hook or die("fatal error\n");
-        print FO "#!/bin/sh\nexit 0\n";
-        close FO;
-        run(qw/chmod a+x/,$hook);
-    }
+
+my $dumpcmd = $OPTS{verbose} ? 'svnadmin dump' : 'svnadmin dump -q';
+
+sub svndump {
+	my $local = shift;
+	my $name = shift;
+	print STDERR "$local ...\n";
+	my $rev;
+	my $last;
+	if(open FI,"-|",'svn','info','file://' . $local) {
+		foreach(<FI>) {
+			if(m/^\s*Last Changed Rev:\s*(\d+)/) {
+				$rev = $1;
+			}
+			elsif(m/^\s*Last Changed Date:\s*(\d+)-(\d+)-(\d+)/) {
+				$last = "$1$2$3";
+			}
+		}
+		close FI;
+		my $dst = $name;
+		$dst = $dst . "_r$rev" if($rev);
+#		$dst = $dst . "_$last" if($last);
+		$dst = $dst . ".svndump";
+		print STDERR "\t-> $dst\n";
+		if(!run("$dumpcmd \"$local\" >\"$dst\"")) {
+			print STDERR "failed\n";
+			return undef;
+		}
+		if($OPTS{bz2}) {
+			run(qw/bzip2 -9v/,$dst);
+		}
+		elsif($OPTS{gz}) {
+			run(qw/gzip -9v/,$dst);
+		}
+	}
+	else {
+		print STDERR "error: not a subversion repository\n";
+	}
 }
 
-
-my $action = shift;
-my $dst = shift;
-unless($dst) {
-    $dst = $action;
-    $action = 'load';
+foreach my $local (@ARGV) {
+	if(! -d $local) {
+		print STDERR "directory not exist: $local\n";
+		next;
+	}
+	$local =~ s/\/+$//;
+	my $name = $local;
+	$name =~ s/\//_/g;
+	$name =~ s/svn_|_svn//g;
+	$local = "$cwd/$local" unless($local =~ m/^\//);
+	svndump($local,$name);
 }
-
-if($action eq 'load') {
-    create_repo($dst);
-    run('svnadmin','load',$dst);
-}
-else {
-    run('svnadmin',$action,$dst,@ARGV);
-}
-
-
 
 __END__
 

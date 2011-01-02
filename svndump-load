@@ -1,0 +1,149 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.8.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/\/+$//;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
+    unshift @INC, 
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man verbose|v/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+    exit 0;
+}
+
+sub run {
+    my $exit = system(@_);
+    die("fatal error: $! while executing [",join(" ",@_),"]\n") if($exit);
+    return 1;
+}
+sub create_repo {
+    my $DEST = shift;
+    if(! -d $DEST) {
+        print STDERR "creating local repository $DEST...\n";
+        run(qw/svnadmin create/,$DEST);
+        my $hook = "$DEST/hooks/pre-revprop-change";
+        print STDERR "creating pre-revprop-change hook in $DEST...\n";
+        open FO,'>',$hook or die("fatal error\n");
+        print FO "#!/bin/sh\nexit 0\n";
+        close FO;
+        run(qw/chmod a+x/,$hook);
+    }
+}
+
+my $cmdload = $OPTS{verbose} ? 'svnadmin load' : 'svnadmin load -q';
+sub svnload {
+	my $dumpfile = shift;
+	my $reponame = shift;
+	print STDERR "$dumpfile -> $reponame\n";
+	unless( -f $dumpfile and -r $dumpfile) {
+		print STDERR "File not accessiable: $dumpfile\n";
+		return undef;
+	}
+	unless( -d $reponame) {
+		create_repo($reponame);
+	}
+	unless( -d $reponame) {
+		print STDERR "Repo not accessiable: $reponame\n";
+		return undef;
+	}
+	return run("$cmdload \"$reponame\" <\"$dumpfile\"");
+}
+
+foreach my $dump_file (@ARGV) {
+	if($dump_file =~ m/^(.+):([^:]+)$/) {
+		svnload($1,$2);
+	}
+	else {
+		my $_ = $dump_file;
+		$_ =~ s/^.+\///;
+		if(m/^(.+)_r\d+_[\d-]+.*$/) {
+			svnload($dump_file,$1);
+		}
+		elsif(m/^(.+)_r\d+.*$/) {
+			svnload($dump_file,$1);
+		}
+		elsif(m/^(.+)\.[^.]+$/) {
+			svnload($dump_file,$1);
+		}
+		else {
+			svnload($dump_file,$_);
+		}
+	}
+}
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+svndump-load - PERL script
+
+=head1  SYNOPSIS
+
+svndump-load [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-11-21 03:48  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl

@@ -1,0 +1,226 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.8.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/\/+$//;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
+    unshift @INC, 
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man all|a/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+    exit 0;
+}
+
+sub run {
+	print STDERR join(" ",@_),"\n";
+	return system(@_) == 0;
+}
+use Cwd qw/getcwd/;
+my $cwd = getcwd;
+my $source = shift;
+$source =~ s/\/+$//;
+$source = $cwd . "/$source" unless($source =~ m/^\//);
+
+my $source_url = $source;
+$source_url =~ s/^.\///;
+$source_url = 'file://' . $source_url;
+my $source_name = $source;
+$source_name =~ s/^.+\///;
+
+my @paths;
+if(@ARGV) {
+	push @paths,@ARGV;
+}
+else {
+	open FI,"-|","svn","ls",$source_url;
+	while(<FI>) {
+		chomp;
+		if(m/^\s*(.+)\//) {
+			if(!$OPTS{all}) {
+				next if($1 eq 'branches');
+				next if($1 eq 'trunk');
+				next if($1 eq 'tags');
+				next if($1 eq 'wiki');
+			}
+			print STDERR "found sub project: $1\n";
+			push @paths,$1;
+		}
+	}
+	close FI;
+}
+die("No paths found\n") unless(@paths);
+
+
+sub svndump {
+	my $local = shift;
+	my $name = shift;
+	print STDERR "$local ...\n";
+	my $rev;
+	my $last;
+	if(open FI,"-|",'svn','info','file://' . $local) {
+		foreach(<FI>) {
+			if(m/^\s*Last Changed Rev:\s*(\d+)/) {
+				$rev = $1;
+			}
+			elsif(m/^\s*Last Changed Date:\s*(\d+)-(\d+)-(\d+)/) {
+				$last = "$1$2$3";
+			}
+		}
+		close FI;
+		my $dst = $name;
+		$dst = $dst . "_r$rev" if($rev);
+#		$dst = $dst . "_$last" if($last);
+		$dst = $dst . ".svndump";
+		if(-f $dst) {
+			print STDERR "$dst exists, skipped dumping $local\n";
+			return $dst;
+		}
+		print STDERR "\t-> $dst\n";
+		if(!run("svnadmin dump \"$local\" >\"$dst\"")) {
+			print STDERR "failed\n";
+			return undef;
+		}
+		return $dst;
+	}
+	else {
+		print STDERR "error: not a subversion repository\n";
+		return undef;
+	}
+}
+
+my $source_filename = svndump($source,$source_name);
+die("No dumpfile exists for $source\n") unless($source_filename and -f $source_filename);
+
+my $filter = 'svndumpfilter --drop-empty-revs --renumber-revs';
+foreach(@paths) {
+	my $dst_name = "$source_name.$_";
+	my $dst_filename = "$dst_name.svndump";
+	print STDERR "dumping $_ -> $dst_filename ...\n";
+	if(!run("$filter include \"$_\" <\"$source_filename\" >\"$dst_filename\"") ) {
+		print STDERR "\n";
+		next;
+	}
+	print STDERR "OK $_ dumped as \"$dst_filename\"\n";
+	print STDERR "Editing $dst_filename ...\n";
+	my $deleted = undef;
+	open FI,"<",$dst_filename or die("$!\n");
+	open FO,">",$dst_filename . ".new" or die("$!\n");
+	my $path = $_;
+	my $node_exp = qr/^Node-path: $path\//;
+	my $rev = 0;
+	while(<FI>) {
+		if(m/^Revision-number: (\d+)[\r\n\s]*$/) {
+			$rev = $1 if($rev < $1);
+		}
+		if((!$deleted) and m/^Node-path: $path[\r\n\s]*$/) {
+			$deleted = 1;
+			print STDERR "[skipped] $_";
+			while(<FI>) {
+				if(m/^PROPS-END[\r\n\s]*$/) {
+					print STDERR "[skipped] $_";
+					print STDERR "Top Node Path deleted\n";
+					last;
+				}
+				print STDERR "[skipped] $_";
+			}
+			next;
+		}
+		elsif(m/$node_exp/) {
+			print STDERR ".";
+			s/$node_exp/Node-path: /;
+			print FO $_;
+		}
+		else {
+			print FO $_;
+		}
+	}
+	close FI;
+	close FO;
+	unlink $dst_filename;
+	rename $dst_filename . ".new", $dst_name . "_r$rev.svndump";
+	print STDERR "OK\n";
+}
+
+
+
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+svnadmin-dump-subprojects - PERL script
+
+=head1  SYNOPSIS
+
+svnadmin-dump-subprojects [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<-a>,B<--all>
+
+Dump all, includes wiki,trunk,branches,tags
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-12-17 01:16  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl
