@@ -30,7 +30,6 @@ else
 }
 
 my $editor="r-edit";
-$editor = "notepad++" if($^O =~ /win/i);
 my $fname=shift @ARGV;
 
 if(!$fname) {
