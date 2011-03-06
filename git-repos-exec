@@ -3,7 +3,7 @@ use Cwd qw/getcwd/;
 use File::Glob qw/bsd_glob/;
 use strict;
 use version '5.8';
-my $VERBOSE;
+my $VERBOSE = 1;
 
 sub run {
 	print STDERR join(" ",@_),"\n" if($VERBOSE);
@@ -72,13 +72,20 @@ sub show_log {
 		$repo->{ws} = $repo->{abs};
 		$repo->{ws} =~ s/\/.git$//;
 		if(-d $repo->{ws}) {
-			print $repo->{ws},"\n";
-			run("git","--git-dir",$repo->{abs},'--work-tree',$repo->{ws},@OPTS);
+            print $repo->{ws},"\n";
+            chdir($repo->{ws});
+            run(@OPTS);
+
+			#run("git","--git-dir",$repo->{abs},'--work-tree',$repo->{ws},@OPTS);
 		}
 		else {
 			print $repo->{abs}, "\n";
-			run("git","--git-dir",$repo->{abs},@OPTS);
+            chdir($repo->{abc});
+            run(@OPTS);
+
+			#run("git","--git-dir",$repo->{abs},@OPTS);
 		}
+        chdir($cwd);
 		print "\n";
     }
 }
