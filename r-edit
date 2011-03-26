@@ -5,7 +5,7 @@ my @g=qw/gvim -f/;
 my @c=qw/vim/;
 my @editor;
 
-if($ENV{OS} =~ m/Windows/i) {
+if(0 and $ENV{OS} =~ m/Windows/i) {
 	@editor= @w;
     shift @ARGV if(@ARGV and $ARGV[0] eq '-b');
     if(-f "/bin/cygpath.exe") {

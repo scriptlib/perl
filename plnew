@@ -54,7 +54,7 @@ else {
 
 
 my $editor="r-edit";
-$editor = "notepad++" if($^O =~ /win/i);
+#$editor = "notepad++" if($^O =~ /win/i);
 
 if (-f $fname) {
     print STDERR "$fname exists,will be open for editing instead.\n";

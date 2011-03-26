@@ -1,0 +1,115 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.8.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/\/+$//;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
+    unshift @INC, 
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+    exit 0;
+}
+
+sub run {
+	print STDERR join(" ",@_),"\n";
+	return system(@_) == 0;
+}
+
+foreach(@ARGV) {
+	my $local_name = $_;
+	$local_name =~ s/^\.\/+//;
+	my $remote_name1 = $local_name;
+	$remote_name1 =~ s/\.git$//i;
+	my $remote_name2 = $remote_name1;
+	if($remote_name1 =~ /^(:?profiles|scripts|texts|utils|webdev|codebase)/i) {
+		$remote_name1 = "z$remote_name1";
+	}
+	if($remote_name1 =~ /^[^\/\\]+$/) {
+		$remote_name1 = "eotect/$remote_name1";
+	}
+
+	run('git','--git-dir',$local_name,'remote','rm','origin');
+	run('git','--git-dir',$local_name,'remote','add','origin',"git\@github.com:$remote_name1.git");
+	run('git','--git-dir',$local_name,'remote','rm','gitorious');
+	run('git','--git-dir',$local_name,'remote','add','gitorious',"git\@gitorious.org:$remote_name1.git");
+	run('git','--git-dir',$local_name,'remote','rm','sf-zrepos');
+	run('git','--git-dir',$local_name,'remote','add','sf-zrepos',"ssh://eotect\@zrepos.git.sourceforge.net/gitroot/zrepos/$remote_name2");
+}
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+git-add-remotes1 - PERL script
+
+=head1  SYNOPSIS
+
+git-add-remotes1 [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2011-03-26 21:44  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl
