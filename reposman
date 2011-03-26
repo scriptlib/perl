@@ -219,6 +219,11 @@ sub parse_url {
 	if($push =~ m/\/$/) {
 		$push = $push ."$name"; 
 	}
+	elsif($push =~ m/^(.+)\/#([^#]+)#$/) {
+		if($project->{$2}) {
+			$push = "$1/$project->{$2}";
+		}
+	}
 	my $user = $project->{user};
 	my $type = $project->{type};
 	if($push =~ m/^([^\/\@]+)\@(.+)$/) {
