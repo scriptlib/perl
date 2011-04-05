@@ -12,7 +12,7 @@ use strict;
 $ARGV[0]="--help" unless(@ARGV);
 exit 0 unless(system("plhelp",$0,(@ARGV)));
 
-my $support="x-awk|x-shellscript|text\/plain|x-perl";
+my $support="text\/|x-awk|x-shellscript|text\/plain|x-perl";
 my $editor="r-edit";
 
 my $cmdname=shift;
