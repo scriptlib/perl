@@ -45,7 +45,7 @@ sub load_rule {
     if($status1) {
         my($status2,$pass_count,@passdown)
             = urlrule_process_result($rule,$result);
-        if($status2 and $pass_count>0) {
+        if($status2 and $pass_count and $pass_count>0) {
             my $cwd = getcwd();
             foreach(@passdown) {
                 $phnd->push($cwd,'load_rule',@{$_});
