@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-use ENV qw/XAUTHORITY DISPLAY/;
+use Env qw/XAUTHORITY DISPLAY/;
 my @g=qw/gvim -f/;
 my @c=qw/vim/;
 exec ((($XAUTHORITY or $DISPLAY) ? @g : @c), @ARGV);
