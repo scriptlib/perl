@@ -9,7 +9,12 @@
 use strict;
 die("Usage:$0 URL\n") unless(@ARGV);
 
-my ($url) = @ARGV;
+my $verbose = 0; 
+my $url = shift;
+if($url eq '-v') {
+	$url = shift;
+	$verbose = 1;
+}
 $url = "http://$url" unless($url =~ /^http:/i);
 
 use LWP::UserAgent;
