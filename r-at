@@ -2,7 +2,7 @@
 # $Id$
 use strict;
 require v5.8.0;
-our $VERSION = 'v0.1';
+our $VERSION = 'v0.2';
 
 BEGIN
 {
@@ -67,7 +67,6 @@ if($command) {
 		$command = join(" ",@envs) . " $command";
 	}
 	print "command [$command] at (",join(" ",@args), ")\n";
-	die;
 	open FO,"|-",'at',@args or die;
 	print FO $command , "\n";
 	close FO;
@@ -122,6 +121,11 @@ ___DESC___
     2011-09-30 18:22  afun  <afun@myplace.hell>
         
         * file created.
+
+	2011-09-30 20:06  afun	<afun@myplace.hell>
+		
+		* enchanced '-t' option.
+		* version 0.2
 
 =head1  AUTHOR
 
