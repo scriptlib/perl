@@ -38,6 +38,17 @@ my @envs;
 if($OPTS{X} and $ENV{'DISPLAY'}) {
 	push @envs,"DISPLAY=$ENV{'DISPLAY'}";
 }
+my $time = $OPTS{t};
+if($OPTS{t}) {
+	if($OPTS{t} =~ m/^(\d\d?):(\d\d?)$/) {
+		use Time::localtime;
+		$time = sprintf("%02d%02d%02d%02d",localtime->mon() + 1 , localtime->mday(),$1,$2);
+	}
+	elsif($OPTS{t} =~ m/^\s*(\d+)\s+(\d\d?):(\d\d?)$/) {
+		$time = sprintf("%s%02d%02d",$1,$2,$3);
+	}
+}
+$OPTS{t} = $time;
 my $command; 
 my @args;
 foreach(keys %OPTS) {
@@ -55,8 +66,8 @@ if($command) {
 	if(@envs) {
 		$command = join(" ",@envs) . " $command";
 	}
-	print 'command: ',$command,"\n";
-	print join(" ",("at",@args)),"\n";
+	print "command [$command] at (",join(" ",@args), ")\n";
+	die;
 	open FO,"|-",'at',@args or die;
 	print FO $command , "\n";
 	close FO;
