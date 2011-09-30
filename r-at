@@ -1,0 +1,121 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.8.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/\/+$//;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
+    unshift @INC, 
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver command|s=s X m M f=s q=s t=s l r d v c V/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+	Getopt::Long::Configure('no_ignore_case'); 
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+    exit 0;
+}
+my @envs;
+if($OPTS{X} and $ENV{'DISPLAY'}) {
+	push @envs,"DISPLAY=$ENV{'DISPLAY'}";
+}
+my $command; 
+my @args;
+foreach(keys %OPTS) {
+	if($_ eq 'command') {
+		$command = $OPTS{$_};
+	}
+	elsif($_ eq 'X') {
+	}
+	else {
+		push @args,"-" . $_;
+		push @args,$OPTS{$_} if($OPTS{$_});
+	}
+}
+if($command) {
+	if(@envs) {
+		$command = join(" ",@envs) . " $command";
+	}
+	print 'command: ',$command,"\n";
+	print join(" ",("at",@args)),"\n";
+	open FO,"|-",'at',@args or die;
+	print FO $command , "\n";
+	close FO;
+}
+else {
+	exec("at",@args);
+}
+
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+r-at - MyPlace at enchancing script
+
+=head1  SYNOPSIS
+
+r-at [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<-s>,B<--command>
+
+Specify what command to run.
+
+=item B<--X>
+
+Require X Windows.
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2011-09-30 18:22  afun  <afun@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+afun <afun@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl

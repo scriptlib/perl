@@ -3,6 +3,7 @@ use Env qw/OS XAUTHORITY DISPLAY/;
 my @w=qw/notepad++.bat/;
 my @g=qw/gvim -f/;
 my @c=qw/vim/;
+@g = @c;
 my @editor;
 
 if(0 and $Env{OS} =~ m/Windows/i) {
