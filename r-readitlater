@@ -18,7 +18,7 @@ BEGIN
 }
 
 my %OPTS;
-my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man user|u=s action|a=s pass|p=s/;
 
 if(@ARGV)
 {
@@ -46,19 +46,37 @@ sub write_config {
 	$config->write_plainfile($configfile);
 }
 
+my @zenity = qw/zenity --width=240 --height=60 --title=r-readitlater/;
+
+sub die_for {
+	my $msg = shift;
+	system(@zenity,'--error',"--text=$msg");
+	die($msg . "\n");
+}
+
 sub read_input {
 	my $msg = shift;
-	print STDOUT "$msg: ";
-	my $value = <STDIN>;
+	my $sec = shift;
+	if(!$sec) {
+		open FI,"-|",@zenity,'--entry',"--text=$msg";
+	}
+	else {
+		open FI,"-|",@zenity,'--password',"--title=$msg";
+	}
+	my $value = <FI>;
+	close FI;
 	chomp($value) if($value);
 	return $value;
 }
 
 my $api = 'https://readitlaterlist.com/v2';
 my $key = '555AcqvMd51a4f1496pG758Ha2TGh142';
-my $user = shift;
-my $action = shift;
-die("No action specified.\n") unless($action);
+my $user = $OPTS{'user'};
+my $action = $OPTS{'action'};
+my $pass = $OPTS{'pass'};
+
+$action = shift unless($action);
+die_for("No action specified.\n") unless($action);
 
 foreach(@ARGV) {
 	s/&/%26/g;
@@ -68,31 +86,38 @@ foreach(@ARGV) {
 	s/ /%20/g;
 }
 
-my $request;
-if($action eq 'add') {
+sub build_request {
 	read_config();
-	my ($pass) = $config->propget('account',$user,'password');
+	($user) = $config->propget('account','default','user') unless($user);
+	$user = read_input('Input your username for Readitlater:') unless($user);
+	die_for("No account information.\n") unless($user);
+	($pass) = $config->propget('account',$user,'password') unless($pass);
 	$pass = read_input('Input your passowrd for ' . $user) unless($pass);
-	die('No account information found in ' . $configfile . " for $user.\n") unless($pass);
+	die_for('No account information found in ' . $configfile . " for $user.\n") unless($pass);
 	$config->propset($pass,'account',$user,'password');
+	$config->propset($user,'account','default','user');
 	write_config();
-	$request = "$api/$action?username=$user&password=$pass&apikey=$key&";
-	$request = $request . join("&",@ARGV);
+	return "$api/$action?username=$user&password=$pass&apikey=$key&";
 }
 
+my $request = build_request() . join("&",@ARGV);
 print STDERR $request,"\n";
 open FI,'-|','curl',,'-#',$request;
 my $response = join("",<FI>);
 close FI;
-print STDERR $response,"\n";
-my @zenity = qw/zenity --timeout=5 --width=240 --height=60 --title=r-readitlater/;
-if($response =~ /200\s*OK/) {
-	system(@zenity,qw/--info --text/, $response);
-	exit 0;
+
+if($action eq 'add') {
+	print STDERR $response,"\n";
+	if($response =~ /200\s*OK/) {
+		system(@zenity,qw/--timeout=6 --info --text/, $response);
+		exit 0;
+	}
+	else {
+		die_for($response);
+	}
 }
 else {
-	system(@zenity,qw/--error --text/,$response);
-	exit 1;
+	print $response;
 }
 
 
@@ -128,6 +153,18 @@ View application manual
 
 Invoke 'editor' against the source
 
+=item B<-a>, B<--action>
+
+Action to perform
+
+=item B<-u>, B<--user>
+
+Specify username 
+
+=item B<-p>, B<--password>
+
+Specify password for username
+
 =back
 
 =head1  DESCRIPTION
@@ -139,6 +176,11 @@ ___DESC___
     2011-10-02 12:29  xiaoranzzz  <xiaoranzzz@myplace.hell>
         
         * file created.
+	2011-10-02 20:24  xiaoranzzz  <xiaoranzzz@myplace.hell>
+
+		* version 0.2
+		* added GUI
+		* added api full supports
 
 =head1  AUTHOR
 
