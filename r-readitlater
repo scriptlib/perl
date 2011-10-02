@@ -116,8 +116,11 @@ if($action eq 'add') {
 		die_for($response);
 	}
 }
-else {
+elsif($action =~ m/^stats|get$/) {
 	print $response;
+}
+else {
+	die_for($response);
 }
 
 
