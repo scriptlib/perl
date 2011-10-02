@@ -1,0 +1,149 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.8.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/\/+$//;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
+    unshift @INC, 
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+    exit 0;
+}
+
+use MyPlace::Config;
+my $configfile = $ENV{'HOME'} . '/.readitlater';
+my $config = MyPlace::Config->new();
+
+sub read_config {
+	$config->read_plainfile($configfile);
+}
+
+sub write_config {
+	$config->write_plainfile($configfile);
+}
+
+sub read_input {
+	my $msg = shift;
+	print STDOUT "$msg: ";
+	my $value = <STDIN>;
+	chomp($value) if($value);
+	return $value;
+}
+
+my $api = 'https://readitlaterlist.com/v2';
+my $key = '555AcqvMd51a4f1496pG758Ha2TGh142';
+my $user = shift;
+my $action = shift;
+die("No action specified.\n") unless($action);
+
+foreach(@ARGV) {
+	s/&/%26/g;
+	s/\?/%3F/g;
+	s/:/%3A/g;
+	s/\//%2F/g;
+	s/ /%20/g;
+}
+
+my $request;
+if($action eq 'add') {
+	read_config();
+	my ($pass) = $config->propget('account',$user,'password');
+	$pass = read_input('Input your passowrd for ' . $user) unless($pass);
+	die('No account information found in ' . $configfile . " for $user.\n") unless($pass);
+	$config->propset($pass,'account',$user,'password');
+	write_config();
+	$request = "$api/$action?username=$user&password=$pass&apikey=$key&";
+	$request = $request . join("&",@ARGV);
+}
+
+print STDERR $request,"\n";
+open FI,'-|','curl',,'-#',$request;
+my $response = join("",<FI>);
+close FI;
+print STDERR $response,"\n";
+my @zenity = qw/zenity --timeout=5 --width=240 --height=60 --title=r-readitlater/;
+if($response =~ /200\s*OK/) {
+	system(@zenity,qw/--info --text/, $response);
+	exit 0;
+}
+else {
+	system(@zenity,qw/--error --text/,$response);
+	exit 1;
+}
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+r-readitlater - PERL script
+
+=head1  SYNOPSIS
+
+r-readitlater [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2011-10-02 12:29  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl
