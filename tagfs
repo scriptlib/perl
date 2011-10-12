@@ -76,7 +76,7 @@ if($root and (! -d $root)) {
 	create_dir($root) or die("$!\n");
 }
 my $saved_in = "$root$REALTAG";
-if(-d $saved_in) {
+if(! -d $saved_in) {
     create_dir($saved_in) or die("$!\n");
 }
 
@@ -109,7 +109,7 @@ sub list_dir {
 #&log_text('[' . scalar(localtime) . "] tagfs " . join(" ",@SAVE_ARGV) . "\n");
 
 sub system_execute {
-#    print STDERR "-- ",join(" ",@_),"\n";
+    #print STDERR "-- ",join(" ",@_),"\n";
 	if($TEST) {
 		print STDERR "[TEST] Execute: ",join(" ",@_), "\n";
 		return 1;
@@ -137,13 +137,13 @@ sub tag_files {
 			log_text(&list_dir($file,'  ├──') , "\n");
 	   }
        if(! -e "$saved_in/$basename") {
-            system_execute("mv","-v",$file,$saved_in);
+            system_execute("mv","--",$file,$saved_in);
        }
        foreach my $tag (@tags) {
             if(! -d "$root$tag") {
                 create_dir "$root$tag" or die("$!\n");
             }
-            system_execute("ln","-vfs","-t","$root$tag","../$REALTAG/$basename");
+            system_execute("ln","-fs","-t","$root$tag","../$REALTAG/$basename");
        }
     }
 }

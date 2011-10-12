@@ -214,6 +214,53 @@ sub action_DOWNLOAD {
     }
     return 1;
 }
+sub action_FEED {
+    my $task = shift;
+    my($name,$id,$host,$url,$level) = @{$task};
+    my $hostname;
+    if($host =~ /^[^\|]+\|(.+)$/)
+    {
+        $hostname = $1;
+    }
+    elsif($host =~ m/^#(.+)$/) {
+        app_message("$name/$1 = \'$id\'\n");
+        return 1;
+    }
+    else
+    {
+        $hostname = $host;
+    }
+    my $cwd = getcwd();
+    if(! -d "$name")
+    {
+        app_message("Create directory: $name\n");
+        mkdir $name;
+    }
+    if(! -d "$name/$hostname") 
+    {
+        app_message("Create directory: $name/$hostname\n");
+        mkdir "$name/$hostname";
+    }
+    if(! -d "$name/$hostname") 
+    {
+        app_error("Can't access $name/$hostname!\n");
+        return undef;
+    }
+    my $Names = MyPlace::Config->new();
+    $Names->read_plainfile($TASK_DATABASE);
+    $Names->propset(scalar(localtime),$name,$id,$host,"last");
+    print STDERR "Saving $TASK_DATABASE...\n";
+    $Names->write_plainfile($TASK_DATABASE);
+    app_message("Processing $name/$host\n");
+    &log("DOWNLOAD - $name/$host $url\[$level\]");
+    if($host =~ /google|baidu|yahoo|sogua/) {
+        load_rule("$name/$hostname",$url,$level,$U_DOWNLOADER);
+    }
+    else {
+        load_rule("$name/$hostname",$url,$level,$S_DOWNLOADER);
+    }
+    return 1;
+}
 sub log {
     open $TASK_FILEHANDLE_LOG,">>",TASK_FILE_LOG;
     print $TASK_FILEHANDLE_LOG scalar(localtime),": ",@_,"\n" if(@_);
