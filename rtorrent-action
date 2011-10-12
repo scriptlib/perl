@@ -84,6 +84,7 @@ AskErase:
         if(&ask("$text_head" . "Move file to :\n$INCOME_DIR'\n?")) {
             system("cp","-fv","--",$torrent,"$TOR_COMPLETED/${date_prefix}_${name}.torrent") if($torrent);
             &abort("$text_head" . "No file specified!") unless($file); 
+			system('touch','--',$file);
             system("mv","-fv","--",$file,$INCOME_DIR);
         }
         else {

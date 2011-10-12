@@ -24,6 +24,15 @@ my @tags;
 my @files;
 my @SAVE_ARGV = @ARGV;
 
+my $TEST = shift;
+if($TEST eq '-t') {
+	$TEST = 1;
+}
+else {
+	unshift @ARGV,$TEST;
+	$TEST = undef;
+}
+
 $root=shift;
 if($root eq '-r') {
     $root=shift;
@@ -45,32 +54,69 @@ sub get_basename {
     return $fullname;
 }
 
+sub create_dir {
+	if($TEST) {
+		print STDERR "[TEST] Create directory: ",join(" ",@_), "\n";
+		return 1;
+	}
+	else {
+		foreach(@_) {
+			mkdir($_);
+		}
+	}
+}
+
+sub now {
+	use POSIX qw/strftime/;
+	my $l = shift;
+	return strftime(($l ? "%Y-%m-%d" : "%Y-%m-%d %H:%M:%S"),localtime);
+}
 
 if($root and (! -d $root)) {
-    mkdir($root) or die("$!\n");
+	create_dir($root) or die("$!\n");
 }
 my $saved_in = "$root$REALTAG";
-if(! -d $saved_in) {
-    mkdir($saved_in) or die("$!\n");
+if(-d $saved_in) {
+    create_dir($saved_in) or die("$!\n");
 }
 
 @tags = split(/\s*,\s*/,$tags);
 die("Empty tag list!\n") unless(@tags);
 
+push @tags,now(1);
+
 my $log_files=$root . "tagfs.logs";
-open FO,">>$log_files";
+if(!$TEST) {
+	open FO,">>$log_files";
+}
 
 sub log_text {
-    print FO @_;
-    print STDERR @_;
+    print FO @_ unless($TEST);
+    print @_;
     1;
 }
 
-&log_text('[' . scalar(localtime) . "] tagfs " . join(" ",@SAVE_ARGV) . "\n");
+sub list_dir {
+	my $dir = $_[0];
+	my $prefix = $_[1] || "";
+	my @result;
+	open FI,"-|",'ls','-sFh',$dir;
+	@result = map "$prefix$_",<FI>;
+	close FI;
+	return @result;
+}
+
+#&log_text('[' . scalar(localtime) . "] tagfs " . join(" ",@SAVE_ARGV) . "\n");
 
 sub system_execute {
-    print STDERR "-- ",join(" ",@_),"\n";
-    return (system(@_) == 0);
+#    print STDERR "-- ",join(" ",@_),"\n";
+	if($TEST) {
+		print STDERR "[TEST] Execute: ",join(" ",@_), "\n";
+		return 1;
+	}
+	else {
+	    return (system(@_) == 0);
+	}
     open FI,"-|",@_ or return undef;
     while(<FI>) 
     {
@@ -85,18 +131,23 @@ sub tag_files {
     foreach my $file (@_) {
        my $basename = get_basename($file);
        next if($basename eq '.' or $basename eq '..');
-       &log_text("\t[" . join(',',@tags) . '] ' . $file . "\n");
+       &log_text("[" . join(',',@tags) . "] $basename\n");
+	   &log_text("\t\t" . now() . "\n");
+	   if(-d $file) {
+			log_text(&list_dir($file,'  ├──') , "\n");
+	   }
        if(! -e "$saved_in/$basename") {
             system_execute("mv","-v",$file,$saved_in);
        }
        foreach my $tag (@tags) {
             if(! -d "$root$tag") {
-                mkdir "$root$tag" or die("$!\n");
+                create_dir "$root$tag" or die("$!\n");
             }
             system_execute("ln","-vfs","-t","$root$tag","../$REALTAG/$basename");
        }
     }
 }
+use utf8;
 
 use File::Glob qw/bsd_glob/;
 foreach (@files) {
@@ -107,7 +158,7 @@ foreach (@files) {
         tag_files(bsd_glob($_));
     }
 }
-close FO;
+close FO unless($TEST);
 
 
 

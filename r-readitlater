@@ -102,7 +102,7 @@ sub build_request {
 
 my $request = build_request() . join("&",@ARGV);
 print STDERR $request,"\n";
-open FI,'-|','curl',,'-#',$request;
+open FI,'-|','curl',,'-#','--globoff','--url',$request;
 my $response = join("",<FI>);
 close FI;
 
@@ -113,14 +113,14 @@ if($action eq 'add') {
 		exit 0;
 	}
 	else {
-		die_for($response);
+		die_for($request . "\n" . $response);
 	}
 }
 elsif($action =~ m/^stats|get$/) {
 	print $response;
 }
 else {
-	die_for($response);
+	die_for($request . "\n" . $response);
 }
 
 
