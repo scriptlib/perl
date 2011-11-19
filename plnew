@@ -48,8 +48,8 @@ elsif( $fname =~ /\.[^\.]*$/) {
     $fname="$source_directory/$fname";
 }
 else {
-    #$fname=$source_directory . "/" . $fname . ".pl";
-    $fname=$source_directory . "/" . $fname;
+    $fname=$source_directory . "/" . $fname . ".pl";
+    #$fname=$source_directory . "/" . $fname;
 }
 
 

@@ -1,35 +1,22 @@
 #!/usr/bin/perl -w
 # $Id$
-use strict;
-require v5.8.0;
-our $VERSION = 'v0.1';
+package MyPlace::Script::___NAME___;
 
-BEGIN
-{
-    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
-    unless($PROGRAM_DIR) {
-        $PROGRAM_DIR = $0;
-        $PROGRAM_DIR =~ s/[^\/\\]+$//;
-        $PROGRAM_DIR =~ s/\/+$//;
-        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
-    }
-    unshift @INC, 
-        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
-}
+use strict;
+use v5.8.0;
+use MyPlace::Usage;
+our $VERSION = 'v0.1';
 
 my %OPTS;
 my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
-
 if(@ARGV)
 {
     require Getopt::Long;
-    require MyPlace::Usage;
     Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
     MyPlace::Usage::Process(\%OPTS,$VERSION);
 }
 else
 {
-    require MyPlace::Usage;
     MyPlace::Usage::PrintHelp();
     exit 0;
 }
