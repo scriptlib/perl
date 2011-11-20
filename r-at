@@ -39,10 +39,29 @@ if($OPTS{X} and $ENV{'DISPLAY'}) {
 	push @envs,"DISPLAY=$ENV{'DISPLAY'}";
 }
 my $time = $OPTS{t};
+use Time::localtime;
+my $year = localtime->year() + 1900;
+my $month = localtime->mon() + 1;
+my $day = localtime->mday();
+my $hour = localtime->hour();
+my $min = localtime->min();
 if($OPTS{t}) {
 	if($OPTS{t} =~ m/^(\d\d?):(\d\d?)$/) {
-		use Time::localtime;
-		$time = sprintf("%02d%02d%02d%02d",localtime->mon() + 1 , localtime->mday(),$1,$2);
+		my $h = $1;
+		my $m = $2;
+		if($hour > $h) {
+			$day = $day + 1;
+		}
+		elsif($hour == $h and $min > $m) {
+			$day = $day + 1;
+		}
+		if($day > 31) {
+			$month = $month + 1;
+		}
+		if($month > 12) {
+			$year = $year + 1;
+		}
+		$time = sprintf("%04d%02d%02d%02d%02d",$year,$month,$day,$h,$m);
 	}
 	elsif($OPTS{t} =~ m/^\s*(\d+)\s+(\d\d?):(\d\d?)$/) {
 		$time = sprintf("%s%02d%02d",$1,$2,$3);

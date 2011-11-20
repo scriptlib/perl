@@ -54,6 +54,25 @@ sub get_basename {
     return $fullname;
 }
 
+sub system_execute {
+    print STDERR "-- ",join(" ",@_),"\n";
+	if($TEST) {
+		print STDERR "[TEST] Execute: ",join(" ",@_), "\n";
+		return 1;
+	}
+	else {
+	    return (system(@_) == 0);
+	}
+    open FI,"-|",@_ or return undef;
+    while(<FI>) 
+    {
+        chomp;
+        next unless $_;
+        print FO "\t\t\t",$_,"\n";
+        print STDERR "\t\t\t",$_,"\n";
+    }
+    return 1;
+}
 sub create_dir {
 	if($TEST) {
 		print STDERR "[TEST] Create directory: ",join(" ",@_), "\n";
@@ -61,9 +80,10 @@ sub create_dir {
 	}
 	else {
 		foreach(@_) {
-			mkdir($_);
+			return undef unless(system_execute('mkdir',$_));
 		}
 	}
+	return 1;
 }
 
 sub now {
@@ -100,7 +120,7 @@ sub list_dir {
 	my $dir = $_[0];
 	my $prefix = $_[1] || "";
 	my @result;
-	open FI,"-|",'ls','-sFh',$dir;
+	open FI,"-|",'ls','-sFh',"$dir/";
 	@result = map "$prefix$_",<FI>;
 	close FI;
 	return @result;
@@ -108,25 +128,6 @@ sub list_dir {
 
 #&log_text('[' . scalar(localtime) . "] tagfs " . join(" ",@SAVE_ARGV) . "\n");
 
-sub system_execute {
-    #print STDERR "-- ",join(" ",@_),"\n";
-	if($TEST) {
-		print STDERR "[TEST] Execute: ",join(" ",@_), "\n";
-		return 1;
-	}
-	else {
-	    return (system(@_) == 0);
-	}
-    open FI,"-|",@_ or return undef;
-    while(<FI>) 
-    {
-        chomp;
-        next unless $_;
-        print FO "\t\t\t",$_,"\n";
-        print STDERR "\t\t\t",$_,"\n";
-    }
-    return 1;
-}
 sub tag_files {
     foreach my $file (@_) {
        my $basename = get_basename($file);
@@ -141,7 +142,7 @@ sub tag_files {
        }
        foreach my $tag (@tags) {
             if(! -d "$root$tag") {
-                create_dir "$root$tag" or die("$!\n");
+                create_dir("$root$tag") or die("$!\n");
             }
             system_execute("ln","-fs","-t","$root$tag","../$REALTAG/$basename");
        }
