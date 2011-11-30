@@ -254,18 +254,32 @@ sub translate_url {
     my $url = shift;
     my $path = shift;
 	my $id = shift;
-    if($url =~ m/#2/ and $path =~ m/^([^\/]+)\/(.+)$/) {
-        my $a = $1;
-        my $b = $2;
-        $url =~ s/#1/$a/g;
-        $url =~ s/#2/$b/g;
-    }
-    else {
-        $url =~ s/#1/$path/g;
-        $url =~ s/#2//g;
-    }
-    $url =~ s/\/+$//;
-	$url =~ s/\.{2,}([^\/]+)/\.$1/g;
+	my $root;
+	my $leaf;
+	if($path =~ m/^([^\/]+)\/(.+)$/) {
+		$root = $1;
+		$leaf = $2;
+	}
+	else {
+		$root = $path;
+		$leaf = undef;
+	}
+	if($leaf) {
+		if($url =~ m/#2/) {
+			$url =~ s/#1/$root/g;
+			$url =~ s/#2[!]?/$leaf/g;
+		}
+		else {
+			$url =~ s/#1/$path/g;
+		}
+	}
+	else {
+		$url =~ s/#1/$root/g;
+		$url =~ s/#2!/$root/g;
+		$url =~ s/[\/\.]?#2//g;
+	}
+    #$url =~ s/\/+$//;
+	#$url =~ s/\.{2,}([^\/]+)/\.$1/g;
 	if($url and $OPTS{'login'}) {
 		$url =~ s/:\/\//:\/\/$id\@/;
 	}
