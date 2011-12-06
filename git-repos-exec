@@ -25,7 +25,7 @@ sub glob_git {
             next;
         }
         elsif(-d $_) {
-            if(m/\.git$/) {
+			if(-f "$_/HEAD" and -f "$_/config") {
                 push @gits,$_;
             }
             else {
@@ -48,8 +48,8 @@ sub show_log {
         $parent = $1;
     }
 	my @gits;
-	if($path =~ m/\.git$/) {
-		push @gits,$path;
+	if(-f "$path/HEAD" and -f "$path/config") {
+		push @gits,'';
 	}
     chdir $path;
 	my $pathname = $path;
@@ -80,7 +80,7 @@ sub show_log {
 		}
 		else {
 			print $repo->{abs}, "\n";
-            chdir($repo->{abc});
+            chdir($repo->{abs});
             run(@OPTS);
 
 			#run("git","--git-dir",$repo->{abs},@OPTS);
