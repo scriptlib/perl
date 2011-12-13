@@ -1,22 +1,32 @@
 #!/usr/bin/perl -w 
 ###APPNAME:     renameext
-###APPAUTHOR:   duel
+###APPAUTHOR:   eotect
 ###APPDATE:	Sun Mar 30 12:46:15 2008
 ###APPVER:	0.1
 ###APPDESC:	rename files using perl regexp
-###APPUSAGE:	[-t] (pattern|func) (files...) 
+###APPUSAGE:	[options] (pattern|func) (files...) 
 ###APPEXAMPLE:	renameext -t 's/^.*(\d+)\.jpg/$1' *\n\trenameext -t 'ucfirst' *
-###APPOPTION:	-t:Test Mode
+###APPOPTION:	--test, -t:Test mode on|--swap, -sw:Swap mode on|--no-dot,-nd:Replace dots
 use strict;
 $ARGV[0]="-h" unless(@ARGV);
 use lib $ENV{XR_PERL_MODULE_DIR};
-use MyPlace::Script::Usage qw/help_even_empty format_help/;
-
-exit 0 if(help_even_empty($0,@ARGV));
-
 
 use utf8;
 use Encode;
+use Getopt::Long;
+use MyPlace::Script::Usage qw/exit_usage/;
+
+my %OPTS;
+my @OPTIONS= qw/
+	help|h|?
+	test|t
+	swap|sw:s
+	no-dot|nd
+/;
+GetOptions(\%OPTS,@OPTIONS);
+exit_usage(0,$0) if($OPTS{'help'});
+
+
 my $utf8 = find_encoding("utf8");
 my @OLDARGV = @ARGV;
 @ARGV = ();
@@ -27,9 +37,23 @@ binmode STDERR,'utf8';
 binmode STDOUT,'utf8';
 binmode STDIN,'utf8';
 
-my $exp=shift;
-my $test;
-$exp=shift,$test="true" if($exp eq "-t");
+my $exp;
+if(defined $OPTS{swap}) {
+	if($OPTS{swap}) {
+		$exp = "s/^([^$OPTS{swap}]+?)(\\s*)$OPTS{swap}(\\s*)(.+)\.([^.]+)\$/\$4\$3$OPTS{swap}\$2\$1.\$5/";
+	}
+	else {
+		$exp = "s/^([^-]+?)\\s*-\\s*(.+)\\.([^.]+)\$/\$2 - \$1.\$3/";
+	}
+	
+}
+elsif($OPTS{'no-dot'}) {
+	$exp = 's/\.(?=.*\.)/ /g'
+}
+else {
+	$exp = shift;
+}
+
 if($exp =~ /\/.*\//) {
     eval
     ('
@@ -87,10 +111,10 @@ foreach my $old(grep !/^\.\.?$/,@files) {
     }
     if(-e $new) {
         $dfile++;
-        print STDERR $dfile,"\"$old\"\n\t->\"$new\" [Failed:File exists]\n";
+        print STDERR "[$dfile] \"$old\"\n\t->\"$new\" [Failed:File exists]\n";
         next;
     }
-    if($test) {
+    if($OPTS{test}) {
         print STDERR ("\"$old\"\n\t->\"$new\" (Test only) [Sucessed!]\n");
     }
     else {
