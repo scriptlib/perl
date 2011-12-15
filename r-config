@@ -13,12 +13,9 @@ use strict;
 #FOR perl to search modules from,
 #OR nothing will work
 use lib $ENV{XR_PERL_MODULE_DIR};
-
-use MyPlace::Script::Usage qw/help_required help_even_empty/;
-exit 0 if(help_required($0,@ARGV));
-#exit 0 if(help_even_empty($0,@ARGV));
 use MyPlace::Config;
 use Term::ANSIColor;
+
 
 sub print1 {
     print STDERR color('green'),@_,color('reset');
@@ -67,15 +64,30 @@ sub print_target {
     }
 }
 
-my $CONFIG;
-my $database;
-my $opt = shift @ARGV;
-if($opt and $opt eq '-f') {
-    $database = shift @ARGV; 
+my @OPTIONS = qw/file|f:s help|h manual|man|m/;
+my %OPTS;
+if(@ARGV)
+{
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
 }
 else {
-    unshift @ARGV,$opt;
+	$OPTS{'help'} = 1;
 }
+
+if($OPTS{manual}) {
+    require Pod::Usage;
+    Pod::Usage::pod2usage(-exitval=>0,-verbose => 2);
+    exit 0;
+}
+elsif($OPTS{help}) {
+    require Pod::Usage;
+    Pod::Usage::pod2usage(-exitval=>0,-verbose => 1);
+    exit 0;
+}
+
+my $CONFIG;
+my $database = $OPTS{file};
 my $action = shift @ARGV;
 my $query = shift @ARGV;
 my $userdata = shift @ARGV;
@@ -164,6 +176,106 @@ if($CONFIG->{dirty}) {
 }
 exit 0;
 
+__END__
 
+=pod
+
+=head1 NAME
+	
+r-config - MyPlace::Config frontend
+
+=head1 SYNOPSIS
+
+r-config [options] action
+
+=head1 OPTIONS
+
+=over
+
+=item B<--file>,B<-f>
+
+Specify configuration file
+
+=item B<--help>,B<-h>
+
+Display help texts
+
+=item B<--manual>,B<--man>,B<-m>
+
+Display manual
+
+=back
+
+=head1 ACTIONS
+
+Supported actions
+
+=over
+
+=item B<read>
+
+read [KEY]
+
+=item B<write>
+
+write KEY VALUE
+
+=item B<add>
+
+add KEY [VALUE]
+
+=item B<delete>
+
+delete KEY [VALUE]
+
+=item B<list>
+
+list [KEY]
+
+=item B<print>
+
+print [KEY]
+
+=item B<query>
+
+query [KEY]
+
+=back
+
+=head1 KEY
+
+=item B<single key>
+
+	string|regex
+
+=item B<Multiply key>
+	
+	single key[,single key][,single key]...
+
+=head1 CONFIGURATION FILE FORMAT
+
+use MyPlace::Config;
+
+=head1  DESCRIPTION
+
+MyPlace configuration manager
+
+=head1  CHANGELOG
+
+	2010-05-25	xiaoranzzz	<xiaoranzzz@myplace.hell>
+
+		* initial code
+	
+	2011-12-14  xiaoranzzz  <xiaoranzzz@myplace.hell>
+
+		* Add options parsing, and manual.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl
 
 
