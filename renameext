@@ -6,7 +6,7 @@
 ###APPDESC:	rename files using perl regexp
 ###APPUSAGE:	[options] (pattern|func) (files...) 
 ###APPEXAMPLE:	renameext -t 's/^.*(\d+)\.jpg/$1' *\n\trenameext -t 'ucfirst' *
-###APPOPTION:	--test, -t:Test mode on|--swap, -sw:Swap mode on|--no-dot,-nd:Replace dots
+###APPOPTION:	--test, -t:Test mode on|--swap, -sw:Swap mode on|--no-dot,-nd:Replace dots|--force,-f:Override exists files
 use strict;
 $ARGV[0]="-h" unless(@ARGV);
 use lib $ENV{XR_PERL_MODULE_DIR};
@@ -22,6 +22,7 @@ my @OPTIONS= qw/
 	test|t
 	swap|sw:s
 	no-dot|nd
+	force|f
 /;
 GetOptions(\%OPTS,@OPTIONS);
 exit_usage(0,$0) if($OPTS{'help'});
@@ -109,7 +110,24 @@ foreach my $old(grep !/^\.\.?$/,@files) {
     if($new eq $old) {
         next;
     }
-    if(-e $new) {
+	$new =~ s/\/+$//;
+	$old =~ s/\/+$//;
+	if($OPTS{force} && -e $new) {
+		print STDERR "[FORCE] backup $new.\n";
+		my $backup = $new . '.backup~';
+		if($OPTS{test}) {
+		    print STDERR ("\"$new\"\n\t->\"$backup\" (Test only) [Sucessed!]\n");
+		}
+		else {
+			if(&my_rename($new,$backup)) {
+		        print STDERR ("\"$new\"\n\t->\"$backup\" [Sucessed!]\n");
+			}
+	        else {
+		        print STDERR ("\"$new\"\n\t->\"$backup\" [Failed:$!]\n");
+			}
+		}
+	}
+	if(-e $new) {
         $dfile++;
         print STDERR "[$dfile] \"$old\"\n\t->\"$new\" [Failed:File exists]\n";
         next;
