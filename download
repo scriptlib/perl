@@ -26,6 +26,7 @@ my @OPTIONS = qw/
 		name|n:s
 		cookie|b:s
 		log|l
+		refurl|r:s
 		autoname|a
 		program|p:s
 		maxtime|m:i
@@ -39,7 +40,7 @@ else {
 	$OPT{help} = 1;
 }
 if($OPT{help}) {
-	pod2usage('-exitval'=>1);
+	pod2usage('-exitval'=>1,'-verbose'=>1);
 }
 elsif($OPT{manual}) {
 	pod2usage('--exitval'=>1,'-verbose'=>2);
