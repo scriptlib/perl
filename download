@@ -10,13 +10,43 @@
 ###APPOPTION:	-v:Verbose Output|-u:URL to download|-s:Filename for output|-d:Create directories|-n:Task name|-r:Referer URL|-b:cookie file|-l:Enable Logging|-a:Auto rename if file exists|-p:Downloader - wget or curl-m:Max time for downloading|-f:Force over writting
 use strict;
 use lib $ENV{XR_PERL_MODULE_DIR};
-
-use MyPlace::Script::Usage qw/help_required help_even_empty/;
 use Cwd;
-use Getopt::Std;
 use MyPlace::Script::Message;
+use Getopt::Long;
+use Pod::Usage;
+#exit 0 if(help_even_empty($0,@ARGV));
 
-exit 0 if(help_even_empty($0,@ARGV));
+my @OPTIONS = qw/
+		help|h
+		manual|man
+		verbose|v
+		url|u:s
+		saveas|s:s
+		directory|d
+		name|n:s
+		cookie|b:s
+		log|l
+		autoname|a
+		program|p:s
+		maxtime|m:i
+		force|f
+	/;
+my %OPT;
+if(@ARGV) {
+	GetOptions(\%OPT,@OPTIONS);
+}
+else {
+	$OPT{help} = 1;
+}
+if($OPT{help}) {
+	pod2usage('-exitval'=>1);
+}
+elsif($OPT{manual}) {
+	pod2usage('--exitval'=>1,'-verbose'=>2);
+}
+
+
+
 
 my $proxy = '127.0.0.1:9050';
 my $blocked_host = '\n';#wretch\.cc|facebook\.com|fbcdn\.net';
@@ -27,6 +57,7 @@ my @WGET = qw{
 my @CURL = qw{
         curl --fail --globoff --location --user-agent Mozilla/5.0 --progress-bar --create-dirs
 };
+
 sub log($$) {
     my $text=shift;
     my $fn=shift;
@@ -86,23 +117,22 @@ sub process {
 }
 
 
-my $OptFlag='m:lvu:s:dn:r:b:ap:f';
-my %OPT;
-getopts($OptFlag,\%OPT);
+#my $OptFlag='m:lvu:s:dn:r:b:ap:f';
+#my %OPT;
+#getopts($OptFlag,\%OPT);
 
-my $verbose= $OPT{"v"} ? $OPT{"v"} : 0;
-my $url= $OPT{"u"} ? $OPT{"u"} : $ARGV[@ARGV-1];
-my $saveas= $OPT{"s"} ? $OPT{"s"} : "";
-my $createdir= $OPT{"d"} ? $OPT{"d"} : 0;
-my $name= $OPT{"n"} ? $OPT{"n"} : "";
-my $refer= $OPT{"r"} ? $OPT{"r"} : "";
-my $cookie= $OPT{b} ? $OPT{b} : "";
-my $logging= $OPT{l} ? $OPT{l} : "";
-my $autorename = $OPT{a} ? $OPT{a} : "";
-my $maxtime = $OPT{m} ? $OPT{m} : undef;
-my $force = $OPT{f} ? $OPT{f} : undef;
-#my $downloader = $OPT{p} ? $OPT{p} : "wget";
-my $downloader = $OPT{p} ? $OPT{p} : "curl";
+my $verbose= $OPT{verbose} || 0;
+my $url= $OPT{"url"} || shift(@ARGV);
+my $saveas= $OPT{"saveas"} || '';
+my $createdir= $OPT{"directory"} || 0;
+my $name= $OPT{"name"} || "";
+my $refer= $OPT{"refurl"} || "";
+my $cookie= $OPT{cookie} || '';
+my $logging= $OPT{log} || '';
+my $autorename = $OPT{autoname}  || '';
+my $maxtime = $OPT{maxtime}  || '';
+my $force = $OPT{force} || undef;
+my $downloader = $OPT{program} || 'curl';
 my $FAILLOG="download.failed";
 my $DOWNLOADLOG="download.log";
 
@@ -188,4 +218,98 @@ else {
     &log("$url->$saveas\n","$FAILLOG") if($logging);;
     exit 0;
 }
+
+__END__
+
+=pod
+
+=head1 NAME
+
+download - customized frontend for wget/curl
+
+=head1 SYNOPSIS
+
+download [OPTIONS] URL
+
+	download "http://www.google.com"
+	download -s google.html "http://www.google.com"
+	download -a "http://www.google.com"
+
+=head1 OPTIONS
+
+=over
+
+=item B<--verbose>,B<-v>
+
+Verbose messaging
+
+=item B<--url>,B<-u>
+
+Specify the URL
+
+=item B<--saveas>,B<-s>
+
+Specify target filename
+
+=item B<--directory>,B<-d>
+
+Create directories if necessary
+
+=item B<--name>,B<-n>
+
+Name downloading session
+
+=item B<--refurl>,B<-r>
+
+Set referer URL
+
+=item B<--cookie>,B<-b>
+
+Set cookie file
+
+=item B<--log>,B<-l>
+
+Enable logging
+
+=item B<--autoname>,B<-a>
+
+Auto rename if target exists
+
+=item B<--program>,B<-p>
+
+Specify downloader, either wget or curl
+
+=item B<--maxtime>,B<-m>
+
+Set timeout
+
+=item B<--force>,B<-f>
+
+Force overwritting
+
+=back
+
+=head1 DESCRIPTION
+
+Not a downloader indeed, but simply a frontend for
+some real downloader e.g. B<curl> or B<wget>.
+
+=head1 CHANGELOG
+
+2007-10-28	xiaoranzzz	<xiaoranzzz@myplace.hell>
+
+* Initial version
+
+2012-12-19	xiaoranzzz	<xiaoranzzz@myplace.hell>
+
+* Add pod document
+* Use Getopt::Long.
+
+=head1 AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+
 
