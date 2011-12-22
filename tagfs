@@ -100,10 +100,12 @@ if(! -d $saved_in) {
     create_dir($saved_in) or die("$!\n");
 }
 
+my %tags;
 @tags = split(/\s*,\s*/,$tags);
-die("Empty tag list!\n") unless(@tags);
-
-push @tags,now(1);
+%tags = map {$_=>1} @tags;
+die("Empty tag list!\n") unless(%tags);
+$tags{now(1)} = 1 if($tags{new} || $tags{newly} || $tags{income} || $tags{incoming});#unless($tags{retag});
+@tags = keys %tags;
 
 my $log_files=$root . "tagfs.logs";
 if(!$TEST) {

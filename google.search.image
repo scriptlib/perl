@@ -117,6 +117,9 @@ REDOIT:
         else {
             print $_->{url},"\n" foreach(@{$images});
         }
+		my $old_fh = select(STDOUT); 
+		$| = 1;
+		select($old_fh);
         if($page_idx < $page_end and $count < 10)
         {
             print STDERR "Less than 10 images returned, Ingored remain pages\n";
