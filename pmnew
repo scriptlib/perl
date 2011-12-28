@@ -14,6 +14,7 @@ BEGIN
     }
     unshift @INC, 
         map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
+	use lib $ENV{XR_PERL_MODULE_DIR};
 }
 my %OPTS;
 my @OPTIONS = qw/stdout|o stdin|i simple|s help|h|? version|ver edit-me manual|man/;
@@ -40,7 +41,7 @@ if(!$module_name) {
 }
 
 our $PROGRAM_DIR;
-my $OUTPUT_DIR=$PROGRAM_DIR . "/modules";
+my $OUTPUT_DIR=$ENV{XR_PERL_MODULE_DIR} || $PROGRAM_DIR . "/modules";
 
 #Output to STDOUT
 if($OPTS{stdout}) {

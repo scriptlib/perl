@@ -61,8 +61,11 @@ if($exp =~ /\/.*\//) {
         sub s_code 
         {
             my $r = shift;
-            $r =~ ' . "$exp" . ' if(\$r);
-            return $r;
+			$_ = $r;
+            ' . 
+			$exp
+			. ';
+            return $_;
         }
     ');
 }
@@ -72,7 +75,10 @@ else {
         sub s_code 
         {
             my $r = shift;
-            $r = ' . "$exp" . ' $r;
+			$_ = $r;
+			$r={' . 
+			$exp 
+			. '}
             return $r;
         }
         '

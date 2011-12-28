@@ -56,7 +56,11 @@ my @WGET = qw{
     wget --user-agent Mozilla/5.0 --connect-timeout 15 -q --progress bar
 };
 my @CURL = qw{
-        curl --fail --globoff --location --user-agent Mozilla/5.0 --progress-bar --create-dirs
+        curl
+		--fail --globoff --location
+		--user-agent Mozilla/5.0
+		--progress-bar --create-dirs
+		--connect-timeout 15
 };
 
 sub log($$) {

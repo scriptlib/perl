@@ -87,11 +87,15 @@ elsif(open FI,"<",$source_directory  . "/perl_script.template") {
     my $DATE= strftime("%Y-%m-%d %H:%M",localtime());
     $USER="xiaoranzzz" unless($USER);
     my $EMAIL="$USER\@" . (defined $HOSTNAME ? $HOSTNAME : "myplace.hell");
+	my $PACKAGE = "MyPlace::Script::$NAME";
+	$PACKAGE =~ s/-/_/g;
+	$PACKAGE =~ s/\//::/g;
 foreach(@TEXT) {
     s/___EMAIL___/$EMAIL/g;
     s/___AUTHOR___/$USER/g;
     s/___NAME___/$NAME/g;
     s/___DATE___/$DATE/g;
+	s/___PACKAGE___/$PACKAGE/g;
     print PIPE $_;
 }
 close PIPE;
