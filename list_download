@@ -1,0 +1,128 @@
+#!/usr/bin/perl -w
+use strict;
+use Getopt::Long;
+use MyPlace::ReEnterable;
+use MyPlace::Script::Message;
+
+our $version = 0.1;
+my @OPTIONS = qw/
+	help|h
+	/;
+my %OPTS;
+GetOptions(\%OPTS,@OPTIONS);
+
+$OPTS{'help'} = 1 unless(@ARGV);
+
+if($OPTS{'help'} || $OPTS{'manual'}) {
+	require Pod::Usage;
+	my $var = $OPTS{'help'} ? 1 : 2;
+	Pod::Usage::pod2usage(-exitval=>$var,-verbose=>$var);
+	exit $var;
+}
+my $RE = new MyPlace::ReEnterable;
+
+sub download_name {
+	my $CWD = shift;
+	my $catalog = shift;
+	my $linkname = shift;
+	my $basename = shift;
+	system('mkdir','-pv','--',"all/$basename") unless(-d "all/$basename");
+	system("ln","-svfT","../all/$basename","$catalog/$linkname");
+	chdir("all/$basename") or die("$!\n");
+	system("urlrule_get","http://google.search.image/\"$basename\"?type=large",0);
+	chdir($CWD);
+	return 1;
+}
+
+sub process_list {
+	my $CWD = shift(@_);
+	my $file = shift(@_);
+	my $name = shift(@_) || $file;
+	if(-f $file) {
+		$name =~ s/\.[^\.]+$//;
+	}
+	else {
+		$file = $file . ".txt";
+	}
+	if(!-f $file) {
+		app_error "File not found: $file\n";
+		return;
+	}
+	if(!-d $name) {
+		app_error "Create directory: $name\n";
+		if(!mkdir $name) {
+			app_error "$!\n";
+			return;
+		}
+	}
+	if(! open FI,'<',$file) {
+		app_error "$!\n";
+		return;
+	}
+	foreach(<FI>) {
+		chomp;
+		next unless($_);
+		my $filename = $_;
+		my $searchname = $_;	
+		if(m/^\d+\.(.+)$/) {
+			$searchname = $1;
+		}
+		$RE->push(undef,'download_name',$CWD,$name,$filename,$searchname);
+	}
+	close FI;
+}
+use Cwd qw/getcwd/;
+my $CWD = getcwd;
+$SIG{INT} = sub {die("KILLED\n");};
+foreach(@ARGV) {
+	$RE->push(undef,'process_list',$CWD,$_);
+}
+while($RE->length) {
+	app_message(colored($RE->length,'YELLOW') . " tasks remain\n");
+	$RE->run;
+}
+app_message("DONE\n");
+exit 0;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+urlrule_list  - Download lists for names by searching
+
+=head1 SYNOPSIS
+
+	urlrule_list [options] LIST_NAME | LIST_FILE
+
+=head1 OPTIONS
+
+=over
+
+=item b<--help>,b<-h>
+
+Display this text
+
+=item b<--test>,b<-t>
+
+Switch to testing mode
+
+=back
+
+=head1 DESCRIPTION
+
+Downloader for lists of searching keywords.
+
+=head1 CHANGELOG
+
+2011-12-28	xiaoranzzz	<xiaoranzzz@myplace.hell>
+
+	* initial version 0.1
+
+=head1 AUTHOR
+
+xiaoranzzz@myplace.hell
+
+
+=cut
