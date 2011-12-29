@@ -1,25 +1,27 @@
 #!/usr/bin/perl -w
 # $Id$
 package ___PACKAGE___;
-
-
 use strict;
-use v5.8.0;
-use MyPlace::Usage;
-our $VERSION = 'v0.1';
 
+our $VERSION = 'v0.1';
+my @OPTIONS = qw/
+	help|h|? 
+	manual|man
+/;
 my %OPTS;
-my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
 if(@ARGV)
 {
     require Getopt::Long;
     Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
-    MyPlace::Usage::Process(\%OPTS,$VERSION);
 }
-else
-{
-    MyPlace::Usage::PrintHelp();
-    exit 0;
+else {
+	$OPTS{'help'} = 1;
+}
+if($OPTS{'help'} or $OPTS{'manual'}) {
+	require Pod::Usage;
+	my $v = $OPTS{'help'} ? 1 : 2;
+	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
+    exit $v;
 }
 
 
