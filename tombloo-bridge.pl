@@ -10,6 +10,16 @@ use utf8;
 my %OPTS;
 my @OPTIONS = qw/
 	help|h|? version|ver edit-me manual|man
+	topdir:s
+	profd:s
+	item:s
+	itemUrl:s
+	pageUrl:s
+	tags:s
+	description:s
+	body:s
+	body-file:s
+	type:s
 	/;
 
 #use Data::Dumper;
@@ -33,29 +43,69 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 	exit($v);
 }
 
+sub parse_file {
+	my %ps;
+	my $tmpfile = shift;
+	my $lastkey;
+	open FI,'<',$tmpfile or die("$!\n");
+	while(<FI>) {
+		if(m/^(.+?)=>(.*)$/m) {
+			$lastkey = $1;
+			$ps{$lastkey} = $ps{$lastkey} ? $ps{$lastkey} . "\n" . $2 : $2;
+		}
+		elsif($lastkey) {
+			$ps{$lastkey} .= "\n" . $_;
+		}
+	}
+	close FI;
+	return %ps;
+}
 
 use File::Spec;
 #use Encode;
 my %ps;
-my $lastkey;
-my $tmpfile = shift;
-open FI,'<',$tmpfile or die("$!\n");
-while(<FI>) {
-	if(m/^(.+?)=>(.*)$/m) {
-		$lastkey = $1;
-		$ps{$lastkey} = $ps{$lastkey} ? $ps{$lastkey} . "\n" . $2 : $2;
+if(@ARGV) {
+	my $tmpfile = shift;
+	if(-f $tmpfile) {
+		%ps = parse_file($tmpfile);
+		unlink $tmpfile;
 	}
-	elsif($lastkey) {
-		$ps{$lastkey} .= "\n" . $_;
+	else {
+		unshift @ARGV,$tmpfile;
 	}
 }
-close FI;
-unlink $tmpfile;
+%ps = (%ps, %OPTS);
+foreach(@ARGV) {
+	if(m/^(.+?)=>(.+)$/m) {
+		$ps{$1} = $2;
+	}
+}
+
 foreach(keys %ps) {
 	if($ps{$_} eq 'undefined') {
 		$ps{$_} = "";
 	}
 }
+
+foreach(qw/
+	itemUrl
+	item
+	body
+	body-file
+	description
+	pageUrl
+	type
+	profd
+	topdir
+	tags
+	/) {
+	$ps{$_} = "" unless($ps{$_});
+}
+
+#use Data::Dumper;
+#open FO,"|-",'zenity','--text-info','--filename','/dev/stdin';
+#print FO Data::Dumper->Dump([\%ps],['*ps']),"\n";
+#close FO;
 
 die("Invalid file format\n") unless($ps{item});
 
@@ -63,18 +113,18 @@ if($ps{tags}) {
 	$ps{tags} =~ s/-/ /g;
 }
 $ps{item} =~ s/\s*-\s*.*-.*$//;
+$ps{body} = "" unless($ps{body});
 #foreach(@ARGV) {
 #	if(m/^(.+?)=>(.*)$/m) {
 #		$ps{$1}=$2;
 #	}
 #}
-#use Data::Dumper;
-#open FO,"|-",'zenity','--text-info','--filename','/dev/stdin';
-#print FO Data::Dumper->Dump([\%ps],['*ps']),"\n";
-#close FO;
 
 my $topdir;
-if($ps{profd}) {
+if($ps{topdir}) {
+	$topdir = $ps{topdir};
+}
+elsif($ps{profd}) {
 	$topdir =  File::Spec->catfile($ps{profd},'websaver');
 }
 else {
@@ -88,7 +138,7 @@ if(! -d $alldir) {
 	mkdir($alldir) or die("$!\n");
 }
 
-my $filename= $ps{itemUrl} || $ps{itemPageUrl};
+my $filename= $ps{itemUrl} || $ps{pageUrl};
 if($ps{type} eq 'photo') {
 	if($filename) {
 		$filename =~ s/\/+$//;
@@ -99,7 +149,10 @@ if($ps{type} eq 'photo') {
 else {
 	$filename = $ps{item};
 }
-$filename =~ s/[:\?\*\\\/]+/_/g;
+$filename =~ s/[:><\?\*\\\/=\|!@#%^&{}]+/_/g;
+$filename =~ s/\s*_+\s*/_/g;
+$filename =~ s/\s+$//;
+$filename =~ s/^\s+//;
 $filename = File::Spec->catfile($alldir,$filename);
 
 if($ps{tags}) {
@@ -110,7 +163,24 @@ if($ps{'body-file'}) {
 	$ps{body} = join("",<FI>);
 	close FI;
 }
+
+my $now = time;
+if($ps{itemUrl}) {
+	my $bmfile = File::Spec->catfile($topdir,'bookmarks.html');
+	open FO,'>>',$bmfile or die("$!\n");
+	print STDERR "Writting to $bmfile...";
+	print FO <<"HTML";
+<DT><A HREF="$ps{itemUrl}" TYPE="$ps{type}" SOURCE="$ps{pageUrl}" TAGS="$ps{tags}" ADD_DATE="$now">$ps{item}</A>
+<DD>$ps{body}$ps{description}
+HTML
+	close FO;
+	print STDERR "\t[OK]\n";
+}
+
 if($ps{type} eq 'photo') {
+	if($filename !~ m/\.[^\.]{3,4}$/) {
+		$filename = $filename . ".jpg";
+	}
 	if($ps{file}) {
 		system('cp','-v','--',$ps{file},$filename);
 		unlink($ps{file});
@@ -118,21 +188,27 @@ if($ps{type} eq 'photo') {
 	else {
 		system('download','-r',$ps{pageUrl},'--saveas',$filename,$ps{itemUrl});
 	}
-	system('tagfs','-r',$topdir,$ps{tags},$filename);
+	if(-f $filename) {
+		exit system('tagfs','-r',$topdir,$ps{tags},$filename);
+	}
 }
+elsif($ps{type} =~ /^(:?regular|text|quote)$/) {
+	$filename = $filename . ".txt";
+	my $under = '=' x length($ps{item});
+	open FO,'>',$filename;
+	print FO <<"ARTICLE";
+$ps{item}
+$under
 
-$filename = $filename . ".txt";
-open FO,'>',$filename;
-print FO join(
-	"\n\n",(
-			$ps{item} . "\n" . $ps{itemUrl},
-			$ps{body},
-			$ps{description} . "\n" . "[" . $ps{tags} . "]",
-			"source:$ps{pageUrl}"
-		  )
-	),"\n";
-close FO;
-system('tagfs','-r',$topdir,$ps{tags},$filename);
+* [$ps{tags}]
+* Source: <$ps{itemUrl}>
+* Link: <$ps{pageUrl}>
+
+$ps{body}$ps{description}
+ARTICLE
+	close FO;
+	exit system('tagfs','-r',$topdir,$ps{tags},$filename);
+}
 #system('zenity','--info','--text',$filename . "\n" . $ps{tags});
 
 __END__
