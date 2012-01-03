@@ -13,6 +13,16 @@ BEGIN
         map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
 }
 
+use MyPlace::Program::Batchget;
+my $self = new MyPlace::Program::Batchget;
+$self->set(@ARGV);
+if(! $self->{tasks} or @{$self->{tasks}} < 1) {
+	$self->readfile(\*STDIN);
+}
+exit $self->execute;
+
+
+
 my %OPTS;
 my @OPTIONS = qw/
                 help|h|? version|ver edit-me manual|man
@@ -119,9 +129,6 @@ sub GetFilename_Auto {
     my $URL=shift;
     my $num=shift;
     my $result;
-    #my $ext=$extname;
-    #($ext=$URL) =~ s/^.*\.([^\.]*)$/.$1/ unless($ext);
-    #$result=$num ? "$num$ext" : Uniqname($ext);
     $result = $URL;
     $result =~ s/^.*:\/\///;
     $result =~ s/[\/\?\:\\\*\&]/_/g;
@@ -129,7 +136,7 @@ sub GetFilename_Auto {
     if(length($result)>=128) {
         $result = substr($result,0,127);
     }
-    $result = "$num.$result" if(defined $num);
+    $result = "$num.$result" if($num);
     if($createdir) {
         my $dirname=$URL;
         $dirname =~ s/^.*:\/*[^\/]*\///;

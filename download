@@ -1,5 +1,11 @@
 #!/usr/bin/perl -w
 # $Id$
+use MyPlace::Program::Download;
+my $main = new MyPlace::Program::Download;
+exit $main->execute(@ARGV);
+
+__END__
+
 ###APPNAME:     download
 ###APPAUTHOR:   geek
 ###APPDATE:	Fri Sep 28 08:31:24 2007
@@ -223,9 +229,6 @@ else {
     &log("$url->$saveas\n","$FAILLOG") if($logging);;
     exit 0;
 }
-
-__END__
-
 =pod
 
 =head1 NAME
