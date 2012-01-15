@@ -89,18 +89,17 @@ elsif($OPTS{help}) {
 my $CONFIG;
 my $database = $OPTS{file};
 my $action = shift @ARGV;
-my $query = shift @ARGV;
-my $userdata = shift @ARGV;
+my @queries = @ARGV;
 
 $action = 'list' unless($action);
-if((!$query) and $action !~ m/^(?:list|add|plain|read|write|print|query)$/) {
-    $query = $action;
+if((!@queries) and $action !~ m/^(?:list|add|plain|read|write|print|query|get|set)$/) {
+    @queries = [$action];
     $action = 'query';
 }
 
 
 
-if($action eq 'add' and !$query) {
+if($action eq 'add' and !@queries) {
     print3 "Invalid usage\n";
     print2 "Usage:\n\tr-config add keys...|values...\n";
     exit 1;
@@ -110,25 +109,44 @@ $CONFIG->read_plainfile($database);
 
 
 if(($action eq 'list') or ($action eq 'query')) {
-    $query = '/.+/' unless($query);
-}
-elsif($action eq 'plain') {
-    $query = '-' unless($query);
-#    print STDERR "Write plain data to $query \n";
-    $CONFIG->write_plainfile($query,1);
-    exit 0;
+    @queries = ['/.+/'] unless(@queries);
 }
 
+
 if($action eq 'add') {
-    my @keys;
-    push @keys,$query if($query);
-    push @keys,$userdata if($userdata);
-    push @keys,@ARGV if(@ARGV);
-    print1 "add ", join(' -> ',@keys);
-    print_status($CONFIG->add(@keys));
+	    print1 "add ", join(' -> ',@queries);
+	    print_status($CONFIG->add(@queries));
+}
+elsif($action eq 'plain') {
+	my $output = shift(@queries) || '-';
+    $CONFIG->write_plainfile($output,1);
+    exit 0;
+}
+elsif($action =~ m/^(?:add|write|delete|set)$/) {
+	my $userdata = pop @queries;
+	if(!@queries) {
+		@queries = [$userdata];
+		$userdata = undef;
+	}
+	my @target = $CONFIG->query(\@queries,1);
+	use Data::Dumper;print STDERR Data::Dumper->Dump([\@queries,\@target],['*queries','*target']),"\n";
+	if($action eq 'write') {
+		die("Usage: $0 write KEYS value\n") unless($userdata);
+        print_target("write \"","\"  = \"$userdata\"\n",$CONFIG,@target);
+        print_status($CONFIG->write($userdata,@target));
+	}
+	elsif($action eq 'delete') {
+	        print_target("delete \"",($userdata ? "->$userdata\"\n" : "\"\n"),$CONFIG,@target);
+	        print_status($CONFIG->delete($userdata,@target));
+	}
+	elsif($action eq 'set') {
+		die("Usage: $0 set KEYS value\n") unless($userdata);
+	    print_target("set \"","\"  = \"$userdata\"\n",$CONFIG,@target);
+	    print_status($CONFIG->set($userdata,@target));
+	}
 }
 else {
-    my @target = $CONFIG->query($query);
+    my @target = $CONFIG->query(\@queries);
     if(!@target) {
         print3 "query match nothing\n";
         exit 2;
@@ -150,21 +168,22 @@ else {
             print2 join(", ",@{$values}),"\n";
         }
     }
-    elsif($action eq 'write') {
-        print_target("write \"","\"  = \"$userdata\"\n",$CONFIG,@target);
-        print_status($CONFIG->write($userdata,@target));
-    }
-    elsif($action eq 'delete') {
-        print_target("delete \"",($userdata ? "->$userdata\"\n" : "\"\n"),$CONFIG,@target);
-        print_status($CONFIG->delete($userdata,@target));
-    }
     elsif($action eq 'query') {
         my @records = $CONFIG->get_records(@target);
         foreach(@records) {
             print_path('',$_,"\n","->");
         }
     }
-    
+	elsif($action eq 'get') {
+		my @r = $CONFIG->get(@target);
+		foreach(@r) {
+			next unless($_);
+			my ($path,@value) = @{$_};
+			foreach(@value) {
+				print STDOUT $_,"\n" if($_);
+			}
+		}
+	}
     if($!) {
         print3 "$!\n";
         exit 1;
