@@ -67,16 +67,16 @@ else {
 my $last_page = $start_page + ($count ? $count : 0);
 foreach my $index ($start_page .. $last_page) {
     $opts{page} = $index;
-    my %result = search_images ($query,%opts);
-    print STDERR "For $query [$index/$last_page]," . ' Get ' . $result{count} . " images";
-    if($result{count}) {
-        if($result{count} < 20 and $index < $last_page) {
+    my ($count,$result) = search_images ($query,%opts);
+    print STDERR "For $query [$index/$last_page]," . ' Get ' . $count . " images";
+    if($count) {
+        if(${count} < 20 and $index < $last_page) {
             print STDERR "\nLess than 20 images returned, searching will stop.\n";
         }
         else {
             print STDERR "\n";
         }
-        foreach(@{$result{result}}) {
+        foreach(@{$result}) {
             print $_->{url},"\n";
         }
     }

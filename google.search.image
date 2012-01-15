@@ -88,10 +88,12 @@ foreach(@ARGV) {
 $page = 1 unless($page and $page =~ m/[0-9]+/ and  $page>1);
 $page_count = 1 unless($page_count and $page_count =~ m/[0-9]+/ and  $page_count>1);
 my $page_end = $page + $page_count -1;
+my $idx = 0;
 foreach my $page_idx ($page .. $page_end)
 {
 REDOIT:
-    print STDERR "Searching for $query, page [$page_idx/$page_end] ...\n";
+	$idx++;
+    print STDERR "[$idx/$page_count] Searching for $query, page [$page_idx] ...\n";
     my ($status,$images) = MyPlace::Google::Search::search_images($query,$page_idx,%params);
     if($status and $images) {
         #print STDERR ref $images,"\n";
@@ -127,7 +129,7 @@ REDOIT:
         }
     }
     else {
-        print STDERR $images,"\n";
+        print STDERR $images,"\n" if($images);
     }
 }
 
