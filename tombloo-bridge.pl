@@ -20,6 +20,7 @@ my @OPTIONS = qw/
 	body:s
 	body-file:s
 	type:s
+	test|t
 	/;
 
 #use Data::Dumper;
@@ -167,17 +168,22 @@ if($ps{'body-file'}) {
 my $now = time;
 if($ps{itemUrl}) {
 	my $bmfile = File::Spec->catfile($topdir,'bookmarks.html');
-	open FO,'>>',$bmfile or die("$!\n");
 	print STDERR "Writting to $bmfile...";
-	print FO <<"HTML";
+	if(!$OPTS{test}) {
+		open FO,'>>',$bmfile or die("$!\n");
+		print FO <<"HTML";
 <DT><A HREF="$ps{itemUrl}" TYPE="$ps{type}" SOURCE="$ps{pageUrl}" TAGS="$ps{tags}" ADD_DATE="$now">$ps{item}</A>
 <DD>$ps{body}$ps{description}
 HTML
-	close FO;
+		close FO;
+	}
 	print STDERR "\t[OK]\n";
 }
 
-if($ps{type} eq 'photo') {
+if($OPTS{test}) {
+	use Data::Dumper;print STDERR Data::Dumper->Dump([\%ps],['*ps']),"\n";
+}
+elsif($ps{type} eq 'photo') {
 	if($filename !~ m/\.[^\.]{3,4}$/) {
 		$filename = $filename . ".jpg";
 	}
@@ -189,7 +195,7 @@ if($ps{type} eq 'photo') {
 		system('download','-r',$ps{pageUrl},'--saveas',$filename,$ps{itemUrl});
 	}
 	if(-f $filename) {
-		exit system('tagfs','-r',$topdir,$ps{tags},$filename);
+		system('tagfs','-r',$topdir,$ps{tags},$filename);
 	}
 }
 elsif($ps{type} =~ /^(:?regular|text|quote)$/) {
@@ -207,8 +213,14 @@ $under
 $ps{body}$ps{description}
 ARTICLE
 	close FO;
-	exit system('tagfs','-r',$topdir,$ps{tags},$filename);
+	system('tagfs','-r',$topdir,$ps{tags},$filename);
 }
+
+my $hook = File::Spec->catfile($topdir,'tb-hook.pl');
+if(-f $hook) {
+	eval `cat $hook` or die("$@\n");
+}
+
 #system('zenity','--info','--text',$filename . "\n" . $ps{tags});
 
 __END__
