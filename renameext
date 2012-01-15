@@ -112,6 +112,7 @@ else {
 
 my $dfile=0;
 foreach my $old(grep !/^\.\.?$/,@files) {
+	print STDERR "$old\n";
     my $new = &s_code($old);
     if($new eq $old) {
         next;
