@@ -64,7 +64,7 @@ sub parse_file {
 
 use File::Spec;
 #use Encode;
-my %ps;
+use vars qw/%ps $PAGE $topdir/;
 if(@ARGV) {
 	my $tmpfile = shift;
 	if(-f $tmpfile) {
@@ -121,7 +121,6 @@ $ps{body} = "" unless($ps{body});
 #	}
 #}
 
-my $topdir;
 if($ps{topdir}) {
 	$topdir = $ps{topdir};
 }

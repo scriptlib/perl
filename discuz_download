@@ -20,8 +20,6 @@ use constant {
     RESUME_DATA_FILE=>".discuz_download.resume",
     THREAD_DBASE_FILE=>".threads",
 };
-use utf8;
-binmode STDERR,"utf8";
 my %THREAD_DBASE;
 my $g_START_DIRECTORY;
 my $g_HANDLER;
@@ -29,25 +27,39 @@ my $g_TYPE;
 my $g_USER;
 my $g_PASS;
 my $g_AUTO_RENAME;
+my $g_EXCLUDE;
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man save=s text attachment image all exist:s multiposts|m pages:i size:i/;
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
 
 sub build_dir {
     my $f =shift;
     my $s = shift;
-    #$s =~ s/^(\[[^\[\]]+\]\s*)+//g;
-    $s =~ s/\s*[\/\:\*\<\>\?\!\\\|]\s*/-/g;
+    $s =~ s/\s*[\:\*\<\>\?\!\|]\s*/-/g;
     $s =~ s/【[^【】]+\s*阅\s*】//;
     $s =~ s/【\s*作者(?:：|:)不(?:祥|详)\s*】\s*//;
     $s =~ s/^\s+//;
     $s =~ s/\s+$//;
+    if($g_AUTO_RENAME) {
+        $f = &autorename($f);
+        $s = &autorename($s);
+    }
     return "$f/$s";
 }
-sub loadpage {
+sub load_page {
     my ($url,$g_USER,$g_PASS,$prompt) = @_;
     app_message "loading $url...";
     sleep 1;
     my $page = MyPlace::Discuz->new(user=>$g_USER,pass=>$g_PASS);
     if($page->init_with_url($url)) {
-        app_message "--no-prefix","\t[OK]\n";
+		app_message "--no-prefix","\t[OK]\n";
+        #app_message "$page->{title}\t[OK]\n";
         return $page;
     }
     else {
@@ -59,35 +71,36 @@ sub loadpage {
 
 sub save_post {
     my ($dir,$filename,$url,$prompt,$subpage,$type) = @_;
-#    $prompt = $prompt ? "[$prompt]" : "";
-#    app_message $prompt,"\n";
+    $prompt = $prompt ? "[$prompt]" : "";
+    app_message $prompt,"\n";
     if(not &write_thread_dbase($url,1)) 
     {
         app_warning "$url [Ignored, in THREAD_DBASE!]\n";
         return undef;
     }
     $type = $g_TYPE unless($type);
-    $subpage = loadpage($url,$g_USER,$g_PASS) unless($subpage);
+	$type = 'text' unless($g_TYPE);
+    $subpage = load_page($url,$g_USER,$g_PASS) unless($subpage);
     unless($subpage and $subpage->{post}) {
         app_warning "Empty post...\n";
         &write_thread_dbase($url,0);
         return undef;
     }
     mkdir $dir unless(-d $dir);
-    if($type eq 'all' or $type =~ /\|all\|/) {
+    if($type eq 'all' or $type =~ /\ball\b/) {
         save_images($dir,$filename,$subpage);
         save_text($dir,$filename,$subpage);
         save_attachment($dir,$filename,$url,$subpage);
     }
     else
     {
-        if($type eq 'image' or $type =~ /\|image\|/) {
+        if($type eq 'image' or $type =~ /\bimage\b/) {
             save_images($dir,$filename,$subpage);
         }
-        if($type eq 'attachment' or $type =~ /\|attachment\|/) {
+        if($type eq 'attachment' or $type =~ /\battachment\b/) {
             save_attachment($dir,$filename,$url,$subpage);
         }
-        if($type eq 'text' or $type =~ /\|text\|/)
+        if($type eq 'text' or $type =~ /\btext\b/)
         {
             save_text($dir,$filename,$subpage);
         }
@@ -102,7 +115,15 @@ sub save_images {
     my $filename = shift;
     my $subpage = shift;
 #    my $prompt = shift;
-    my @images = $subpage->get_post_images($subpage->{post});
+    my @images;
+	if($OPTS{multiposts} and $subpage->{posts}) {
+		foreach(@{$subpage->{posts}}) {
+			push @images, @{$subpage->get_post_images($_)};
+		}
+	}
+	else {
+		@images = $subpage->get_post_images($subpage->{post});
+	}
     app_message("Saving images ...");
     unless(@images) {
         app_warning "--no-prefix","\t[No images found!]\n";
@@ -113,7 +134,7 @@ sub save_images {
     foreach my $idx (0 .. $#images) {  
         app_message "\n[" . ($idx+1)  . "/$#images]" if(@images > 1);
         app_message "--no-prefix","$images[$idx]\n-->$dst/$idx.jpg ...\n";
-        if(-f "$dst/$idx.jpg") {
+        if(-f "$dst/$idx.jpg" and !($OPTS{exist} eq 'ow')) {
             app_message "\t[Skipped] File exists\n";
             next;
         }
@@ -138,31 +159,39 @@ sub save_text {
     my $filename = shift;
     my $subpage = shift;
 #    my $prompt = shift;
-    if($g_AUTO_RENAME) {
-        $filename = &autorename($filename);
-    }
     my $dst = build_dir($dir,$filename);
-    $dst = &get_filename($dst,".txt");
+	if($OPTS{exist} eq 'rn') {
+		$dst = get_filename($dst,'.txt');
+	}
+	else {
+		$dst = "$dst.txt";
+	}
     app_message "Saving Text ==>$dst ...";
     mkdir $dir unless(-d $dir);
     return (app_error "--no-prefix","\t[Failed: $dir not exists!]\n") unless(-d $dir);
-    if(-f $dst) { 
+    if(-f $dst and !($OPTS{exist} eq 'ow')) { 
         app_warning "--no-prefix","\t[Skipped: File exists!]\n";
         return undef;
     }
-    my $text;
-    if($subpage) {
-        $text = $subpage->get_post_text($subpage->{post});
+    my @texts;
+	if($OPTS{multiposts} and $subpage->{posts}) {
+		foreach(@{$subpage->{posts}}) {
+			push @texts,@{$subpage->get_post_text($_)};
+			push @texts,"\n\n";
+		}
+	}
+	elsif($subpage->{post}) {
+		push @texts,@{$subpage->get_post_text($subpage->{post})};
+	}
+	else {
+        push @texts,shift @_;
     }
-    else {
-        $text = shift;
-    }
-    unless($text) {
+    unless(@texts) {
         app_message "--no-prefix","\t[No text to save!]\n";
         return undef;
     }
     open FO,">:utf8",$dst or return (app_message "--no-prefix","\t[Failed:]$!\n");
-    print FO @{$text};
+    print FO @texts;
     close FO;
     app_message "--no-prefix","\t[Done]\n";
     return 1;
@@ -182,7 +211,7 @@ sub save_attachment {
     {
         my $attachment_filename = build_dir($dst,$_->[0] . '_' . $_->[1]);
         app_message "Downloading $attachment_filename ...";
-        if( -f $attachment_filename) 
+        if(-f $attachment_filename and !($OPTS{exist} eq 'ow')) 
         {
             app_warning "--no-prefix","\t[Ignored: File exists!]\n";
             next;
@@ -204,10 +233,25 @@ sub min_max {
 sub process_url {
     my $dir = shift;
     my $url = shift;
-    my $no_subpage = shift;
+	my $flags = shift;
+#    my $no_pages = shift;
     my $prompt = shift;
     my $type = shift;
-    my $page = loadpage($url,$g_USER,$g_PASS);
+	if($g_EXCLUDE and $url =~ $g_EXCLUDE) {
+		app_warning("$url\t[Excluded]\n");
+		return 1;
+	}
+    my $page = load_page($url,$g_USER,$g_PASS);
+	my $F_NOPAGES = 0x01;
+	my $F_NOFORUMS = 0x02;
+	my $F_NOTHREADS = 0x04;
+	my $no_pages; #1
+	my $no_forums; #2
+	my $no_threads; #4
+	$no_pages = 1 if($flags & $F_NOPAGES); 
+	$no_forums = 1 if($flags & $F_NOFORUMS);
+	$no_threads = 1 if($flags & $F_NOTHREADS);
+#	die(join("\n",$no_pages,$no_forums,$no_threads),"\n");
     #,$prompt);
     mkdir $dir unless(-d $dir);
     return unless($page);
@@ -216,26 +260,30 @@ sub process_url {
             $page->delete();
         return 1;
     }
-    if(!$no_subpage and $dir eq ".") {
-        my $title = $page->{title};$title =~ s/\s*-.*//g;
+    if(!$no_pages and $dir eq ".") {
+        my $title = $page->{title};#$title =~ s/\s*-.*//g;
         $dir = build_dir($dir,$title);
         mkdir $dir unless(-d $dir);
     }
-    if($page->{forums}) {
-        foreach my $idx (0 .. $#{$page->{forums}}) {
+	#print STDERR "DIR\t$dir\n";
+    if((!$no_forums) and $page->{forums}) {
+        foreach my $idx (reverse 0 .. $#{$page->{forums}}) {
             my $subdir = build_dir($dir,$page->{forums}->[$idx]->[1]);
             my $suburl = $page->build_url($page->{forums}->[$idx]->[0],$url);
+			print STDERR "SUBDIR\t$subdir\n";
             $g_HANDLER->push(undef,"process_url", $subdir,$suburl,0,$prompt . " forum " . min_max($idx,$#{$page->{forums}}),$type);
         }
     }
-    if((!$no_subpage) and  $page->{pages}) {
-        foreach my $idx (0 .. $#{$page->{pages}}) {
+    if((!$no_pages) and  $page->{pages}) {
+		my $limit_pages = $#{$page->{pages}};
+		$limit_pages = $OPTS{pages} - 1 if($OPTS{pages} and $OPTS{pages}>0);
+        foreach my $idx (reverse 0 .. $limit_pages) {
             my $suburl = $page->build_url($page->{pages}->[$idx],$url);
-            $g_HANDLER->push(undef,"process_url", $dir,$suburl,1,$prompt . " page " . min_max($idx,$#{$page->{pages}}),$type);
+            $g_HANDLER->push(undef,"process_url", $dir,$suburl,$F_NOPAGES | $F_NOFORUMS,$prompt . " page " . min_max($idx,$limit_pages),$type);
         }
     }
-    else {
-        foreach my $idx (0 .. $#{$page->{threads}}) {
+    elsif(!$no_threads) {
+        foreach my $idx (reverse 0 .. $#{$page->{threads}}) {
             my $suburl = $page->build_url($page->{threads}->[$idx]->[0],$url);
             my $subfile = $page->{threads}->[$idx]->[1];
             $g_HANDLER->push(undef,"save_post",$dir,$subfile,$suburl,$prompt . " thread " . min_max( $idx,$#{$page->{threads}} . " "),undef,$type);
@@ -254,7 +302,7 @@ sub write_thread_dbase {
     return undef if($THREAD_DBASE{$str});
     return 1 if($flag_no_save);
     $THREAD_DBASE{$str}=1;
-    my $rand_number = int(rand(10));
+    my $rand_number = int(rand(20));
     if($rand_number == 5)
     {
         &save_thread_dbase
@@ -306,16 +354,7 @@ sub save_thread_dbase
     }
 }
 
-my %OPTS;
-my @OPTIONS = qw/help|h|? version|ver edit-me manual|man save=s text attachment image all/;
-if(@ARGV)
-{
-    require Getopt::Long;
-    require MyPlace::Usage;
-    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
-    MyPlace::Usage::Process(\%OPTS,$VERSION);
-}
-
+$OPTS{exist} = 'ig' unless($OPTS{exist});
 my %SAVE_TYPE;
 if($OPTS{save})
 {
@@ -356,10 +395,10 @@ if(%SAVE_TYPE)
     $g_TYPE = '|' . join('|',keys %SAVE_TYPE) . '|';
 }
 
-
 my $url = shift;
 $g_USER = shift;
 $g_PASS = shift;
+$g_TYPE = "text" unless($g_TYPE);
 my @urls;
 $g_HANDLER = MyPlace::ReEnterable->new('main');
 
@@ -368,6 +407,7 @@ if($url) {
         app_message "Input URLs:\n";
         while(<STDIN>) {
             chomp;
+			next if(/^\s*#/);
             push @urls,$_ if($_);
         }
         app_message scalar(@urls)," URLs read.\n";
@@ -425,6 +465,17 @@ if( -f "autorename.pl") {
     do "autorename.pl";
 }
 
+if(-f "exclude.url" and open FI,'<exclude.url') {
+	my @exps;
+	while(<FI>) {
+		chomp;
+		next if(/^\s*#/);
+		push @exps,$_;
+	}
+	my $exp = join("|",@exps);
+	$g_EXCLUDE = qr/$exp/i;
+}
+
 &load_thread_dbase;
 while(my $tasks = $g_HANDLER->length) {
     app_message "[$tasks] tasks remained\n";
@@ -480,6 +531,12 @@ Shortcut for option: --save attachment
 =item B<--all>
 
 Shortcut for option: --save all
+
+=item B<--exist>
+
+Action when downloading targets exist, valid options 
+include 'ig' for 'ignore', 'rn' for 'rename' and
+'ow' for 'overwrite'.
 
 =item B<--version>
 

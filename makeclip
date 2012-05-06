@@ -27,10 +27,13 @@ my $profile=shift;
 die("File not exists:$input\n") unless(-f $input);
 $profile="avi" unless($profile);
 
-my $ext = $profile;
-$ext = 'mp4' if($profile =~ m/^(?:milestone|ms)$/i);
 
 require MyPlace::Filename;
+my $ext;
+$ext = $profile if($profile =~ m/^(?:avi|mpeg|mp4|rmvb|mkv)$/);
+$ext = 'mp4' if($profile =~ m/^(?:milestone|ms)$/i);
+$ext = MyPlace::Filename::get_extname($input) unless($ext);
+$ext =~ s/^\.+//;
 my $basename=MyPlace::Filename::get_basename($input);
 unless($clip_name) {
     my $idx=1;
@@ -63,12 +66,19 @@ $encoder = 'mencoder' if($profile =~ m/^avi$/i);
 if($encoder eq 'ffmpeg') {
     push @enarg,'-t',fix_time_arg($length) if($length);
     push @enarg,'-i',$input;
+	push @enarg,'-q','1';
     if($profile =~ m/^(?:3gp|mp4)$/i) {
         push @enarg,'-s','320x240','-vf','scale=-1:-1';
     }
     elsif($profile =~ m/^(?:milestone|ms)$/i) {
         push @enarg,'-s','428x240','-vf','scale=-1:-1';
     }
+	elsif($profile =~ m/^(\d+)%$/) {
+		push @enarg,'-vf',"scale=$1/100*iw:$1/100*ih";
+	}
+	elsif($profile =~ m/^(\d+)[xX](\d+)$/) {
+		push @enarg,'-s',"$1x$2",'-vf','scale=-1:-1';
+	}
     push @enarg,@ARGV if(@ARGV);
     push @enarg,$output;
 }

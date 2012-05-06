@@ -8,7 +8,6 @@
 ###APPEXAMPLE:	discuz_dump
 ###APPOPTION:	
 use strict;
-
 #ENV variable MUST be defined somewhere,
 #FOR perl to search modules from,
 #OR nothing will work
@@ -22,6 +21,5 @@ use MyPlace::Discuz;
 my ($url,$user,$pass,$what) = @ARGV;
 my $index = MyPlace::Discuz->new(user=>$user,pass=>$pass);
 $index->init_with_url($url);
-binmode STDERR,"utf8";
 use Data::Dumper;die Dumper($what ? $index->{$what} : $index),"\n";
 

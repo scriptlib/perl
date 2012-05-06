@@ -85,7 +85,7 @@ sub create_dir {
 	}
 	else {
 		foreach(@_) {
-			return undef unless(system_execute('mkdir',$_));
+			return undef unless(system_execute('mkdir','-p',$_));
 		}
 	}
 	return 1;
@@ -143,7 +143,7 @@ sub tag_files {
     foreach my $file (@_) {
        my $basename = get_basename($file);
        next if($basename eq '.' or $basename eq '..');
-       &log_text("[" . join(',',@tags) . "] $basename\n");
+       &log_text("[" . join(',',@tags) . "] $file\n");
 	   &log_text("\t\t" . now() . "\n");
 	   if(-d $file) {
 			log_text(&list_dir($file,'  ├──') , "\n");
@@ -155,7 +155,9 @@ sub tag_files {
             if(! -d "$root$tag") {
                 create_dir("$root$tag") or die("$!\n");
             }
-            system_execute(@linker,"$root$tag","../$REALTAG/$basename");
+			my @level = ($tag =~ m/\//g);
+			my $dotdot = scalar(@level) + 1;
+            system_execute(@linker,"$root$tag","../"x$dotdot . "$REALTAG/$basename");
        }
     }
 }

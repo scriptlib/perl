@@ -17,6 +17,20 @@ if($url eq '-v') {
 }
 $url = "http://$url" unless($url =~ /^http:/i);
 
+use MyPlace::LWP;
+print STDERR "$url " if($verbose);
+my($ok,$data,$res) = (new MyPlace::LWP('progress'=>$verbose))->get($url,@ARGV);
+if($ok) {
+	print $data;
+	exit 0;
+}
+else {
+	print STDERR "[",$res->code,"]",$res->status_line,"\n" unless($ok);
+	exit $res->code;
+}
+
+__END__
+
 use LWP::UserAgent;
 use HTTP::Cookies;
 

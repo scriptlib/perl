@@ -1,0 +1,164 @@
+#!/usr/bin/perl -w
+# $Id$
+package MyPlace::Script::video_resize;
+use strict;
+
+our $VERSION = 'v0.1';
+my @OPTIONS = qw/
+	help|h|? 
+	manual|man
+	input|i:s
+	size|s:s
+	suffix|u:s
+	ext|e:s
+	output|o:s
+	quality|q:i
+	bitrate|b:s
+/;
+my %OPTS;
+if(@ARGV)
+{
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+}
+else {
+	$OPTS{'help'} = 1;
+}
+if($OPTS{'help'} or $OPTS{'manual'}) {
+	require Pod::Usage;
+	my $v = $OPTS{'help'} ? 1 : 2;
+	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
+    exit $v;
+}
+
+
+my $start = 0;
+my $length = 0;
+
+
+
+
+my $input=$OPTS{'input'} || shift;
+my $size=$OPTS{'size'} || shift;
+my $suffix=$OPTS{'suffix'} || 'resized';
+my $ext = $OPTS{'ext'};
+my $output = $OPTS{'output'};
+my $quality = $OPTS{'quality'} || '4';
+my $bitrate = $OPTS{'bitrate'};
+
+if(!$ext) {
+	$ext = $input;
+	$ext =~ s/^.*\.//;
+	$ext = 'mp4' unless($ext);
+}
+
+die("Error: no input specified.\n") unless($input);
+die("Error: file not exists: $input.\n") unless(-f $input);
+die("Error: no size specified.\n") unless($size);
+if(!$output) {
+	my $basename = $input;
+	$basename =~ s/^.*\///;
+	$basename =~ s/\.[^\.]+$//;
+	unless($suffix) {
+		my $idx=1;
+	    while(-f "$basename-clip$idx.$ext") {
+		    $idx++;
+	    }
+		$suffix = "clip$idx";
+	}
+	$output="$basename-$suffix.$ext";
+}
+
+my $encoder="ffmpeg";
+unless(`which "$encoder"`) {
+    $encoder = 'mencoder';
+}
+
+#my $comment=`date +%x`;
+#chomp($comment);
+
+sub fix_time_arg {
+    my $time = shift;
+    $time = '0:0:0:' . $time;
+    $time =~ s/^.+(\d+:\d+:\d+)$/$1/;
+    return $time;
+}
+
+my @enarg;
+push @enarg,'-ss',fix_time_arg($start) if($start);
+if($encoder eq 'ffmpeg') {
+    push @enarg,'-t',fix_time_arg($length) if($length);
+    push @enarg,'-i',$input;
+	push @enarg,'-q',$quality if($quality);
+	push @enarg,'-b:v',$bitrate if($bitrate);
+	if($size =~ m/^(\d+)%$/) {
+		push @enarg,'-vf',"scale=$1/100*iw:$1/100*ih";
+	}
+	elsif($size =~ m/^(\d+)[xX](\d+)$/) {
+		push @enarg,'-s',"$1x$2",'-vf','scale=-1:-1';
+	}
+	else {
+		die("Invalid parameters\n");
+	}
+    push @enarg,@ARGV if(@ARGV);
+    push @enarg,$output;
+}
+else {
+	die("$encoder not supported\n");
+}
+print STDERR join(" ",($encoder,@enarg)),"\n";
+exec $encoder,@enarg;
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+video-resize - PERL script
+
+=head1  SYNOPSIS
+
+video-resize [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2012-04-14 23:32  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+
+
