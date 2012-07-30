@@ -1,0 +1,116 @@
+#!/usr/bin/perl -w
+# $Id$
+package MyPlace::Script::opml2html;
+use strict;
+
+our $VERSION = 'v0.1';
+my @OPTIONS = qw/
+	help|h|? 
+	manual|man
+/;
+my %OPTS;
+if(@ARGV)
+{
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+}
+else {
+	$OPTS{'help'} = 1;
+}
+if($OPTS{'help'} or $OPTS{'manual'}) {
+	require Pod::Usage;
+	my $v = $OPTS{'help'} ? 1 : 2;
+	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
+    exit $v;
+}
+
+sub dq {
+	return '"' . $_[0] . '"';
+}
+
+use XML::Simple;
+use Data::Dumper;
+binmode STDOUT,'utf8';
+my %arg = (KeepRoot=>1);
+my $xml = XMLin($ARGV[0] ? $ARGV[0] : "/dev/stdin",%arg);
+
+my $cats = $xml->{opml}->{body}->{outline};
+die("No catalogs found\n") unless(ref $cats);
+print <<HEAD;
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Feeds list</title>
+</head>
+<body>
+<h1>Feeds:</h1>
+HEAD
+foreach(@{$cats}) {
+	print '<ul>' . "\n";
+	print '<h2>' . $_->{text} . '</h2>' . "\n";
+	foreach(@{$_->{outline}}) {
+		print '<li>' . "\n";
+		print '<strong>' . $_->{text} . '</strong>' . "</br>\n";
+		print '<a href=' . dq($_->{xmlUrl}) . ' alt=' . dq($_->{title}) . '>' . $_->{xmlUrl} . '</a></br>' . "\n";
+		print '</li>' . "\n";
+	}
+	print '</ul>' . "\n";
+}
+print <<FOOT;
+</body></html>
+FOOT
+
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+opml2html - PERL script
+
+=head1  SYNOPSIS
+
+opml2html [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2012-07-30 18:27  xiaoranzzz  <xiaoranzzz@myplace-win7>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace-win7>
+
+=cut
+
+#       vim:filetype=perl
