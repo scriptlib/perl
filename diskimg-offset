@@ -42,7 +42,7 @@ while(<TABLE>) {
     chomp;
     #                      Device Boot      Start         End      Blocks   Id  System 
     #/myplace/emuos/tinycore.img1   *          63      101807       50872    6  FAT1
-    if(m{$name$num\s+\*?\s+(\d+)\s+(\d+)\s+(\d+)\s+([a-z0-9]+)\s+([a-zA-z0-9]+)$}) {
+    if(m{$name$num\s+\*?\s+(\d+)\s+(\d+)\s+(\d+)\s+([a-z0-9]+)\s+([a-zA-z0-9]+)}) {
         my $fsid = $1;
         print ($fsid*$unitsize,"\n");
         last;
