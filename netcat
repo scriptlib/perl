@@ -15,7 +15,7 @@ if($url eq '-v') {
 	$url = shift;
 	$verbose = 1;
 }
-$url = "http://$url" unless($url =~ /^http:/i);
+$url = "http://$url" unless($url =~ /^(http|https|ftp):/i);
 
 use MyPlace::LWP;
 print STDERR "$url " if($verbose);
