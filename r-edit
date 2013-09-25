@@ -1,12 +1,13 @@
 #!/usr/bin/perl
 use Env qw/OS XAUTHORITY DISPLAY/;
-my @w=qw/notepad++.bat/;
+#my @w=qw/notepad++.bat/;
+my @w=qw/gvim.exe/;
 my @g=qw/gvim -f/;
 my @c=qw/vim/;
 @g = @c;
 my @editor;
 
-if(0 and $Env{OS} =~ m/Windows/i) {
+if($Env{OS} =~ m/Windows/i) {
 	@editor= @w;
     shift @ARGV if(@ARGV and $ARGV[0] eq '-b');
     if(-f "/bin/cygpath.exe") {

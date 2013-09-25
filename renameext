@@ -23,6 +23,8 @@ my @OPTIONS= qw/
 	swap|sw:s
 	no-dot|nd
 	force|f
+	verbose|v
+	debug
 /;
 GetOptions(\%OPTS,@OPTIONS);
 exit_usage(0,$0) if($OPTS{'help'});
@@ -102,7 +104,7 @@ if(@ARGV) {
     @files = @ARGV;
 }
 else {
-    print STDERR "Please input filenames:\n";
+    print STDERR "Please input filenames:\n" if($OPTS{verbose});
     while(<STDIN>) {
         chomp;
         push @files,$_;
@@ -112,7 +114,7 @@ else {
 
 my $dfile=0;
 foreach my $old(grep !/^\.\.?$/,@files) {
-	print STDERR "$old\n";
+	print STDERR "$old\n" if($OPTS{'debug'});
     my $new = &s_code($old);
     if($new eq $old) {
         next;

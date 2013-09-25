@@ -17,8 +17,9 @@ if(@ARGV)
     MyPlace::Usage::Process(\%OPTS,$VERSION);
 }
 
-my $p = '林';
-my @keywords = qw/ 之 庭 心 忆 扬 阳 彤 宁 冉 南 天 尔 尘 执 易 灵 知 离 秦 章 端 绰 自 至 豆 良 诺 读 采 陵 凌 晨 /;
+#my $p = '林';
+my $p = '';
+my @keywords = qw/ 语 予 伊 涵 橙 风 格 之 庭 心 扬 阳 彤 宁 冉 南 天 尔 尘 执 易 灵 知 离 秦 章 绰 自 至 良 诺 读 采 晨 /;
 my @optwords = qw/ 千 纤 未 东 飞 尺 词 幼 双 声 芊 芷 若 可 宸 桐 梓 祈 思 舟 一 羽 辰 其 雨 /;
 use List::Util qw/shuffle/;
 binmode STDOUT,'utf8';
@@ -31,7 +32,7 @@ foreach my $word1 (shuffle @keywords) {
 }
 my @names = keys %names;
 my $count = scalar(@names);
-my $idx = 0; my $col = 7;
+my $idx = 0; my $col = 8;
 while($idx < $count) {
 	for($idx .. $idx + $col - 1) {
 		if($names[$_]) { $names[$_] = $p . $names[$_]; }
