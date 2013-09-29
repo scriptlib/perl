@@ -8,6 +8,7 @@ my @OPTIONS = qw/
 	help|h|? 
 	manual|man
 	debug
+	style|s:s
 /;
 use utf8;
 use Encode;
@@ -34,6 +35,7 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
     exit $v;
 }
 
+
 sub getnewname {
 	system('mv','--',@_);
 }
@@ -44,10 +46,12 @@ sub readqsed {
 		while(<$FI>) {
 		chomp;
 		$_ = $utf8->decode($_);
-		if(m/qvod:\/*(.+)/) {
-			$qvod = $1;
-			$qvod =~ s/\".+$//;
-			$qvod =~ s/\s+$//;
+		if(m/qvod:\/*([^\|]+)\|([^\|]+)\|([^\|]+)\|/) {
+			$qvod = {
+				id=>$1,
+				hash=>$2,
+				fullname=>$3,
+			};
 			last;
 		}
 		}
@@ -79,18 +83,20 @@ sub process {
 		my $qvod = readqsed($old);
 		print STDERR "$old\n"if($OPTS{debug});
 		if($qvod) {
-			my $name = $qvod;
-			print STDERR "=>[qvod]$qvod\n"if($OPTS{debug});
-			$name =~ s/^[^\|]+\|[^\|]+\|//;
-			$name =~ s/\|+$//;
-			print STDERR "=>[name]$name\n"if($OPTS{debug});
-			if($name) {
+			my $name;
+			if($OPTS{style} eq 'hash') {
+				$name = $qvod->{hash};
+			}
+			elsif($OPTS{style} eq 'fullname') {
+				$name = $qvod->{fullname};
+			}
+			else {
+				$name = $qvod->{fullname};
 				$name =~ s/^([^\s\[]*[\[【〖［｛『〔〈《「][^\[\]\(\)]+[〕〉》」』〗】｝\]]|www\.([^\.]+)+\.(com|us))[_ ]*//i;
-				print STDERR "=>[name]$name\n"if($OPTS{debug});
+			}
+			if($name) {
 				my $new = dirname($old);
 				$new = $new . $name . '.qsed';
-				print STDERR "=>[new]$new\n"if($OPTS{debug});
-				print STDERR "[$cur/$count] $old\n=>$qvod\n==>$new\n" if($OPTS{debug});
 				print STDERR "[$cur/$count] $old\n=>$new\n";
 				getnewname($old,$new);
 			}
@@ -98,6 +104,7 @@ sub process {
 	}
 }
 
+$OPTS{style} = 'name' unless($OPTS{style});
 my @lines= @ARGV;
 if(!@lines) {
 	while(<STDIN>) {
