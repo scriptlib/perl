@@ -128,6 +128,7 @@ my %Actions = (
 		        print STDERR "\tError: $file not exist.\n"
 		    }
 		    else {
+				print STDERR "[$target] <<< $file\n";
 		        if($OPTS{verbose}) {
 		            system_run('mv','-v','--',$file,$target);
 		        }
