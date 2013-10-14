@@ -3,12 +3,16 @@
 package MyPlace::Script::saveqvod;
 use strict;
 
-our $VERSION = 'v0.1';
+our $VERSION = 'v0.2';
 my @OPTIONS = qw/
 	help|h|? 
 	manual|man
 /;
 my %OPTS;
+use MyPlace::Script::Message;
+use MyPlace::Program::Download;
+my $downloader = new MyPlace::Program::Download;
+my $msg = MyPlace::Script::Message->new("Saveurl");
 if(@ARGV)
 {
     require Getopt::Long;
@@ -20,28 +24,90 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
     exit $v;
 }
+
+my @BLOCKED = (
+	'rapidimg\.org',
+	'7seasex\.com',
+	'sadpanda\.us',
+	'imagehost\.it',
+	'freespace\.com\.au',
+	'imgjoe\.com',
+	'leetleech\.org',
+	'imgkeep\.com',
+	'uyl\.me',
+	'789zy\.us',
+	'item\.slide\.com',
+	'umei\.cc',
+	'flare\.me',
+	'fototube\.pl',
+	'shareimage\.org',
+	'imagevenue\.com',
+	'imgchili\.com',
+	'imagekiss\.com',
+	'tinypic\.com',
+	'ojiji\.net',
+);
+
+sub blocked {
+	my $url = shift;
+	foreach(@BLOCKED) {
+		if($url =~ m/$_/) {
+			return 1;
+		}
+	}
+	return undef;
+}
+
 sub normalize {
 	my $_ = $_[0];
-	s/[\/:\\]/ /g;
+	if($_) {
+		s/[\/:\\]/ /g;
+	}
 	return $_;
 }
 sub process_http {
 	my ($link,$filename) = @_;
+	if(blocked($link)) {
+		$msg->warning("Blocked: $link\n");
+		return;
+	}
 	$filename = normalize($filename);
-	system('download','-u',$link,'-s',$filename);
+	if(-f $filename) {
+		$msg->warning("Ignored: File exists, $filename\n");
+		return;
+	}
+	$msg->green("Saving file $filename\n");
+	return $downloader->execute('-u',$link,'-s',$filename,'-m','60');
+#	system('download','-u',$link,'-s',$filename);
 	
 }
 sub process_file {
 	my ($link,$filename) = @_;
 	$filename = normalize($filename);
-	print STDERR "Saving file $filename...\n";
+#	if(-f $filename) {
+#		print STDERR "Ignored: File exists, $filename\n";
+#		return;
+#	}
+	$msg->green("Saving file $filename\n");
 	system('mv','-v','--',$link,$filename);
 }
 sub process_qvod {
 	my ($link,$filename) = @_;
+	if(!$filename) {
+		if($link =~ m/([^\|]+)\|$/) {
+			$filename = $1;
+		}
+		elsif($link =~ m/\/([^\/]+)$/) {
+			$filename = $1;
+		}
+	}
 	$filename = normalize($filename);
+	if(-f $filename) {
+		$msg->warning("Ignored: File exists, $filename\n");
+		return;
+	}
 	if($link && $filename) {
-		print STDERR "Saving $filename.qsed ...\n";
+		$msg->green("Saving file $filename.qsed\n");
 		open FO,'>',$filename . '.qsed';
 		print FO 
 <<"EOF";
@@ -56,11 +122,11 @@ EOF
 }
 while(<STDIN>) {
 	chomp;
-	if(m/^(qvod:\/\/.+)\t(.+)$/) {
+	if(m/^qvod:(.+)\t(.+)$/) {
 		process_qvod($1,$2);
 	}
-	elsif(m/^qvod:\/\/.+\|([^\|]+)\|$/) {
-		process_qvod($_,$1);
+	elsif(m/^qvod:(.+)$/) {
+		process_qvod($1);
 	}
 	elsif(m/^(http:\/\/.+)\t(.+)$/) {
 		process_http($1,$2);
@@ -72,7 +138,7 @@ while(<STDIN>) {
 		process_file($1,"./");
 	}
 	else {
-		print STDERR "Ignore $_\n";
+		$msg->warning("Ignored: URL not supported, $_\n");
 	}
 }
 
