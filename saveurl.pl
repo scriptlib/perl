@@ -12,7 +12,7 @@ my %OPTS;
 use MyPlace::Script::Message;
 use MyPlace::Program::Download;
 my $downloader = new MyPlace::Program::Download;
-my $msg = MyPlace::Script::Message->new("Saveurl");
+my $msg = MyPlace::Script::Message->new();
 if(@ARGV)
 {
     require Getopt::Long;
@@ -46,8 +46,37 @@ my @BLOCKED = (
 	'imagekiss\.com',
 	'tinypic\.com',
 	'ojiji\.net',
+	'mmsky\.net',
+	'snapfish\.com',
+	'15335\.com',
+	'gg88\.com',
+	'slide\.com',
+	'donsnaughtymodels\.com',
+	'dosug\.cz',
+	'imagehyper\.com',
+	'totallynsfw\.com',
+	'img\.vkdt\.info',
+	'mmyishu\.com:99',
+	'schoolgirl-bdsm\.jp',
+	'imgly\.net',
+	'imgplanet\.com',
 );
 
+my %EXPS = (
+	"bdhd"=>'^(bdhd:\/\/.*\|)([^\|]+?)(\|?)$',
+	'ed2k'=>'^(ed2k:\/\/\|file\|)([^\|]+)(\|.*)$',
+	'http'=>'^(http:\/\/.*\/)([^\/]+)$',
+	'qvod'=>'^(qvod:\/\/.*\|)([^\|]+?)(\|?)$',
+);
+
+sub extname {
+	my $filename = shift;
+	return "" unless($filename);
+	if($filename =~ m/\.([^\.\/\|]+)$/) {
+		return $1;
+	}
+	return "";
+}
 sub blocked {
 	my $url = shift;
 	foreach(@BLOCKED) {
@@ -71,7 +100,12 @@ sub process_http {
 		$msg->warning("Blocked: $link\n");
 		return;
 	}
-	$filename = normalize($filename);
+	if(!$filename) {
+		if($link =~ m/$EXPS{http}/) {
+			$filename = $2;
+		}
+	}
+	$filename = normalize($filename) if($filename);
 	if(-f $filename) {
 		$msg->warning("Ignored: File exists, $filename\n");
 		return;
@@ -89,33 +123,82 @@ sub process_file {
 #		return;
 #	}
 	$msg->green("Saving file $filename\n");
-	system('mv','-v','--',$link,$filename);
+	system('mv','--',$link,$filename);
 }
-sub process_qvod {
-	my ($link,$filename) = @_;
+
+
+sub process_bdhd {
+	my $link = shift;
+	my $filename = shift;
+	$link = lc($link);
 	if(!$filename) {
-		if($link =~ m/([^\|]+)\|$/) {
-			$filename = $1;
-		}
-		elsif($link =~ m/\/([^\/]+)$/) {
-			$filename = $1;
+		foreach($EXPS{bdhd},$EXPS{ed2k},$EXPS{qvod},$EXPS{http}) {
+			if($link =~ m/$_/) {
+				$filename = $2;
+				$filename = normalize($filename);
+				last;
+			}
 		}
 	}
-	$filename = normalize($filename);
-	if(-f $filename) {
-		$msg->warning("Ignored: File exists, $filename\n");
-		return;
+	else {
+		$filename = normalize($filename);
+		foreach($EXPS{bdhd},$EXPS{ed2k},$EXPS{qvod}) {
+			if($link =~ m/$_/) {
+				$link = $1 . $filename . $3;
+				last;
+			}
+		}
+	}
+	if($link && $filename) {
+		$filename = $filename . ".bsed";
+		$msg->green("Saving file $filename\n");
+		open FO,'>',$filename;
+		print FO 
+<<"EOF";
+{
+	"bsed":{
+		"version":"1,19,0,195",
+		"seeds_href":{"bdhd":"$link"}
+	}
+}
+EOF
+		close FO;
+	}
+	else {
+		print STDERR "No filename specified for [$link]\n";
+	}
+}
+
+sub process_qvod {
+	my $link = shift;
+	my $filename = shift;
+	$link = lc($link);
+	if(!$filename) {
+		foreach($EXPS{qvod},$EXPS{bdhd},$EXPS{ed2k},$EXPS{http}) {
+			if($link =~ m/$_/) {
+				$filename = $2;
+				last;
+			}
+		}
+		$filename = normalize($filename) if($filename);
+	}
+	else {
+		$filename = normalize($filename);
+		foreach($EXPS{qvod},$EXPS{bdhd},$EXPS{ed2k}) {
+			if($link =~ m/$_/) {
+				$link = $1 . $filename . $3;
+				last;
+			}
+		}
 	}
 	if($link && $filename) {
 		$msg->green("Saving file $filename.qsed\n");
 		open FO,'>',$filename . '.qsed';
 		print FO 
 <<"EOF";
-	<qsed version="3.5.0.61">
-		<entry>
-			<ref href="$link"/>
-		</entry>
-	</qsed>
+<qsed version="3.5.0.61"><entry>
+<ref href="$link" />
+</entry></qsed>
 EOF
 		close FO;
 	}
@@ -128,8 +211,23 @@ while(<STDIN>) {
 	elsif(m/^qvod:(.+)$/) {
 		process_qvod($1);
 	}
+	elsif(m/^bdhd:(.+)\t(.+)$/) {
+		process_bdhd($1,$2);
+	}
+	elsif(m/^bdhd:(.+)$/) {
+		process_bdhd($1);
+	}
+	elsif(m/^(ed2k:\/\/.+)\t(.+)$/) {
+		process_bhdh($1,$2);
+	}
+	elsif(m/^(ed2k:\/\/.+)$/) {
+		process_bhdh($1);
+	}
 	elsif(m/^(http:\/\/.+)\t(.+)$/) {
 		process_http($1,$2);
+	}
+	elsif(m/^(http:\/\/.+)$/) {
+		process_http($1);
 	}
 	elsif(m/^file:\/\/(.+)\t(.+)$/) {
 		process_file($1,$2);
