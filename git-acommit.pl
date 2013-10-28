@@ -33,7 +33,7 @@ my $cmd = 'add';
 $cmd = 'rm' if(($action eq 'Delete') || ($action eq 'delete'));
 my $action_done = $action;
 $action_done =~ s/e?$/ed/;
-my $message = $OPTS{message} . "\n\n" || '';
+my $message = $OPTS{message} ? $OPTS{message} . "\n\n" : '';
 foreach(@ARGV) {
 	run('git',$cmd,$_);
 	$message .= "\t$action file: $_\n"

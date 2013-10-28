@@ -124,7 +124,7 @@ my %Actions = (
 		    if($TESTMODE) {
 		        print STDERR "\t[TEST MODE] Moving $file to $target\n"
 		    }
-		    elsif(!-f $file) {
+		    elsif(!-e $file) {
 		        print STDERR "\tError: $file not exist.\n"
 		    }
 		    else {

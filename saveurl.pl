@@ -12,7 +12,7 @@ my %OPTS;
 use MyPlace::Script::Message;
 use MyPlace::Program::Download;
 my $downloader = new MyPlace::Program::Download;
-my $msg = MyPlace::Script::Message->new();
+my $msg = MyPlace::Script::Message->new('saveurl');
 if(@ARGV)
 {
     require Getopt::Long;
@@ -60,6 +60,7 @@ my @BLOCKED = (
 	'schoolgirl-bdsm\.jp',
 	'imgly\.net',
 	'imgplanet\.com',
+	'mudadia\.p8\.hu',
 );
 
 my %EXPS = (
@@ -110,7 +111,7 @@ sub process_http {
 		$msg->warning("Ignored: File exists, $filename\n");
 		return;
 	}
-	$msg->green("Saving file $filename\n");
+	$msg->green("Saving file: $filename\n");
 	return $downloader->execute('-u',$link,'-s',$filename,'-m','60');
 #	system('download','-u',$link,'-s',$filename);
 	
@@ -122,7 +123,7 @@ sub process_file {
 #		print STDERR "Ignored: File exists, $filename\n";
 #		return;
 #	}
-	$msg->green("Saving file $filename\n");
+	$msg->green("Saving file: $filename\n");
 	system('mv','--',$link,$filename);
 }
 
@@ -132,9 +133,10 @@ sub process_bdhd {
 	my $filename = shift;
 	$link = lc($link);
 	if(!$filename) {
-		foreach($EXPS{bdhd},$EXPS{ed2k},$EXPS{qvod},$EXPS{http}) {
+		foreach my $p (qw/bdhd ed2k/) {
+			my $_ = $EXPS{$p};
 			if($link =~ m/$_/) {
-				$filename = $2;
+				$filename = "$2.$p";
 				$filename = normalize($filename);
 				last;
 			}
@@ -142,16 +144,19 @@ sub process_bdhd {
 	}
 	else {
 		$filename = normalize($filename);
-		foreach($EXPS{bdhd},$EXPS{ed2k},$EXPS{qvod}) {
+		foreach my $p (qw/bdhd ed2k/) {
+			my $_ = $EXPS{$p};
 			if($link =~ m/$_/) {
 				$link = $1 . $filename . $3;
+				$filename = "$filename.$p";
 				last;
 			}
 		}
 	}
+	$filename =~ s/\.bdhd$//;
 	if($link && $filename) {
 		$filename = $filename . ".bsed";
-		$msg->green("Saving file $filename\n");
+		$msg->green("Saving file: $filename\n");
 		open FO,'>',$filename;
 		print FO 
 <<"EOF";
@@ -174,9 +179,10 @@ sub process_qvod {
 	my $filename = shift;
 	$link = lc($link);
 	if(!$filename) {
-		foreach($EXPS{qvod},$EXPS{bdhd},$EXPS{ed2k},$EXPS{http}) {
+		foreach my $p (qw/qvod bdhd ed2k http/) {
+			my $_ = $EXPS{$p};
 			if($link =~ m/$_/) {
-				$filename = $2;
+				$filename = "$2.$p";
 				last;
 			}
 		}
@@ -184,15 +190,18 @@ sub process_qvod {
 	}
 	else {
 		$filename = normalize($filename);
-		foreach($EXPS{qvod},$EXPS{bdhd},$EXPS{ed2k}) {
+		foreach my $p (qw/qvod bdhd ed2k/) {
+			my $_ = $EXPS{$p};
 			if($link =~ m/$_/) {
-				$link = $1 . $filename . $3;
+				$link = "$1$filename$3";
+				$filename = "$filename.$p";
 				last;
 			}
 		}
 	}
+	$filename =~ s/\.qvod$//;
 	if($link && $filename) {
-		$msg->green("Saving file $filename.qsed\n");
+		$msg->green("Saving file: $filename.qsed\n");
 		open FO,'>',$filename . '.qsed';
 		print FO 
 <<"EOF";
