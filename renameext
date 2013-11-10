@@ -21,14 +21,13 @@ my @OPTIONS= qw/
 	help|h|?
 	test|t
 	swap|sw:s
-	no-dot|nd
 	force|f
 	verbose|v
 	debug
+	rule|r:s
 /;
 GetOptions(\%OPTS,@OPTIONS);
 exit_usage(0,$0) if($OPTS{'help'});
-
 
 my $utf8 = find_encoding("utf8");
 my @OLDARGV = @ARGV;
@@ -40,8 +39,63 @@ binmode STDERR,'utf8';
 binmode STDOUT,'utf8';
 binmode STDIN,'utf8';
 
+sub strnum {
+	my $val = shift;
+	my $numlen = shift(@_) || 0;
+	return $val if($numlen<2);
+	return $val if($val >= (10**$numlen));
+	my $str = "0"x$numlen . $val;
+	return substr($str,length($str) - $numlen);
+}
+
+my $INTPOOL=1;
+
+my %RULES = (
+	'autonumber'=>sub {
+		my $old = shift;
+		my $new = $old;
+		my $ext = '';
+		my $prefix = '';
+		if($new =~ m/^(.+)\/(.+)$/) {
+			$prefix = $1;
+			$new = $2;
+		}
+		if($new =~ m/\.([^\.\\\/]+)$/) {
+			$ext = ".$1";
+		}
+		return $old if($new =~ m/\d\d\d\d\d\d\d\d$ext$/);
+		my $filename = $prefix . strnum($INTPOOL,8) . $ext;
+		while(-e $filename) {
+			$INTPOOL++;
+			$filename = $prefix . strnum($INTPOOL,8) . $ext;
+		}
+		return $filename;
+	},
+	cleanbegin1=>'s/(^|[\/\\\\])\s*(?:【.+?】|（.+?）)\s*/$1/',
+	cleanend1=>'s/[_\s]*【?\d+[Pp]】?\s*$//',
+	dotless=>'s/\.(?=.*\.)/ /g',
+);
+
 my $exp;
-if(defined $OPTS{swap}) {
+
+if(defined $OPTS{rule}) {
+	if($OPTS{rule} && defined $RULES{$OPTS{rule}}) {
+		print STDERR "Use internal rule $OPTS{rule}\n";
+		$exp = $RULES{$OPTS{rule}};
+	}
+	elsif($OPTS{rule}) {
+		print STDERR "Error, rule \"$OPTS{rule}\" not defined.\n";
+		exit 1;
+	}
+	else {
+		print STDERR "Defined rules are:\n";
+		foreach (keys %RULES) {
+			print STDERR sprintf("%-12s: %s\n",$_ ,ref $RULES{$_} ? "{CODES}" : $RULES{$_}); 
+		}
+		exit 2;
+	}
+}
+elsif(defined $OPTS{swap}) {
 	if($OPTS{swap}) {
 		$exp = "s/^([^$OPTS{swap}]+?)(\\s*)$OPTS{swap}(\\s*)(.+)\.([^.]+)\$/\$4\$3$OPTS{swap}\$2\$1.\$5/";
 	}
@@ -50,43 +104,37 @@ if(defined $OPTS{swap}) {
 	}
 	
 }
-elsif($OPTS{'no-dot'}) {
-	$exp = 's/\.(?=.*\.)/ /g'
-}
 else {
 	$exp = shift;
 }
 
-if($exp =~ /\/.*\//) {
-    eval
-    ('
-        sub s_code 
-        {
+my $RENAMER;
+
+print STDERR ref $exp,"\n";
+if(ref $exp) {
+	$RENAMER = $exp;
+}
+elsif($exp =~ /\/.*\//) {
+	$RENAMER = sub    {
             my $r = shift;
 			$_ = $r;
-            ' . 
-			$exp
-			. ';
+			eval($exp);
             return $_;
-        }
-    ');
+   };
 }
 else {
-    eval
-    (   '
-        sub s_code 
-        {
-            my $r = shift;
-			$_ = $r;
-			$r={' . 
-			$exp 
-			. '}
-            return $r;
-        }
-        '
-    );
+	$RENAMER = sub {
+		my $r = shift;
+		$_ = $r;
+		$r = eval($exp);
+		return $r;
+	}
 }
-die("$@\n") if($@);
+
+use Data::Dumper;
+print Dumper($RENAMER);
+
+die("Error: $@\n") if($@);
 
 my $tempname = 0;
 while(-e $tempname) {
@@ -115,8 +163,9 @@ else {
 my $dfile=0;
 foreach my $old(grep !/^\.\.?$/,@files) {
 	print STDERR "$old\n" if($OPTS{'debug'});
-    my $new = &s_code($old);
+    my $new = &$RENAMER($old);
     if($new eq $old) {
+		print STDERR ("\"$old\" [Ignored]\n");
         next;
     }
 	$new =~ s/\/+$//;
