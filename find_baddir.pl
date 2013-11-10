@@ -16,6 +16,7 @@ my @OPTIONS = qw/
 	strict:i
 	size:i
 	files:i
+	dest|D=s
 /;
 my %OPTS;
 if(@ARGV)
