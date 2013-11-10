@@ -179,6 +179,68 @@ my %TestMethod;
 	},
 	'filecontent'=>{
 	},
+	'files'=>{
+		'name'=>'Count files in directory',
+		'test'=>sub {
+			my $dir = shift;
+			my $size = shift;
+			if(opendir(my $dh,$dir)) {
+				my $count = 0;
+				while(readdir $dh) {
+					#print STDERR "$_\n";
+					$count++;
+				}
+				close $dh;
+				$count -=2;
+				if($count > $size) {
+					return 1,">";
+				}
+				elsif($count == $size) {
+					return 2,"=";
+				}
+				else {
+					return 3,"<";
+				}
+			}
+			else {
+				return undef,"error",$!;
+			}
+		},
+	},
+	'imagesdir'=>{
+		'name'=>'Images directory',
+		'test'=>sub {
+			my $dir = shift;
+			my $exp = shift;
+			my $size = 0;
+			if($dir =~ m/[（\[【](\d+)[Pp][】\］）]/) {
+				$size = $1;
+			}
+			elsif($dir =~ m/_(\d+)[Pp]$/) {
+				$size = $1;
+			}
+			my ($status,$sign,$msg);
+			if($size < 1) {
+				$status = undef;
+				$sign="error";
+				$msg = "Directory Size Property Unknown.";
+			}
+			else {
+				($status,$sign,$msg) = $TestMethod{files}->{test}->($dir,$size);
+			}
+			if($sign =~ m/$exp/) {
+				if($status) {
+					return 1,"$sign $size";
+				}
+				else {
+					return 1,"Error: $msg";
+				}
+			}
+			else {
+				return undef;
+			}
+		}
+	},
 );
 sub system_run {
     $OPTS{'debug'} && print join(" ",@_),"\n";
@@ -193,29 +255,28 @@ sub do_action {
 sub test {
     my $file = shift;
     my $rule = shift;
-    if($TEST_METHOD->{test}->($file,$rule->{'exp'})) {
-        return $file,$rule;
-    }
-    return;
+    return $TEST_METHOD->{test}->($file,$rule->{'exp'});
 }
 
 sub classify {
     my $file = shift;
     my $rule = shift;
-    $rule->{name} =~ s/^\^+//;
-    $rule->{name} =~ s/\$+$//;
-    if(test($file,$rule)) {
+#    $rule->{name} =~ s/^\^+//;
+#    $rule->{name} =~ s/\$+$//;
+	my($status,$msg) = test($file,$rule);
+    if($status) {
         $CLASSIFIED{$file} = 1;
         $rule->{files}=[] if(!$rule->{files});
         push @{$rule->{files}},$file;
-        print STDERR "Classify [",$rule->{name},"] $file\n" if($OPTS{verbose});
-    #    do_action($file,$rule);
+        print STDERR "Classify [",$rule->{name},($msg ? ": $msg" : ""),"] $file\n" if($OPTS{verbose});
         return $file,$rule;
     }
-    elsif($OPTS{debug}) {
-        print STDERR "Classify [",'FAILED',"] $file\n";
-    }
-    return;
+	else {
+	    if($OPTS{debug} || $OPTS{verbose}) {
+			print STDERR "Classify [",'FAILED',($msg ? ": $msg" : ""),"] $file\n";
+	    }
+		return;
+	}
 }
 
 sub process_file {
@@ -238,16 +299,17 @@ sub process_rule {
 sub process {
     my $files = shift;
     my $rules = shift;
-    foreach(@$rules) {
-        process_rule($files,$_);
+    foreach my $rule (@$rules) {
+        process_rule($files,$rule);
     }
+#	use Data::Dumper;print STDERR Dumper($rules);
     foreach my $rule (@$rules) {
         if($rule->{files} && @{$rule->{files}}) {
             print STDERR "Class [$rule->{name}] matches " . scalar(@{$rule->{files}}) . " file(s).\n";
             do_action($rule->{files},$rule);
         }
         else {
-            print STDERR "Class [$rule->{name}] matches nothing!\n" if($OPTS{debug});
+            print STDERR "Class [$rule->{name}] matches nothing!\n" if($OPTS{debug} || $OPTS{verbose});
         }
     }
     #foreach(@$files) {
