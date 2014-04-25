@@ -13,6 +13,7 @@ my @OPTIONS = qw/
 	test|t
     verbose|v:i
     action|a:s
+	only-empty
 	strict:i
 	size:i
 	files:i
@@ -136,6 +137,15 @@ sub process_dir {
 	if(@subdirs) {
 		foreach(@subdirs) {
 			process_dir($_);
+		}
+	}
+	elsif($OPTS{'only-empty'}) {
+		if(@files and scalar(@files)>0) {
+			say_msg "\t\t PASS TEST\n";
+		}
+		else {
+			say_warn "\t\t EMPTY DIRECTORY\n";
+			output_emptydir($D);
 		}
 	}
 	elsif(@files) {

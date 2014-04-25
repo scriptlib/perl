@@ -390,10 +390,20 @@ Specify destination directory
 
 Specify method for classifing.
 
-  --by name
-	By filename
-  --by content
-	By file content
+  --by text
+	Testing text input
+
+  --by filename
+	Testing filename
+
+  --by filecontent
+	Testing filecontent
+
+  --by files
+	Testing files count
+
+  --by imagesdir
+	Testing images directory
 
 =item B<--rule>
 

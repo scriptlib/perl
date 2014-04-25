@@ -21,6 +21,7 @@ my @OPTIONS = qw/
 	body-file:s
 	type:s
 	test|t
+	debug
 	/;
 
 #use Data::Dumper;
@@ -50,12 +51,20 @@ sub parse_file {
 	my $lastkey;
 	open FI,'<',$tmpfile or die("$!\n");
 	while(<FI>) {
+		chomp;
 		if(m/^(.+?)=>(.*)$/m) {
 			$lastkey = $1;
 			$ps{$lastkey} = $ps{$lastkey} ? $ps{$lastkey} . "\n" . $2 : $2;
 		}
-		elsif($lastkey) {
+		elsif(m/^\<(.+?)>:\s*$/) {
+			$lastkey = $1;
+		}
+		elsif($lastkey && $ps{$lastkey} && ($lastkey =~ m/body|description/)) {
 			$ps{$lastkey} .= "\n" . $_;
+		}
+		elsif($lastkey) {
+			s/^\s+//;
+			$ps{$lastkey} = $_;
 		}
 	}
 	close FI;
@@ -103,10 +112,11 @@ foreach(qw/
 	$ps{$_} = "" unless($ps{$_});
 }
 
-#use Data::Dumper;
-#open FO,"|-",'zenity','--text-info','--filename','/dev/stdin';
-#print FO Data::Dumper->Dump([\%ps],['*ps']),"\n";
-#close FO;
+if($OPTS{debug}) {
+use Data::Dumper;
+print  Data::Dumper->Dump([\%ps],['*ps']),"\n";
+close FO;
+}
 
 die("Invalid file format\n") unless($ps{item});
 
@@ -130,12 +140,12 @@ elsif($ps{profd}) {
 else {
 	$topdir =  File::Spec->catfile($ENV{'HOME'},'.websaver');
 };
-if(! -d $topdir) {
-	mkdir($topdir) or die("$!\n");
+if(! -e $topdir) {
+	mkdir($topdir) or die("Error creating $topdir: $!\n");
 }
 my $alldir = File::Spec->catfile($topdir,'all');
-if(! -d $alldir) {
-	mkdir($alldir) or die("$!\n");
+if(! -e $alldir) {
+	mkdir($alldir) or die("Error creating $alldir: $!\n");
 }
 
 my $filename= $ps{itemUrl} || $ps{pageUrl};
