@@ -30,6 +30,7 @@ sub run {
 }
 
 sub mm {
+	return "$_[0]\@myplace.hell" if($_[1]);
     return "$_[0]\@gmail.com";
 }
 
@@ -46,6 +47,14 @@ elsif("xiaoranzzz" =~ m/^$u/) {
 elsif("nahncm" =~ m/^$u/) {
     run(qw/git config user.name/,"Coding Machine");
     run(qw/git config user.email/,mm("nahncm"));
+}
+elsif("sesadit" =~ m/^$u/) {
+    run(qw/git config user.name/,"Ses Adit");
+    run(qw/git config user.email/,mm("sesadit"));
+}
+elsif("afun" =~ m/^$u/) {
+    run(qw/git config user.name/,"Afun Nahn");
+    run(qw/git config user.email/,mm("afun",1));
 }
 else {
     print STDERR "Can't not found user\n";
