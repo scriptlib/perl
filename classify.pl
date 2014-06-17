@@ -73,17 +73,19 @@ sub read_rules {
                         $dest = "$dest/$d"
                     }
                 }
-                elsif(m/^#/) {
+                elsif(m/^\s*\/\//) {
                 }
                 elsif($_ and (!@rule)) {
                     push @rule,$_;
+					s/([\[\]\(\)\@\$\*\?\^])/\\\\$1/g;
+					push @rule,$_;
                 }
                 elsif($_) {
                     push @rule,$_;
                 }
                 elsif(@rule) {
                     push @rules,{
-                        'name'=>$rule[0],
+                        'name'=>shift(@rule),
                         'exp'=>join('|',@rule),
                         'dest'=>$dest,
                     };
@@ -92,7 +94,7 @@ sub read_rules {
 	}
         if(@rule) {
             push @rules,{
-                'name'=>$rule[0],
+                'name'=>shift(@rule),
                 'exp'=>join('|',@rule),
                 'dest'=>$dest,
             };

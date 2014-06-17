@@ -34,7 +34,7 @@ push @args,'--verbose' if($OPTS{'verbose'});
 push @args,'--test' if($OPTS{'test'});
 push @args,'--dest', $OPTS{'dest'} if($OPTS{dest});
 push @args,'--rule',$OPTS{'rule'} if($OPTS{rule});
-exec('classify',@args);
+exec('classify',@ARGV,@args);
 
 __END__
 
