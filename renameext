@@ -74,6 +74,7 @@ my %RULES = (
 	cleanbegin1=>'s/(^|[\/\\\\])\s*(?:【.+?】|（.+?）)\s*/$1/',
 	cleanend1=>'s/[_\s]*【?\d+[Pp]】?\s*$//',
 	dotless=>'s/\.(?=.*\.)/ /g',
+	trim=>'s/^\s+|[\.\s]+$|(?<=\/)\s+|[\.\s]+(?=\/)//g',
 );
 
 my $exp;
@@ -165,7 +166,7 @@ foreach my $old(grep !/^\.\.?$/,@files) {
 	print STDERR "$old\n" if($OPTS{'debug'});
     my $new = &$RENAMER($old);
     if($new eq $old) {
-		print STDERR ("\"$old\" [Ignored]\n");
+		print STDERR ("\"$old\" [Ignored]\n") if($OPTS{verbose});
         next;
     }
 	$new =~ s/\/+$//;
