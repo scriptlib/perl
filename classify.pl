@@ -121,7 +121,7 @@ my %Actions = (
         'do'=>sub {
             my ($files,$rule)=@_;
 	    my $target = $rule->{dest} . '/' . $rule->{name} . '/'; 
-	    system_run('mkdir','--',$target) unless(-d $target || $TESTMODE);
+	    system_run('mkdir','-pv','--',$target) unless(-d $target || $TESTMODE);
             foreach my $file(@$files) {
 		    if($TESTMODE) {
 		        print STDERR "\t[TEST MODE] Moving $file to $target\n"
@@ -141,7 +141,7 @@ my %Actions = (
             }
         },
         'check'=>sub {
-            return 1 if($OPTS{'dest'});
+            return 1 if($OPTS{'dest'} || $DEST);
             print STDERR "Error: option --dest must be specified.\n";
             return;
         },
