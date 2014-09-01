@@ -5,9 +5,9 @@ use strict;
 use MyPlace::Program::Saveurl;
 my $app = new MyPlace::Program::Saveurl;
 my @tasks;
-binmode STDOUT,":utf8";
-binmode STDERR,":utf8";
-binmode STDIN,":utf8";
+#binmode STDOUT,":utf8";
+#binmode STDERR,":utf8";
+#binmode STDIN,":utf8";
 while(<>) {
 	chomp;
 #	print STDERR ">$_\n";
