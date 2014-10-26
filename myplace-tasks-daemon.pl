@@ -1,13 +1,19 @@
 #!/usr/bin/perl -w
 # $Id$
-package MyPlace::Script::myplace_tasks_daemon;
 use warnings;
 use strict;
 
-our $VERSION = 'v0.1';
+our $VERSION = 'v0.2';
 my @OPTIONS = qw/
 	help|h|? 
 	manual|man
+	start
+	stop
+	sleep=i
+	no-git
+	no-pull
+	debug
+	no-push
 /;
 my %OPTS;
 if(@ARGV)
@@ -23,184 +29,120 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 }
 
 
+use MyPlace::SimpleConfig qw/sc_from_file sc_to_file/;
 use MyPlace::Script::Message;
 use MyPlace::Tasks::Utils qw/strtime/;
 use MyPlace::Tasks::Center::Git;
+use MyPlace::Tasks::Builder;
 use MyPlace::Tasks::Listener;
 use MyPlace::Tasks::Worker;
+use MyPlace::Tasks::Task qw/$TASK_STATUS/;
+use Cwd qw/getcwd/;
 
 
-sub urlrule_sites_from_url {
-	my $url = shift;
-	my $name;
-	my $id;
-	my $host;
-	$url =~ s/weipai\.cn\/(?:videos|user)\//weipai.cn\/follows\//;
-	open FI,'-|','netcat',$url or return;
-	while(<FI>) {
-		chomp;
-		if(!$host) {
-			if(m/'LoginDownloadUrl'\s*:\s*'http:\/\/www.weipai.cn\/coop/) {
-				$host = "weipai.cn";
-			}
-		}
-		if(!$name) {
-			if(m/class="name"[^>]*title="([^"]+)"/) {
-				$name = $1;
-			}
-		}
-		if(!$id) {
-			if(m/href="\/user\/([^"]+)/) {
-				$id = $1;
-			}
-		}
-		last if($id and $name);
-	}
-	close FI;
-	#print STDERR "$name === $id\n";
-	return $host,$name,$id;
+
+my $CONFIGURATION = ".myplace/tasks-daemon.config";
+our $MYSETTING = sc_from_file($CONFIGURATION);
+
+my $TASKER;
+if(!$OPTS{"no-git"}) {
+	$TASKER = MyPlace::Tasks::Center::Git->new();
+}
+else {
+	$TASKER = MyPlace::Tasks::Center->new();
+}
+$TASKER->ignore('follows\.(txt|md)$',"^ladies");
+$TASKER->trace('ladies');
+if($ENV{DEBUG} || $OPTS{'debug'}) {
+	$TASKER->{DEBUG} = 1;
+}
+foreach (qw/sleep no-pull no-push/) {
+	$TASKER->{options}{$_} = $OPTS{$_} if(defined $OPTS{$_});
 }
 
-my $WORKER = MyPlace::Tasks::Worker->new(
-	name=>'urlrule',
-	routine=>sub{
-		my $type = shift;
-		if($type eq 'sites') {
-			my $hosts = shift;
-			my $name = shift;
-			my $id = shift;
-			my $url;
-			if(!-d "ladies") {
-				mkdir "ladies";
-			}
-			chdir "ladies";
-			if(uc($hosts) eq 'FROMURLS') {
-				$url = $name;
-				($hosts,$name,$id) = urlrule_sites_from_url($url,$id,@_);
-				if(!($id and $name and $hosts)) {
-					app_error "Invalid information read from <$url>\n";
-					return;
-				}
-				app_message "From $url: $hosts/$name/$id\n";
-				system("urlrule_sites","--hosts",$hosts,"--add","$id\t$name");
-			}
-			if($id) {
-				system("urlrule_sites","--hosts",$hosts,$id);
-			}
-			elsif($name) {
-				system("urlrule_sites","--hosts",$hosts,$name);
-			}
-			else {
-				system("urlrule_sites","--hosts",$hosts);
-			}
-			return join(": ",
-				"[urlrule::sites] Saved", 
-				join(" ",$id,"[$name]",($url ? "($url)" : undef))
-			);
-		}
-		else {
-			print STDERR "Worker[urlrule] not support type\n";
-			return "[urlrule] Error $type not support";
-		}
-	},
-);
-
-my @LISTENER = (
-	MyPlace::Tasks::Listener->new('urlrule',$WORKER),
-	MyPlace::Tasks::Listener->new('overjoy',MyPlace::Tasks::Worker->new(
-		name=>'overjoy',
-		routine=>sub{
-			my $type = shift;
-			if($type eq 'ladies') {
-				my @names = @_;
-				if(@names) {
-					chdir "/myplace/overjoy/ladies";
-					system("urlrule_task","SAVE",@names);
-				}
-			}
-		},
-	)),
-	MyPlace::Tasks::Listener->new('download',MyPlace::Tasks::Worker->new(
-		name=>'download',
-		routine=>sub{
-			my $dir= shift;
-			mkdir "download" unless(-d "download");
-			$dir = "download/$dir";
-			mkdir $dir unless(-d $dir);
-			chdir $dir;
-			my $r = (system('download',@_) == 0);
-			if($r) {
-			}
-			else {
-			}
-			return $r;
-		},
-	)),
-	MyPlace::Tasks::Listener->new('dump', 
-		MyPlace::Tasks::Worker->new(
-				name=>'dump',
-				routine=>sub{
-					use Data::Dumper;
-					print STDERR Data::Dumper->Dump(\@_);
-				}
-		)
-	),
-	MyPlace::Tasks::Listener->new('exec',
-		MyPlace::Tasks::Worker->new(
-			name=>'exec',
-			routine=>sub{
-				my @result;
-				open FI,'-|',@_ or return "$!";
-				@result = <FI>;
-				close FI;
-				return join("",@result);
-			}
-		)
-	),
+my $START_DIR = getcwd;
+my $TasksBuilder = MyPlace::Tasks::Builder->new();
+my @DEFAULT_LISTENERS = (
+		MyPlace::Tasks::Listener->new('dump', 
+			MyPlace::Tasks::Worker->new(
+					name=>'dump',
+					routine=>sub{
+						use Data::Dumper;
+						print Data::Dumper->Dump(\@_);
+						return $TASK_STATUS->{DONOTHING};
+					}
+			)
+		),
+		MyPlace::Tasks::Listener->new('echo', 
+			MyPlace::Tasks::Worker->new(
+					name=>'echo',
+					routine=>sub{
+						print join(" ",@_),"\n";
+						return $TASK_STATUS->{DONOTHING};
+					}
+			)
+		),
 );
 
 
 
-my $TASKER = MyPlace::Tasks::Center::Git->new();
+use Cwd qw/getcwd/;
 
 sub abort {
+	delete $SIG{INT};
+	chdir $START_DIR;
 	$TASKER->abort();
-	print STDERR "Program killed\n";
+	app_error "X"x10 . " PROGRAM KILLED!!! " . "X"x10 ."\n";
+	sc_to_file($CONFIGURATION,$MYSETTING);
 	exit $TASKER->exit();
 }
 $SIG{INT} = \&abort;
 
-app_message "[" . strtime() . "] Start\n";
-app_message "[" . strtime() . "] Waiting for event\n";
+app_warning "[" . strtime() . "] Start\n";
+app_warning "Directory: $START_DIR\n";
+
+do ".myplace/listener";
+my @LISTENER = (
+		@DEFAULT_LISTENERS,
+		listener_init($TASKER,$TasksBuilder)
+);
+app_warning scalar(@LISTENER) . " listener initilized\n";
+foreach(@LISTENER) {
+	app_warning "Listen to namespace [" . $_->{namespace} . "]\n";
+}
+print STDERR "\n";
+
 my $count =0;
 while(!$TASKER->end()) {
+	app_message2 "[" . strtime() . "] Waiting for event\n";
+	my $task;
+	my $last_task;
 	my $remain;
 	if ($remain = $TASKER->more()) {
-		my $task = $TASKER->next();
-		$task->{status} = 0;
-		my $status = 0;
-#		print STDERR join("\n",$TASKER->status),"\n";
-		app_message "Tasks $count DONE, $remain REMAIN:\n";
-		print STDERR join("\n",$TASKER->status()),"\n";
-		app_message "Current task:" . $task->to_string . "\n";
+		$last_task = $task;
+		$task = $TASKER->next();
+		$TASKER->{status} = 'RUNNING';
+		app_warning "Tasks $count DONE, $remain REMAIN:\n";
+		app_warning "Working on task:\n";
+		app_warning " * " . $task->to_string . "\n";
+		$count++;
+		my $fired;
 		foreach my $listener (@LISTENER) {
 			if($listener->check($task)) {
-				if($listener->fire_event($task)) {
-					$task->{status} = 1;
-					$status = 1;
-				}
-				else {
-					$task->{status} = 2;
-					$status = 2;
-				}
+				$fired = 1;
+				$listener->fire_event($task);
+				chdir $START_DIR;
 			}
 		}
-		$TASKER->finish($task,$status);
+		$task->{status} = $TASK_STATUS->{IGNORED} unless($fired);
+		$TASKER->finish($task);
 	}
-	else {
-		app_message "[" . strtime() . "] Waiting for event\n" 
+	elsif($TasksBuilder->more()) {
+		app_message2 "[" . strtime() . "] Queuing scheduled task\n";
+		$TASKER->queue($TasksBuilder->next());
 	}
 } 
+sc_to_file($CONFIGURATION,$MYSETTING);
 exit $TASKER->exit();
 
 
