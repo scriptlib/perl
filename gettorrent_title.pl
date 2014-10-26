@@ -28,7 +28,7 @@ sub gethtml {
 	my $URL = shift;
 	my $REF = shift(@_) || $URL;
 	my @cmd = (
-		qw{curl --fail --silent -L -A Mozilla/5.0 -m 180 --connect-timeout 15},
+		qw{curl -L --fail --silent -L -A Mozilla/5.0 -m 180 --connect-timeout 15},
 		"--referer",$REF,
 		'--url',$URL,
 	);
@@ -42,8 +42,10 @@ my $hash = shift;
 my $url = "http://bitsnoop.com/search/all/$hash/c/d/1/";
 print STDERR "Retriving info from $url\n";
 my $html = gethtml($url);
-if($html =~ m/<title>\s*([^<]+?)\s+- Video - Torrent Download \| Bitsnoop</) {
-	print $1;
+if($html =~ m/<title>\s*([^<]+?)\s+-[^-]+-\s*Torrent Download\s*\|\s*Bitsnoop</i) {
+	my $title = $1;
+	$title =~ s/[\s\.]+torrent$//;
+	print $title;
 }
 
 __END__

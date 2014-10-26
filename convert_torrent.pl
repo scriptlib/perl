@@ -70,6 +70,7 @@ my %DICT = qw/
 	潮吹		潮Chui
 	淫汁		Yin汁
 	黑木麻衣	黑MU麻衣
+	肉棒		Rou棒
 /;
 
 my %HZPY = qw/
@@ -249,6 +250,9 @@ zoink
 痙攣  新藥 地獄
 中出 交尾
  Slut
+	伊莉
+	eyny.com
+	桜木凜
 /;
 =cut
 =qustionable 
@@ -257,8 +261,6 @@ zoink
 =ok
 =cut
 my @indoubt = qw/
-
-
 /;
 my @dirty = qw/
 	潮吹

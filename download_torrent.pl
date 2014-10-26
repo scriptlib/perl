@@ -29,13 +29,15 @@ my $SCRIPTDIR = $0;
 $SCRIPTDIR =~ s/[\/\\]+[^\/\\]+$//;
 
 my @SITES = (
+	#http://www.520bt.com/Torrent/:HASH:
+	#http://torcache.net/torrent/:HASH:.torrent	
 	qw{
-		http://www.520bt.com/Torrent/:HASH:
-		http://torcache.net/torrent/:HASH:.torrent	
-		http://torrentproject.se/torrent/:HASH:.torrent
+		http://www.torrenthound.com/torrent/:HASH:
+		http://torcache.net/torrent/:HASH:/TORRENTNAME.torrent
 		http://torrage.com/torrent/:HASH:.torrent
 		http://zoink.it/torrent/:HASH:.torrent
 		http://torrage.ws/torrent/:HASH:.torrent
+		http://torrentproject.se/torrent/:HASH:.torrent
 	}
 );
 sub checktype {
