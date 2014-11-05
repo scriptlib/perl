@@ -375,8 +375,11 @@ foreach(keys %filter) {
 
 sub clean_text {
 	my $text = shift;
+	my $position = shift;
 	my $old = $text;
-	#	print STDERR $text,"\n";
+	if($old =~ m/_____padding_file_/) {
+		return $text,undef;
+	}
 	my $suf = "";
 	if($text =~ m/~(.+)\.([~\.]{1,4})$/) {
 		$suf = ".$2";
@@ -387,12 +390,13 @@ sub clean_text {
 		$text =~ s/$_/$ufilter{$_}/gi;
 	}
 	$text = $text . $suf;
+	print STDERR "Processing $position";
 	if($old eq $text) {	
-		print  "\t[No change]$text\n";
+		print  "\t$text [NO change]\n";
 		return $text,undef;
 	}
 	else {
-		print  "\n\t$old\n\t=>$text\n";
+		print STDERR  "\n      $old\n    =>$text\n";
 		return $text,1;
 	}
 }
@@ -403,7 +407,7 @@ sub clean {
 	my $type = ref $tor;
 	my $dirty = undef;
 	
-	if($position =~ m/piece|filehash|magnet|ed2k|nodes|announce|encoding/) {
+	if($position =~ m/length|piece|filehash|magnet|ed2k|nodes|announce|encoding/) {
 		return ($tor,$dirty);
 	}
 	#if($all or $key =~ m/publisher|path|publisher|created by|name|comment|files/i) {
@@ -430,7 +434,6 @@ sub clean {
 		}
 	}
 	else {
-		print STDERR "Processing $position";
 		my $d;
 		($tor,$d) = clean_text($tor,$position);
 		$dirty = $d if($d);
@@ -479,6 +482,21 @@ sub process {
 		# $dirty = $d if($d);
 	}
 	if($dirty) {
+		
+		my $backup = $filename;
+		$backup =~ s/\.([^\.]+)$/.UNSAFE.$1/;
+		if(! -f $backup) {
+			print STDERR "Backing up $filename ...\n";
+			print STDERR "==> $backup ...";
+			if(system("cp","-a",$filename,$backup) == 0) {
+				print STDERR " [OK]\n";
+			}
+			else {
+				print STDERR " [FAILED]\n";
+				return undef;
+			}
+
+		}
 		print STDERR "Wrting $filename ...\n";
 		open FO,">:raw",$filename or die("Error opening $filename:$!\n");
 		print FO bencode($torrent);
