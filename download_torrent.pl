@@ -23,6 +23,7 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 }
 
 use File::Spec;
+use MyPlace::Script::Message;
 
 my $VERBOSE = $OPTS{'verbose'};
 my $SCRIPTDIR = $0;
@@ -32,12 +33,12 @@ my @SITES = (
 	#http://www.520bt.com/Torrent/:HASH:
 	#http://torcache.net/torrent/:HASH:.torrent	
 	qw{
-		http://www.torrenthound.com/torrent/:HASH:
 		http://torcache.net/torrent/:HASH:/TORRENTNAME.torrent
+		http://torrentproject.se/torrent/:HASH:.torrent
+		http://www.torrenthound.com/torrent/:HASH:
 		http://torrage.com/torrent/:HASH:.torrent
 		http://zoink.it/torrent/:HASH:.torrent
 		http://torrage.ws/torrent/:HASH:.torrent
-		http://torrentproject.se/torrent/:HASH:.torrent
 	}
 );
 sub checktype {
@@ -55,7 +56,8 @@ sub download {
 	my $REF = shift(@_) || $URL;
 	my @cmd = (
 			qw{curl -L --compressed --fail --create-dir -A Mozilla/5.0 -m 180 --connect-timeout 15},
-			'-#',
+#			'-#',
+			'-s',
 			"--referer",$REF,
 			'--url',$URL,
 			'-o',$output
@@ -64,7 +66,7 @@ sub download {
 		print STDERR "\n",join(" ",@cmd),"\n";
 	}
 	else {
-		print STDERR $URL,"\n";
+#		print STDERR "\n";#$URL,"\n";
 	}
 	if(system(@cmd) == 0) {
 		if(checktype($output)) {
@@ -78,13 +80,23 @@ sub download {
 }
 
 sub process {
-	my $hash = shift;
+	my $URI = shift;
 	my $title = shift;
 	my $dest = shift;
 	my $filename = shift;
+	my $hash = uc($URI);
+
 	if($hash =~ m/^([\dA-Z]+)\s*\t\s*(.+?)\s*$/) {
-		$hash = $1;
+		$hash = uc($1);
 		$title = $2 if(!$title);
+	}
+	else {
+		if($URI =~ m/^magnet:\?.*xt=urn:btih:([\dA-Za-z]+)/) {
+			$hash = uc($1);
+		}
+		if(!$title and $URI =~ m/[^\t]+\t(.+)$/) {
+			$title = $1;
+		}
 	}
 	
 	my $output = "";
@@ -105,25 +117,25 @@ sub process {
 		$output = $filename;
 	}
 	
-	print STDERR "==> $output\n";
+	app_message2 "Downloading torrent:\n==> $output\n";
 	if(checktype($output)) {
-		print STDERR "  File already downloaded, Ignored\n";
+		app_warning "Error, File already downloaded, Ignored\n";
 		return;
 	}
-	foreach(@SITES) {
+	foreach(@SITES,@SITES) {
 		my $sitename = $_;
 		if(m/:\/\/([^\/]+)/) {
 			$sitename = $1;
 		}
 		my $url = $_;
 		$url =~ s/:HASH:/$hash/g;
-		print STDERR "Try [$sitename] ";
+		print STDERR "Try [$sitename] ... ";
 		if(download($output,$url)) {
-			print STDERR "  [OK]\n";
+			color_print('GREEN',"  [OK]\n");
 			last;
 		}
 		else {
-			print STDERR "\n";
+			color_print('red',"  [FAILED]\n");
 		}
 	}
 }
