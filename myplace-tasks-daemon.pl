@@ -136,6 +136,9 @@ while(!$TASKER->end()) {
 		}
 		$task->{status} = $TASK_STATUS->{IGNORED} unless($fired);
 		$TASKER->finish($task);
+		if($TASKER->{DEBUG}) {
+			exit $TASKER->exit();
+		}
 	}
 	elsif($TasksBuilder->more()) {
 		app_message2 "[" . strtime() . "] Queuing scheduled task\n";
