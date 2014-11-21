@@ -12,9 +12,12 @@ my @OPTIONS = qw/
 	rule|r:s
 	dest|d:s
 	test|t
-        verbose|v
-        debug
-        action|a:s
+    verbose|v
+    debug
+    action|a:s
+	prefix=s
+	suffix=s
+	dump
 /;
 my %OPTS;
 if(@ARGV)
@@ -31,6 +34,9 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
     exit $v;
 }
+
+
+use Cwd qw/getcwd/;
 
 my (
     @files,$DEST,
@@ -49,12 +55,12 @@ sub dumpdata {
 	print STDERR Data::Dumper->Dump([$var],[$name]);
 }
 
-
 sub read_rules {
     my $RULE_FILE = shift;
     my $dest = (shift @_) || $DEST;
     my @rules;
     my @rule=();
+	my @keyword;
     open my $FI,'<',$RULE_FILE or die("$!\n");
 	while(<$FI>) {
 		chomp;
@@ -78,18 +84,23 @@ sub read_rules {
                 elsif($_ and (!@rule)) {
                     push @rule,$_;
 					s/([\[\]\(\)\@\$\*\?\^])/\\\\$1/g;
+					s/\s+/[-_\\s]*/g;
+					s/^#+//;
 					push @rule,$_;
                 }
                 elsif($_) {
                     push @rule,$_;
+					push @keyword,$_;
                 }
                 elsif(@rule) {
                     push @rules,{
                         'name'=>shift(@rule),
                         'exp'=>join('|',@rule),
                         'dest'=>$dest,
+						'keyword'=>[@keyword],
                     };
                     @rule=();
+					@keyword=();
                 }
 	}
         if(@rule) {
@@ -97,13 +108,42 @@ sub read_rules {
                 'name'=>shift(@rule),
                 'exp'=>join('|',@rule),
                 'dest'=>$dest,
+				'keyword'=>[@keyword],
             };
         }
     close $FI;
-    return \@rules;
+	return \@rules;
 }
 
 my %Actions = (
+	'keyword'=>{
+		'name'=>'keyword',
+		'do'=>sub {
+			my ($files,$rule) = @_;
+			my $target = $rule->{dest} . '/' . $rule->{name} . '/'; 
+		    system_run('mkdir','-pv','--',$target) unless(-d $target || $TESTMODE);
+			print STDERR "For [" . $rule->{name},"]\n";
+			my @prog = ();
+			push @prog,split(/\s+/,$OPTS{prefix}) if($OPTS{prefix});
+			@prog = (qw/echo/) unless(@prog);
+			my @suf = ();
+			push @suf,split(/\s+/,$OPTS{suffix}) if($OPTS{suffix});
+			print STDERR "Execute @prog ...\n" if(@prog);
+			my @keywords = ($rule->{name});
+			push @keywords, @{$rule->{keyword}} if($rule->{keyword});
+			my $CWD = getcwd;
+			chdir $target;
+			foreach my $key (@keywords) {
+				print STDERR "    Processing [" . $rule->{name} . "/$key] ...\n";
+				system(@prog,$key,@suf);
+			}
+			chdir $CWD;
+		},
+		'check'=>sub {
+			return 1;
+		},
+		'NOFILES'=>1,
+	},
     'print'=>{
         'name'=>'print',
         'do'=>sub {
@@ -158,7 +198,7 @@ my %TestMethod;
 			my $right = shift;
 			return ($TestMethod{text}->{case}) ? ($left =~ $right) : ($left =~ /$right/i) ;
 		},
-		'case'=>'0',
+		'case'=>0,
 	},
 	'filename'=>{
 		'name'=>'filename',
@@ -281,6 +321,27 @@ sub classify {
 	}
 }
 
+sub process_nofiles {
+	my $files = shift;
+	my $rules = shift;
+	my @match = ();
+	if($files and @$files) {
+		foreach my $rule(@$rules) {
+			foreach my $file(@files) {
+				if($rule->{name} =~ /$file/i) {
+					push @match,$rule;
+				}
+			}
+		}
+	}
+	else {
+		@match = (@$rules);
+	}
+	foreach my $rule(@match) {
+		do_action($files,$rule);
+	}
+}
+
 sub process_file {
     my $file = shift;
     my $rules = shift;
@@ -320,16 +381,6 @@ sub process {
 }
 
 
-if(@ARGV) {
-    @files = @ARGV;
-}
-else {
-    $OPTS{verbose} && print STDERR "Please input filenames:\n";
-    while(<STDIN>) {
-        chomp;
-        push @files,$_;
-    }
-}
 $DEST = $OPTS{'dest'} || '.';
 $METHOD = $OPTS{'by'} || 'text';
 $RULE_FILE = $OPTS{'rule'} || 'classify.rule';
@@ -337,14 +388,28 @@ $TESTMODE = $OPTS{'test'} || '';
 my $ACTION_NAME=$OPTS{'action'} || 'print';
 $ACTION=$Actions{$ACTION_NAME};
 
+if($OPTS{dump}) {
+	$RULES=read_rules($RULE_FILE);
+	my $count=0;
+	foreach my $rule (@$RULES) {
+		$count++;
+		print STDERR "NAME:  ",$rule->{name},"\n";
+		print STDERR "  EXPS: ",$rule->{exp},"\n";
+	}
+	print STDERR "Totally " . ($count >1 ? "$count rules" : "$count rule") . " dumped\n";
+	exit 0;
+}
+
+
 if(! -d $DEST) {
 	die("Error $DEST not exsits, or not a directory.\n");
 }
 if(! -f $RULE_FILE) {
 	die("Error: Rule file $RULE_FILE not exist, or not a file.\n");
 }
-if(!@files) {
-	die("Error: Nothing to do.\n");
+
+if(@ARGV) {
+    @files = @ARGV;
 }
 if(!$ACTION) {
         die("Error: Action $ACTION_NAME not defined.\n");
@@ -352,8 +417,9 @@ if(!$ACTION) {
 if(!$ACTION->{check}->()) {
         die();
 }
+
 $RULES=read_rules($RULE_FILE);
-dumpdata($RULES,'rules');
+dumpdata($RULES,'rules') if($OPTS{debug});
 
 $TEST_METHOD = $TestMethod{$METHOD};
 if(!$TEST_METHOD) {
@@ -366,8 +432,23 @@ print STDERR "Test by $METHOD\n" if($OPTS{'debug'});
 
 #dumpdata(\@files,'Operation target');
 
+if($ACTION->{NOFILES}) {
+	exit process_nofiles(\@files,$RULES);
+}
 
-process(\@files,$RULES);
+if(!@files) {
+    print STDERR "Read files list from standard input...\n";
+    while(<STDIN>) {
+        chomp;
+        push @files,$_;
+    }
+}
+
+if(!@files) {
+	die("Error: Nothing to do.\n");
+}
+
+exit process(\@files,$RULES);
 
 
 __END__
