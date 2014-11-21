@@ -10,15 +10,13 @@ my @OPTIONS = qw/
 	manual|man
 	download|d
 	engine|e:s
+	dest:s
 /;
 my %OPTS;
 if(@ARGV)
 {
     require Getopt::Long;
     Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
-}
-else {
-	$OPTS{'help'} = 1;
 }
 if($OPTS{'help'} or $OPTS{'manual'}) {
 	require Pod::Usage;
@@ -30,15 +28,19 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 
 my %ENGINES = (
 	'torrentproject'=>[
-		'http://torrentproject.se/?safe=off&t=QUERY',
+		'http://torrentproject.se/?safe=off&t=###QUERY###',
 		2,
 	],
 	'bitsnoop'=>[
-		'http://bitsnoop.com/search/all/QUERY+safe:no/c/d/1',
+		'http://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
 		2,
 	],
 	'torrentkitty.org'=>[
-		'http://www.torrentkitty.org/search/QUERY/',
+		'http://www.torrentkitty.org/search/###QUERY###/',
+		1,
+	],
+	'sobt.org'=>[
+		'http://www.sobt.org/Query/###QUERY###',
 		1,
 	],
 );
@@ -64,12 +66,40 @@ if(!%engine) {
 	exit 1;
 }
 
+
+if(!@ARGV) {
+	foreach my $fk(qw/keywords.lst keywords.txt search.ini/) {
+		next unless(-f $fk);
+		app_message2 "Read queires from <$fk>\n";
+		open FI,'<',$fk or next;
+		foreach(<FI>) {
+			s/[\r\n]+$//;
+			next unless($_);
+			push @ARGV,$_;
+			app_message2 "  : $_\n" 
+		}
+		close FI;
+	}
+}
+
+if(!@ARGV) {
+	app_warning "Usage:$0 [-d] <Queries...>\n";
+	exit 1;
+}
+
+if($OPTS{dest}) {
+	if(! -d $OPTS{dest}) {
+		mkdir $OPTS{dest} or die("Error creating directory $OPTS{dest}: $!\n");
+	}
+	chdir $OPTS{dest} or die("Error changing to directory $OPTS{dest}: $!\n");
+	app_warning "Enter $OPTS{dest} ...\n";
+}
 foreach my $QUERY(@ARGV) {
 	foreach(keys %engine) {
-		app_message2 "Search \"$QUERY\" using engine [$_]\n";
+		app_message2 "Search \<$QUERY\> using engine \[$_\]\n";
 		my $url = $engine{$_}[0];
 		my $level = $engine{$_}[1];
-		$url =~ s/QUERY/$QUERY/g;
+		$url =~ s/###QUERY###/$QUERY/g;
 		my @prog = ('urlrule_action',$url,$level);
 		push @prog,"SAVE" if($OPTS{download});
 		system(@prog);

@@ -39,6 +39,7 @@ my @SITES = (
 		http://torrage.com/torrent/:HASH:.torrent
 		http://zoink.it/torrent/:HASH:.torrent
 		http://torrage.ws/torrent/:HASH:.torrent
+		http://www.sobt.org/url.php?hash=:HASH:&name=TORRENTNAME
 	}
 );
 sub checktype {
@@ -108,7 +109,7 @@ sub process {
 			$title = `perl "$getor" "$hash"`;
 			chomp($title) if($title);
 		}
-		$filename = $hash . ( $title ? "_$title" : "") . ".torrent";
+		$filename = ($title ? $title . "_" : "") . $hash . ".torrent";
 	}
 	if($dest) {
 		$output = File::Spec->catfile($dest,$filename);
