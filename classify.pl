@@ -55,63 +55,49 @@ sub dumpdata {
 	print STDERR Data::Dumper->Dump([$var],[$name]);
 }
 
+use MyPlace::Config::Array;
 sub read_rules {
     my $RULE_FILE = shift;
     my $dest = (shift @_) || $DEST;
     my @rules;
     my @rule=();
 	my @keyword;
-    open my $FI,'<',$RULE_FILE or die("$!\n");
-	while(<$FI>) {
-		chomp;
-		s/^\s+//g;
-		s/\s+$//g;
-                if(m/^#include\s+(.+)$/) {
-                    my $r = read_rules($1,$dest);
-                    push @rules,@$r if($r);
-                }
-                elsif(m/^#dest\s+(.+)$/) {
-                    my $d = $1;
-                    if($d =~ m/^\//) {
-                        $dest = $d;
-                    }
-                    else {
-                        $dest = "$dest/$d"
-                    }
-                }
-                elsif(m/^\s*\/\//) {
-                }
-                elsif($_ and (!@rule)) {
-                    push @rule,$_;
-					s/([\[\]\(\)\@\$\*\?\^])/\\\\$1/g;
-					s/\s+/[-_\\s]*/g;
-					s/^#+//;
-					push @rule,$_;
-                }
-                elsif($_) {
-                    push @rule,$_;
-					push @keyword,$_;
-                }
-                elsif(@rule) {
-                    push @rules,{
-                        'name'=>shift(@rule),
-                        'exp'=>join('|',@rule),
-                        'dest'=>$dest,
-						'keyword'=>[@keyword],
-                    };
-                    @rule=();
-					@keyword=();
-                }
-	}
-        if(@rule) {
-            push @rules,{
-                'name'=>shift(@rule),
-                'exp'=>join('|',@rule),
-                'dest'=>$dest,
-				'keyword'=>[@keyword],
-            };
+	my $A = new MyPlace::Config::Array;
+	$A->readfile($RULE_FILE);
+	my @data = $A->get_data;
+	foreach my $def (@data) {
+		my @value = @$def;
+		$_ = shift @value;
+        if(m/^#include\s+(.+)$/) {
+			my $r = read_rules($1,$dest);
+            push @rules,@$r if($r);
+			next;
         }
-    close $FI;
+        elsif(m/^#dest\s+(.+)$/) {
+            my $d = $1;
+            if($d =~ m/^\//) {
+                $dest = $d;
+            }
+            else {
+                $dest = "$dest/$d"
+            }
+			next;
+        }
+        elsif(m/^(?:#|\/\/)/) {
+			next;
+        }
+		else {
+			my %r;
+			$r{name} = $_;
+			s/([\[\]\(\)\@\$\*\?\^])/\\\\$1/g;
+			s/\s+/[-_\\s]*/g;
+			s/^#+//;
+			$r{exp} = join('|',$_,@value);
+			$r{dest} = $dest;
+			$r{keyword} = [@value];
+			push @rules,\%r;
+		}
+	}
 	return \@rules;
 }
 
@@ -395,6 +381,7 @@ if($OPTS{dump}) {
 		$count++;
 		print STDERR "NAME:  ",$rule->{name},"\n";
 		print STDERR "  EXPS: ",$rule->{exp},"\n";
+		print STDERR "  KEYS: ",join(", ",@{$rule->{keyword}}),"\n";
 	}
 	print STDERR "Totally " . ($count >1 ? "$count rules" : "$count rule") . " dumped\n";
 	exit 0;

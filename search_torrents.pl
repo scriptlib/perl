@@ -100,7 +100,7 @@ foreach my $QUERY(@ARGV) {
 		my $url = $engine{$_}[0];
 		my $level = $engine{$_}[1];
 		$url =~ s/###QUERY###/$QUERY/g;
-		my @prog = ('urlrule_action',$url,$level);
+		my @prog = ('urlrule_action','--prompt',"$_:$QUERY",$url,$level);
 		push @prog,"SAVE" if($OPTS{download});
 		system(@prog);
 	}
