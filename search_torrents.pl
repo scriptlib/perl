@@ -27,10 +27,10 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 
 
 my %ENGINES = (
-	'torrentproject'=>[
-		'http://torrentproject.se/?safe=off&t=###QUERY###',
-		2,
-	],
+#	'torrentproject'=>[
+#		'http://torrentproject.se/?safe=off&t=###QUERY###',
+#		2,
+#	],
 	'bitsnoop'=>[
 		'http://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
 		2,
@@ -41,6 +41,14 @@ my %ENGINES = (
 	],
 	'sobt.org'=>[
 		'http://www.sobt.org/Query/###QUERY###',
+		1,
+	],
+	'btkitty.org'=>[
+		'http://btkitty.org/?###QUERY###',
+		2,
+	],
+	'storetorrent.org'=>[
+		'http://www.storetorrent.org/s/###QUERY###',
 		1,
 	],
 );
