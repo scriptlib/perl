@@ -7,6 +7,7 @@ our $VERSION = 'v0.1';
 my @OPTIONS = qw/
 	help|h|? 
 	manual|man
+	overwrite
 /;
 my %OPTS;
 if(@ARGV)
@@ -33,7 +34,7 @@ use utf8;
 sub big_word {
 	my $_ = shift;
 	#tr/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/nopqrstuvwxyzabcdefghijklmNOPQRSTUVWXYZABCDEFGHIJKLM/;
-	tr/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ/;
+	tr/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ０１２３４５６７８９/;
 	return $_;
 }
 
@@ -71,6 +72,20 @@ my %DICT = qw/
 	淫汁		Yin汁
 	黑木麻衣	黑MU麻衣
 	肉棒		Rou棒
+	城市風情	ＣＳＦＱ
+	親親社區	ＱＱＳＱ
+	香港廣場	ＸＧＧＣ
+	情\s+色\s+六\s+月\s+天	QS6YT
+	有码	骑兵
+	无码 步兵
+	有碼	骑兵
+	無碼  步兵
+	爆操	操
+	大奶	丰满
+	麻生希	麻生XI
+	裸聊	"裸_聊"
+	视频聊天	"视讯"
+	性交	交媾
 /;
 
 my %HZPY = qw/
@@ -111,6 +126,8 @@ my %HZPY = qw/
 	沙英	さえ
 	心美	ここみ
 	恋		こい
+	恭子 きょうこ
+	レイ Rei
 /;
 
 
@@ -253,6 +270,37 @@ zoink
 	伊莉
 	eyny.com
 	桜木凜
+		18p2p
+	三匹狼論壇
+	城市風情
+	親親社區
+	香港廣場
+	MimiP2P
+	P.R俱樂部
+	救國P2P
+	hotavxxx
+	touch99
+	avxxx
+	ＭＭ公寓
+ＡＶ影片
+FDZone-Forum
+公仔箱論壇
+HD1080.org
+eXBii
+無碼
+av9898vod
+香港討論區
+discuss.com.hk
+痴漢俱樂部
+ 色女
+  川上ゆう
+   加藤なお
+    東方小鎮
+ dfxz.org
+ 	性交
+	色中色
+	XIAAV
+	sex8
 /;
 =cut
 =qustionable 
@@ -263,6 +311,12 @@ zoink
 my @indoubt = qw/
 /;
 my @dirty = qw/
+	裸聊
+	视频聊天
+	大奶
+	爆操
+	南レイ
+	情色论坛
 	潮吹
 	丁字裤
 	苏小美
@@ -330,7 +384,11 @@ my @dirty = qw/
 	梓ユイ
 	西野翔
 	性吧
-	娱乐城	
+	娱乐城
+	有码
+	无码
+	高島恭子
+	麻生希
 /;
 
 
@@ -340,6 +398,7 @@ foreach(@dirty) {
 	if(defined $DICT{$_}) {
 		$value = $DICT{$_} || "";
 	}
+	
 	if($value eq $_) {
 		$value = atoi($_);
 	}
@@ -460,9 +519,12 @@ sub process {
 	my $basename = $filename;
 	$basename =~ s/.*[\/\\]//;
 	$basename =~ s/\.([^\.]+)$//;
-	if($basename =~ m/^([A-Fa-f0-9]+)_(.+?)\s*$/) {
-		$basename = $2;
+	my $name = $basename;
+	if($name =~ m/^([A-Fa-f0-9]+)_(.+?)\s*$/) {
+		$name = $2;
 	}
+
+	
 	if($torrent) {
 		if($torrent->{info}->{name} && !($torrent->{info}->{name} eq $basename)) {
 			$torrent->{info}->{name} = $basename;
@@ -481,24 +543,14 @@ sub process {
 		# ($torrent->{info},$d) = clean($torrent->{info},undef,"torrent->{info}");
 		# $dirty = $d if($d);
 	}
-	if($dirty) {
-		
-		my $backup = $filename;
-		$backup =~ s/\.([^\.]+)$/.UNSAFE.$1/;
-		if(! -f $backup) {
-			print STDERR "Backing up $filename ...\n";
-			print STDERR "==> $backup ...";
-			if(system("cp","-a",$filename,$backup) == 0) {
-				print STDERR " [OK]\n";
-			}
-			else {
-				print STDERR " [FAILED]\n";
-				return undef;
-			}
-
+	if($dirty) {	
+		my $output = $filename;
+		if(!$OPTS{overwrite}) {
+			$output =~ s/^.*[\/\\]+//;
+			$output =~ s/\.([^\.]+)$/.MASKED.$1/;
 		}
-		print STDERR "Wrting $filename ...\n";
-		open FO,">:raw",$filename or die("Error opening $filename:$!\n");
+		print STDERR "Wrting $output ...\n";
+		open FO,">:raw",$output or die("Error opening $output for writting:$!\n");
 		print FO bencode($torrent);
 		close FO;
 		return 1;
