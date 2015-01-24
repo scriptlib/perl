@@ -1,7 +1,1 @@
-#!/usr/bin/perl -w
-use strict;
-use MyPlace::Program::Ids;
-my $PROG = new MyPlace::Program::Ids;
-exit $PROG->execute(@ARGV);
-__END__
-
+modules/MyPlace/Program/Ids.pm
