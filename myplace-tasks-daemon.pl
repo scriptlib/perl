@@ -28,7 +28,7 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
     exit $v;
 }
 
-
+use File::Spec;
 use MyPlace::SimpleConfig qw/sc_from_file sc_to_file/;
 use MyPlace::Script::Message;
 use MyPlace::Tasks::Utils qw/strtime/;
@@ -39,23 +39,64 @@ use MyPlace::Tasks::Worker;
 use MyPlace::Tasks::Task qw/$TASK_STATUS/;
 use Cwd qw/getcwd/;
 
+if($ENV{DEBUG} || $OPTS{'debug'}) {
+	$OPTS{'debug'} = 1;
+}
 
-
-my $CONFIGURATION = ".myplace/tasks-daemon.config";
+our $CONFIGDIR = '.mtd';
+our $CONFIGURATION = File::Spec->catdir($CONFIGDIR,"config");
 our $MYSETTING = sc_from_file($CONFIGURATION);
+
+$MYSETTING->{_DIR} = $CONFIGDIR;
+print STDERR "CONFIG : $CONFIGDIR\n" if($OPTS{debug});
 
 my $TASKER;
 if(!$OPTS{"no-git"}) {
-	$TASKER = MyPlace::Tasks::Center::Git->new();
+	app_message "Checking GIT ... \n";
+	if(system('git','--version') == 0) {		
+		$TASKER = MyPlace::Tasks::Center::Git->new($MYSETTING);
+	}
+	else {
+		app_message "No GIT found, disable GIT\n";
+		$TASKER = MyPlace::Tasks::Center->new($MYSETTING);		
+	}
 }
 else {
-	$TASKER = MyPlace::Tasks::Center->new();
+	$TASKER = MyPlace::Tasks::Center->new($MYSETTING);
 }
-$TASKER->ignore('follows\.(txt|md)$',"^ladies");
-$TASKER->trace('ladies');
-if($ENV{DEBUG} || $OPTS{'debug'}) {
-	$TASKER->{DEBUG} = 1;
+$TASKER->{DEBUG} = 1 if($OPTS{debug});
+
+my $F_IGNORE = File::Spec->catfile($CONFIGDIR,'ignore');
+$MYSETTING->{_IGNORE} = $F_IGNORE;
+if(open my $FI,'<',$F_IGNORE) {
+	my @PAT;
+	while(<$FI>) {
+		chomp;
+		next unless($_);
+		next if(m/^\s+$/);
+		print STDERR "IGNORE : " . $_ . "\n" if($OPTS{debug});
+		push @PAT,$_;
+	}
+	close $FI;
+	$TASKER->ignore(@PAT);
 }
+
+my $F_TRACE = File::Spec->catfile($CONFIGDIR,'trace');
+$MYSETTING->{_TRACE} = $F_TRACE;
+if(open(my $FI,'<',$F_TRACE)) {
+	my @PAT;
+	while(<$FI>) {
+		chomp;
+		next unless($_);
+		next if(m/^\s+$/);
+		print STDERR "TRACE  : " . $_ . "\n" if($OPTS{debug});
+		push @PAT,$_;;
+	}
+	close $FI;
+	$TASKER->trace(@PAT);
+}
+
+
 foreach (qw/sleep no-pull no-push/) {
 	$TASKER->{options}{$_} = $OPTS{$_} if(defined $OPTS{$_});
 }
@@ -77,6 +118,7 @@ my @DEFAULT_LISTENERS = (
 			MyPlace::Tasks::Worker->new(
 					name=>'echo',
 					routine=>sub{
+						my $task = shift;
 						print join(" ",@_),"\n";
 						return $TASK_STATUS->{DONOTHING};
 					}
@@ -101,11 +143,16 @@ $SIG{INT} = \&abort;
 app_warning "[" . strtime() . "] Start\n";
 app_warning "Directory: $START_DIR\n";
 
-do ".myplace/listener";
+
+my $F_LISTENER = File::Spec->catfile($CONFIGDIR,'listener');
+$MYSETTING->{_LISTENER} = $F_LISTENER;
+do $F_LISTENER;
+
 my @LISTENER = (
 		@DEFAULT_LISTENERS,
 		listener_init($TASKER,$TasksBuilder)
 );
+
 app_warning scalar(@LISTENER) . " listener initilized\n";
 foreach(@LISTENER) {
 	app_warning "Listen to namespace [" . $_->{namespace} . "]\n";
