@@ -33,6 +33,10 @@ my $A = MyPlace::Config::Array->new();
 if($OPTS{filename}) {
 	$A->readfile($OPTS{filename});
 }
+elsif(@ARGV and -f $ARGV[0]) {
+	$OPTS{filename} = shift @ARGV;
+	$A->readfile($OPTS{filename});
+}
 else {
 	$A->readtext(<STDIN>);
 }
