@@ -1,0 +1,88 @@
+#!/usr/bin/perl -w
+# $Id$
+package MyPlace::Script::download_weipai_video;
+use warnings;
+use strict;
+use MyPlace::Weipai::Downloader qw/download_video/;
+
+our $VERSION = 'v0.1';
+my @OPTIONS = qw/
+	help|h|? 
+	manual|man
+	history|hist
+	overwrite|o
+	exts:s
+/;
+my %OPTS;
+if(@ARGV)
+{
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+}
+else {
+	$OPTS{'help'} = 1;
+}
+if($OPTS{'help'} or $OPTS{'manual'}) {
+	require Pod::Usage;
+	my $v = $OPTS{'help'} ? 1 : 2;
+	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
+    exit $v;
+}
+
+my $baseurl = shift;
+my $basename = shift;
+
+exit download_video($baseurl,$basename,$OPTS{history},$OPTS{overwrite},$OPTS{exts});
+
+__END__
+
+=pod
+
+=head1  NAME
+
+download_weipai_video - PERL script
+
+=head1  SYNOPSIS
+
+download_weipai_video [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2014-11-26 00:18  xiaoranzzz  <xiaoranzzz@MyPlace>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@MyPlace>
+
+=cut
+
+#       vim:filetype=perl
+
