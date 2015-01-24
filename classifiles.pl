@@ -11,6 +11,7 @@ my @OPTIONS = qw/
 	rule|r:s
 	test|t
 	verbose|v
+	word|w
 /;
 my %OPTS;
 if(@ARGV)
@@ -34,6 +35,7 @@ push @args,'--verbose' if($OPTS{'verbose'});
 push @args,'--test' if($OPTS{'test'});
 push @args,'--dest', $OPTS{'dest'} if($OPTS{dest});
 push @args,'--rule',$OPTS{'rule'} if($OPTS{rule});
+push @args,'--word' if($OPTS{word});
 exec('classify',@ARGV,@args);
 
 __END__

@@ -17,8 +17,10 @@ my @OPTIONS = qw/
     action|a:s
 	prefix=s
 	suffix=s
-	dump
+	dump	
+	word|w
 /;
+
 my %OPTS;
 if(@ARGV)
 {
@@ -57,14 +59,27 @@ sub dumpdata {
 
 use MyPlace::Config::Array;
 sub read_rules {
-    my $RULE_FILE = shift;
+    my $filelist = shift;
     my $dest = (shift @_) || $DEST;
     my @rules;
     my @rule=();
 	my @keyword;
+	my @data;
 	my $A = new MyPlace::Config::Array;
-	$A->readfile($RULE_FILE);
-	my @data = $A->get_data;
+	foreach my $file (split(/\s*,\s*/,$filelist)) {
+		my $RULE_FILE = $file;
+		if(!-f $RULE_FILE) {
+			$RULE_FILE .= ".rule";
+		}
+		if(!-f $RULE_FILE) {
+			print STDERR "Rule <$file> not exists\n";
+			next;
+		}
+		print STDERR "Rules read from <$RULE_FILE>\n";
+		$A->readfile($RULE_FILE);
+		push @data, $A->get_data;
+	}
+	my $count = 0;
 	foreach my $def (@data) {
 		my @value = @$def;
 		$_ = shift @value;
@@ -83,21 +98,52 @@ sub read_rules {
             }
 			next;
         }
-        elsif(m/^(?:#|\/\/)/) {
+        elsif(m/^\/\//) {
 			next;
         }
-		else {
-			my %r;
-			$r{name} = $_;
-			s/([\[\]\(\)\@\$\*\?\^])/\\\\$1/g;
-			s/\s+/[-_\\s]*/g;
-			s/^#+//;
-			$r{exp} = join('|',$_,@value);
-			$r{dest} = $dest;
-			$r{keyword} = [@value];
-			push @rules,\%r;
+		
+		#Translate values like "AB CD EF" to "AB[-~_\.\s]*CD[-~_\.\s]*EF
+		my %r;
+		$r{name} = $_;
+		$r{dest} = $dest;
+		$r{keyword} = [@value];
+		@value = map {s/\\-|\\_/[-~_\.\\s]*/g;$_} @value;
+		@value = map {s/\s+/[-~_\.\\s]+/g;$_} @value;
+		if(m/^<SN>(.+)$/) {
+			$r{name} = $1;
+			$r{exp} = join("|","\\b$1\[-~_\\.\\s]*\\d+",@value);
 		}
+		elsif(m/^<TI>(.+)$/) {
+			my $name = $1;
+			$r{name} = $name;
+			$name =~ s/\\-|\\_|\s+/[-~_\.\\s]*/g;
+			$r{exp} = join("|",$name,@value);
+		}
+		elsif(m/^<W>(.+?)\s*$/) {
+			my $name = $1;
+			$r{name} = $name;
+			$name =~ s/\\-|\\_|\s+/[-~_\.\\s]*/g;
+			$name = "\\b$name\\b";
+			$r{exp} = join("|",$name,@value);
+		}
+		elsif($_ =~ m/^</) {
+			s/^<//;
+			$r{name} = $_;
+			$r{exp} = join('|',@value);
+		}
+		else {
+			s/^\/</</;
+			s/([\[\]\(\)\@\$\*\?\^])/\\\\$1/g;
+			s/\s+/[-~_\.\\s]*/g;
+			s/^#+//;
+			$_ = '\b' . $_ . '\b' if($OPTS{word});
+			$r{exp} = join('|',$_,@value);
+		}
+		push @rules,\%r;
+		$count++;
+		print STDERR "\r$count rules read";
 	}
+	print STDERR "\n";
 	return \@rules;
 }
 
@@ -182,6 +228,11 @@ my %TestMethod;
 		'test'=>sub {
 			my $left = shift;
 			my $right = shift;
+			#if($left =~ m/082312-110/ and $right =~ m/Carib/) {
+			#	print STDERR "Left:$left\nRgith:$right\n";
+			#	print STDERR $left =~ /$right/ ? "Match: True\n" : "Match: False\n";
+			#	die();
+			#}
 			return ($TestMethod{text}->{case}) ? ($left =~ $right) : ($left =~ /$right/i) ;
 		},
 		'case'=>0,
@@ -352,8 +403,10 @@ sub process {
         process_rule($files,$rule);
     }
 #	use Data::Dumper;print STDERR Dumper($rules);
+	my $count = 0;
     foreach my $rule (@$rules) {
         if($rule->{files} && @{$rule->{files}}) {
+			$count +=scalar(@{$rule->{files}});
             print STDERR "Class [$rule->{name}] matches " . scalar(@{$rule->{files}}) . " file(s).\n";
             do_action($rule->{files},$rule);
         }
@@ -361,6 +414,12 @@ sub process {
             print STDERR "Class [$rule->{name}] matches nothing!\n" if($OPTS{debug} || $OPTS{verbose});
         }
     }
+	if($count) {
+		print STDERR "Total $count files classified\n\n";
+	}
+	else {
+		print STDERR "Rules match no file\n\n";
+	}
     #foreach(@$files) {
     #    process_file($_,$rules);
     #}
@@ -391,9 +450,9 @@ if($OPTS{dump}) {
 if(! -d $DEST) {
 	die("Error $DEST not exsits, or not a directory.\n");
 }
-if(! -f $RULE_FILE) {
-	die("Error: Rule file $RULE_FILE not exist, or not a file.\n");
-}
+#if(! -f $RULE_FILE) {
+#	die("Error: Rule file $RULE_FILE not exist, or not a file.\n");
+#}
 
 if(@ARGV) {
     @files = @ARGV;
@@ -455,6 +514,9 @@ classify [options] filenames...
 =item B<--dest>
 
 Specify destination directory
+
+=item B<--word>
+Treat every rule exp as a word
 
 =item B<--by>
 
