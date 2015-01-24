@@ -6,7 +6,7 @@
 ###APPDESC:	rename files using perl regexp
 ###APPUSAGE:	[options] (pattern|func) (files...) 
 ###APPEXAMPLE:	renameext -t 's/^.*(\d+)\.jpg/$1' *\n\trenameext -t 'ucfirst' *
-###APPOPTION:	--test, -t:Test mode on|--swap, -sw:Swap mode on|--no-dot,-nd:Replace dots|--force,-f:Override exists files
+###APPOPTION:	--test, -t:Test mode on|--rule,-r:Use internal rule|--swap, -sw:Swap mode on|--no-dot,-nd:Replace dots|--force,-f:Override exists files
 use strict;
 $ARGV[0]="-h" unless(@ARGV);
 use lib $ENV{XR_PERL_MODULE_DIR};
@@ -25,6 +25,8 @@ my @OPTIONS= qw/
 	verbose|v
 	debug
 	rule|r:s
+	dir|d:s
+	delete
 /;
 GetOptions(\%OPTS,@OPTIONS);
 exit_usage(0,$0) if($OPTS{'help'});
@@ -33,11 +35,11 @@ my $utf8 = find_encoding("utf8");
 my @OLDARGV = @ARGV;
 @ARGV = ();
 foreach(@OLDARGV) {
-    push @ARGV,$utf8->decode($_);
+    push @ARGV,$_;
 }
-binmode STDERR,'utf8';
-binmode STDOUT,'utf8';
-binmode STDIN,'utf8';
+#binmode STDERR,'utf8';
+#binmode STDOUT,'utf8';
+#binmode STDIN,'utf8';
 
 sub strnum {
 	my $val = shift;
@@ -75,13 +77,17 @@ my %RULES = (
 	cleanend1=>'s/[_\s]*【?\d+[Pp]】?\s*$//',
 	dotless=>'s/\.(?=.*\.)/ /g',
 	trim=>'s/^\s+|[\.\s]+$|(?<=\/)\s+|[\.\s]+(?=\/)//g',
+	noemoji=>'s/[\p{Emoticons}]+//g',
+	#cjk=>'s/[^\p{CJK_Symbols_And_Punctuation}\p{CJK_Unified_Ideographs}\p{ASCII}]+//g',
+	cjk=>'s/[^{\p{Punctuation}\p{CJK_Unified_Ideographs}\p{CJK_SYMBOLS_AND_PUNCTUATION}\p{HALFWIDTH_AND_FULLWIDTH_FORMS}\p{CJK_COMPATIBILITY_FORMS}\p{VERTICAL_FORMS}\p{ASCII}\p{LATIN}\p{CJK_Unified_Ideographs_Extension_A}\p{CJK_Unified_Ideographs_Extension_B}\p{CJK_Unified_Ideographs_Extension_C}\p{CJK_Unified_Ideographs_Extension_D}]//g',
+	
 );
 
 my $exp;
 
 if(defined $OPTS{rule}) {
 	if($OPTS{rule} && defined $RULES{$OPTS{rule}}) {
-		print STDERR "Use internal rule $OPTS{rule}\n";
+		print STDERR "[RenameEXT] Rule => \"$OPTS{rule}\"\n";
 		$exp = $RULES{$OPTS{rule}};
 	}
 	elsif($OPTS{rule}) {
@@ -111,19 +117,26 @@ else {
 
 my $RENAMER;
 
-print STDERR ref $exp,"\n";
+
+
 if(ref $exp) {
 	$RENAMER = $exp;
+	print STDERR "[RenameEXT] Exp => <REF>\n";
 }
 elsif($exp =~ /\/.*\//) {
+	print STDERR "[RenameEXT] Exp => \"$exp\"\n";
 	$RENAMER = sub    {
             my $r = shift;
 			$_ = $r;
+			$! = undef;
+			$@ = undef;
 			eval($exp);
+			print STDERR "$!$@\n" if($! or $@);
             return $_;
    };
 }
 else {
+	print STDERR "[RenameEXT] Exp => \"$exp\"\n";
 	$RENAMER = sub {
 		my $r = shift;
 		$_ = $r;
@@ -133,7 +146,7 @@ else {
 }
 
 use Data::Dumper;
-print Dumper($RENAMER);
+#print Dumper($RENAMER);
 
 die("Error: $@\n") if($@);
 
@@ -143,16 +156,39 @@ while(-e $tempname) {
 }
 sub my_rename {
     my ($old,$new)=@_;
+	if($OPTS{delete}) {
+		unlink $old or return undef;
+		return 1;
+	}
     rename $old,"$tempname" or return undef;
     rename "$tempname",$new or return undef;
     return 1;
 }
 
 my @files;
-if(@ARGV) {
-    @files = @ARGV;
+if($OPTS{dir}) {
+	die("Directory not accessiable: <$OPTS{dir}>\n") unless(-d $OPTS{dir});
+	if(opendir(my $dh,$OPTS{dir})) {
+		while(readdir($dh)) {
+			next if($_ eq '.');
+			next if($_ eq '..');
+			#print STDERR $_,"\n";
+			push @files,"$OPTS{dir}/$_";
+		}
+		close $dh;
+	}
+	else {
+		print STDERR "Error opening directory <$OPTS{dir}>: $!\n";
+	}
 }
-else {
+if(@ARGV) {
+    push @files,@ARGV;
+}
+
+if($OPTS{dir}) {
+	print STDERR "Nothing to do for directory: <$OPTS{dir}>\n" unless(@files);
+}
+elsif(!@files) {
     print STDERR "Please input filenames:\n" if($OPTS{verbose});
     while(<STDIN>) {
         chomp;
@@ -164,7 +200,9 @@ else {
 my $dfile=0;
 foreach my $old(grep !/^\.\.?$/,@files) {
 	print STDERR "$old\n" if($OPTS{'debug'});
-    my $new = &$RENAMER($old);
+	my $uold = $utf8->decode($old);
+    my $unew = &$RENAMER($uold);
+	my $new = $utf8->encode($unew);
     if($new eq $old) {
 		print STDERR ("\"$old\" [Ignored]\n") if($OPTS{verbose});
         next;
