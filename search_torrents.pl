@@ -37,11 +37,11 @@ my %ENGINES = (
 	],
 	'torrentkitty.org'=>[
 		'http://www.torrentkitty.org/search/###QUERY###/',
-		1,
+		2,
 	],
 	'sobt.org'=>[
 		'http://www.sobt.org/Query/###QUERY###',
-		1,
+		2,
 	],
 	'btkitty.org'=>[
 		'http://btkitty.org/?###QUERY###',
@@ -49,7 +49,7 @@ my %ENGINES = (
 	],
 	'storetorrent.org'=>[
 		'http://www.storetorrent.org/s/###QUERY###',
-		1,
+		2,
 	],
 );
 
@@ -108,10 +108,15 @@ foreach my $QUERY(@ARGV) {
 		my $url = $engine{$_}[0];
 		my $level = $engine{$_}[1];
 		$url =~ s/###QUERY###/$QUERY/g;
-		my @prog = ('urlrule_action','--prompt',"$_:$QUERY",$url,$level);
-		push @prog,"SAVE" if($OPTS{download});
+		my @prog = ('urlrule_action','--prompt',"$_:$QUERY",$url,$level,'!DATABASE');
 		system(@prog);
 	}
+}
+if($OPTS{download}) {
+	exit system("mdown","--input","urls.lst","--title",join(" ",@ARGV));
+}
+else {
+	exit 0;
 }
 
 __END__

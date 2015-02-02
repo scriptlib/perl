@@ -80,7 +80,28 @@ my %RULES = (
 	noemoji=>'s/[\p{Emoticons}]+//g',
 	#cjk=>'s/[^\p{CJK_Symbols_And_Punctuation}\p{CJK_Unified_Ideographs}\p{ASCII}]+//g',
 	cjk=>'s/[^{\p{Punctuation}\p{CJK_Unified_Ideographs}\p{CJK_SYMBOLS_AND_PUNCTUATION}\p{HALFWIDTH_AND_FULLWIDTH_FORMS}\p{CJK_COMPATIBILITY_FORMS}\p{VERTICAL_FORMS}\p{ASCII}\p{LATIN}\p{CJK_Unified_Ideographs_Extension_A}\p{CJK_Unified_Ideographs_Extension_B}\p{CJK_Unified_Ideographs_Extension_C}\p{CJK_Unified_Ideographs_Extension_D}]//g',
-	
+	fixweipai=>sub {
+		my $old = shift;
+		my $new = $old;
+		my $p1;
+		my $p2;
+		if($new =~ m/^(.*\/)([^\/]+)$/) {
+			$p1 = $1;
+			$p2 = $2;
+		}
+		else {
+			$p1 ='';
+			$p2 = $new;
+		}
+		$_ = $p2;
+		s/^(201\d)(\d\d)(\d\d)(\d\d)\d\d/$1$2$3$4/;
+		s/^(201\d)(\d)(\d)(\d)(\d\d)([\._])/${1}0${2}0${3}0${4}${6}/;
+		s/^(201\d)([2-9])(\d\d)(\d\d)(\d\d)([\._])/${1}0${2}${3}${4}${6}/;
+		s/^(201\d)([2-9])(\d[03456789])(\d)(\d\d)([\._])/${1}0${2}${3}0${4}${6}/;
+		s/^(201\d)([2-9])([4-9])/${1}0${2}0${3}/;
+		s/^(201\d)([2-9])(\d+)/${1}0${2}${3}/;
+		return $p1 . $_;
+	},
 );
 
 my $exp;

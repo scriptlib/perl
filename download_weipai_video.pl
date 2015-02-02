@@ -3,7 +3,7 @@
 package MyPlace::Script::download_weipai_video;
 use warnings;
 use strict;
-use MyPlace::Weipai::Downloader qw/download_video/;
+use MyPlace::Weipai::Downloader qw/download/;
 
 our $VERSION = 'v0.1';
 my @OPTIONS = qw/
@@ -32,7 +32,7 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 my $baseurl = shift;
 my $basename = shift;
 
-exit download_video($baseurl,$basename,$OPTS{history},$OPTS{overwrite},$OPTS{exts});
+exit download($baseurl,$basename,$OPTS{history},$OPTS{overwrite},$OPTS{exts});
 
 __END__
 

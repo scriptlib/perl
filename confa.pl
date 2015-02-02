@@ -54,6 +54,15 @@ if($action eq 'LIST') {
 	print $A->get_text();
 	exit 0;
 }
+elsif($action eq 'GET') {
+	foreach(@ARGV) {
+		my @data = $A->get($_);
+		if(@data) {
+			print $_;
+			print join("\n\t",@data),"\n";
+		}
+	}
+}
 elsif($action eq 'DUMP') {
 	$A->sort() if($OPTS{sort});
 	print $A->dump;

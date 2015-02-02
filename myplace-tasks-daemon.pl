@@ -44,8 +44,13 @@ if($ENV{DEBUG} || $OPTS{'debug'}) {
 }
 
 our $CONFIGDIR = '.mtd';
+if(! -d $CONFIGDIR) {
+	mkdir $CONFIGDIR or die("Error creating directory [$CONFIGDIR]:$!\n");
+}
+
 our $CONFIGURATION = File::Spec->catdir($CONFIGDIR,"config");
 our $MYSETTING = sc_from_file($CONFIGURATION);
+
 
 $MYSETTING->{_DIR} = $CONFIGDIR;
 print STDERR "CONFIG : $CONFIGDIR\n" if($OPTS{debug});
@@ -65,6 +70,10 @@ else {
 	$TASKER = MyPlace::Tasks::Center->new($MYSETTING);
 }
 $TASKER->{DEBUG} = 1 if($OPTS{debug});
+
+my $F_LOG = File::Spec->catfile($CONFIGDIR,"mtd.log");
+my $FH_LOG;
+open $FH_LOG,'>>',$F_LOG or die("Error opening file [$F_LOG]:$!\n");
 
 my $F_IGNORE = File::Spec->catfile($CONFIGDIR,'ignore');
 $MYSETTING->{_IGNORE} = $F_IGNORE;
@@ -94,6 +103,28 @@ if(open(my $FI,'<',$F_TRACE)) {
 	}
 	close $FI;
 	$TASKER->trace(@PAT);
+}
+
+my $F_CONTROL = File::Spec->catfile($CONFIGDIR,'control');
+sub CONTROL_INPUT {
+	use MyPlace::Tasks::File qw/read_tasks/;
+	my $filename = $F_CONTROL;
+	return unless (-f $filename);
+	my $tasks;
+	if($OPTS{debug}) {
+		$tasks = &read_tasks($filename,"",0,1);
+	}
+	else {
+		$tasks = &read_tasks($filename,"",1,1);
+	}
+	if($tasks and @{$tasks}) {
+		my $count = @$tasks;
+		app_message2 "Read $count commands from CONTROL\n";
+		return @{$tasks};
+	}
+	else {
+		return;
+	}
 }
 
 
@@ -128,15 +159,33 @@ my @DEFAULT_LISTENERS = (
 
 
 
-use Cwd qw/getcwd/;
+sub control {
+	my $cmd = shift;
+	return unless($cmd);
+	$cmd = uc($cmd);
+	app_warning("CONTROL COMMAND: $cmd\n");
+
+	if($cmd eq 'QUIT' || $cmd eq 'EXIT') {
+		exit &abort('QUIT');
+	}
+	if(($cmd eq 'TASK') && @_){
+		app_message("Try queue task [@_]\n");
+		my $task = MyPlace::Tasks::Task->new(@_);
+		$TASKER->queue($task,1);
+	}
+}
 
 sub abort {
-	delete $SIG{INT};
+	#delete $SIG{INT};
 	chdir $START_DIR;
 	$TASKER->abort();
-	app_error "X"x10 . " PROGRAM KILLED!!! " . "X"x10 ."\n";
+	app_error "X"x10 . " " . ($_[0] || "PROGRAM KILLED!!!") . " " . "X"x10 ."\n";
+	app_warning "Write configuration to $CONFIGURATION\n";
+	$TASKER->exit();
 	sc_to_file($CONFIGURATION,$MYSETTING);
-	exit $TASKER->exit();
+	if($FH_LOG) {
+		print $FH_LOG "[" . strtime() . "] PROGRAM ABORTED\n";
+	}
 }
 $SIG{INT} = \&abort;
 
@@ -159,9 +208,11 @@ foreach(@LISTENER) {
 }
 print STDERR "\n";
 
+print $FH_LOG "[" . strtime() . "] PROGRAM START\n"; 
 my $count =0;
 while(!$TASKER->end()) {
 	app_message2 "[" . strtime() . "] Waiting for event\n";
+	control(@{$_}) foreach(CONTROL_INPUT());
 	my $task;
 	my $last_task;
 	my $remain;
@@ -172,6 +223,8 @@ while(!$TASKER->end()) {
 		app_warning "Tasks $count DONE, $remain REMAIN:\n";
 		app_warning "Working on task:\n";
 		app_warning " * " . $task->to_string . "\n";
+		sleep 1;
+		print $FH_LOG "[" . strtime() . "] TASK:" . $task->to_string . "\n";
 		$count++;
 		my $fired;
 		foreach my $listener (@LISTENER) {
@@ -181,19 +234,25 @@ while(!$TASKER->end()) {
 				chdir $START_DIR;
 			}
 		}
+		sleep 1;
+		control(@{$_}) foreach(CONTROL_INPUT());
 		$task->{status} = $TASK_STATUS->{IGNORED} unless($fired);
 		$TASKER->finish($task);
 		if($TASKER->{DEBUG}) {
+			print $FH_LOG "[" . strtime() . "] PROGRAM DEBUG END\n"; 
 			exit $TASKER->exit();
 		}
+		sleep 1;
 	}
 	elsif($TasksBuilder->more()) {
 		app_message2 "[" . strtime() . "] Queuing scheduled task\n";
 		$TASKER->queue($TasksBuilder->next());
 	}
 } 
+$TASKER->exit();
 sc_to_file($CONFIGURATION,$MYSETTING);
-exit $TASKER->exit();
+print $FH_LOG "[" . strtime() . "] PROGRAM END\n"; 
+exit 0;
 
 
 

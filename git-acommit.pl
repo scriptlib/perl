@@ -9,6 +9,11 @@ my @OPTIONS = qw/
 	manual|man
 	action|a:s
 	message|m:s
+	all
+	force|f
+	verbose|v
+	ignore-errors
+	auto
 /;
 my %OPTS;
 if(@ARGV)
@@ -25,20 +30,80 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
     exit $v;
 }
+my @gitarg = ();
+push @gitarg,"-A" if($OPTS{all});
+push @gitarg,"--force" if($OPTS{force});
+push @gitarg,"--verbose" if($OPTS{verbose});
+push @gitarg,"--ignore-errors" if($OPTS{'ignore-errors'});
+
 sub run{
+	print STDERR join(" ",@_),"\n";
 	system(@_) == 0;
 }
+sub gitacommit {
+	my $action = shift;
+	my $cmd = shift;
+	my @files = @_;
+	run("git",$cmd,@gitarg,"--",@files);
+	my $message;
+	my $count = @files;
+	
+	if($count > 2) {
+		$message = "$action $count files:\n\n\t";
+		$message .= join("\n\t",@files);
+	}
+	elsif($count == 2) {
+		$message = "$action files:" . join(",",@files);
+	}
+	else {
+		$message = "$action file: $files[0]";
+	}
+	run(qw/git commit -m/,$message);
+}
+
 my $action = $OPTS{action} || 'Update';
 my $cmd = 'add';
-$cmd = 'rm' if(($action eq 'Delete') || ($action eq 'delete'));
+$cmd = 'rm' if((lc($action) eq 'delete'));
 my $action_done = $action;
 $action_done =~ s/e?$/ed/;
 my $message = $OPTS{message} ? $OPTS{message} . "\n\n" : '';
-foreach(@ARGV) {
-	run('git',$cmd,$_);
-	$message .= "\t$action file: $_\n"
+
+
+my @default;
+my @modified;
+my @deleted;
+my @new;
+
+if($OPTS{auto}) {
+	open FI,"-|",qw/git status --porcelain/ or die("Error run <git status --porcelain>: $!\n");	
+	while(<FI>) {
+		chomp;
+		next unless(m/^(..)\s(.+)$/);
+		my $c = $1;
+		my $file = $2;
+		if($c eq ' M') {
+			push @modified,$file;
+		}
+		elsif($c eq ' D') {
+			push @deleted,$file;
+		}
+		elsif($c eq '??') {
+			push @new,$file;
+		}
+		else {
+			print STDERR "Ignored unknown file: $file\n";
+		}
+	}
 }
-run(qw/git commit -m/,$message);
+else {
+	@default = @ARGV;
+}
+
+&gitacommit('Update','add',@modified) if(@modified);
+&gitacommit('Delete','rm',@deleted) if(@deleted);
+&gitacommit('Add','add',@new) if(@new);
+&gitacommit($action,$cmd,@default) if(@default);
+
 
 __END__
 
