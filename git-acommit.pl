@@ -42,9 +42,23 @@ sub run{
 }
 sub gitacommit {
 	my $action = shift;
-	my $cmd = shift;
+	my $cmds = shift;
 	my @files = @_;
-	run("git",$cmd,@gitarg,"--",@files);
+	return unless($cmds);
+
+	if(ref $cmds) {
+		foreach my $cmd (@{$cmds}) {
+			if(ref $cmd) {
+				run("git",@$cmd,@gitarg,"--",@files);
+			}
+			else {
+				run("git",$cmd,@gitarg,"--",@files);
+			}
+		}	
+	}
+	else {
+		run("git",$cmds,@gitarg,"--",@files);
+	}
 	my $message;
 	my $count = @files;
 	
@@ -81,10 +95,11 @@ if($OPTS{auto}) {
 		next unless(m/^(..)\s(.+)$/);
 		my $c = $1;
 		my $file = $2;
-		if($c eq ' M') {
+		$file =~ s/^"(.+)"$/$1/;
+		if($c eq ' M' || $c eq 'A ') {
 			push @modified,$file;
 		}
-		elsif($c eq ' D') {
+		elsif($c eq ' D' || $c eq 'AD') {
 			push @deleted,$file;
 		}
 		elsif($c eq '??') {
@@ -100,7 +115,10 @@ else {
 }
 
 &gitacommit('Update','add',@modified) if(@modified);
-&gitacommit('Delete','rm',@deleted) if(@deleted);
+&gitacommit('Delete',[
+		['rm','--cached','-f'],
+		['rm','-f',],
+	],@deleted) if(@deleted);
 &gitacommit('Add','add',@new) if(@new);
 &gitacommit($action,$cmd,@default) if(@default);
 

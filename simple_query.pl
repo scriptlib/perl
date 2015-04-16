@@ -13,6 +13,7 @@ my @OPTIONS = qw/
 	dump|d
 	command|c=s
 	additem
+	overwrite
 /;
 my %OPTS;
 if(@ARGV)
@@ -59,12 +60,13 @@ if($action !~ /^(?:ADD|QUERY|DUMP|ADDITEM)$/) {
 
 
 my $sq = new MyPlace::SimpleQuery;
+$sq->set_options('overwrite',1) if($OPTS{overwrite});
 my $data = $OPTS{database};
 if(!$data) {
 	print STDERR "Read data from stdin: \n";
 	$data=join("",<STDIN>);
 }
-$sq->feed($data);
+$sq->feed($data,'file');
 
 my $status = 1;
 my @query = @ARGV;

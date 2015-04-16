@@ -43,12 +43,18 @@ my %ENGINES = (
 		'http://www.sobt.org/Query/###QUERY###',
 		2,
 	],
-	'btkitty.org'=>[
-		'http://btkitty.org/?###QUERY###',
-		2,
+
+	#Mirror btkitty.org
+	'btdigg.me'=>[
+		'http://btdigg.me/?###QUERY###',
+		3,
 	],
 	'storetorrent.org'=>[
 		'http://www.storetorrent.org/s/###QUERY###',
+		2,
+	],
+	'mp4ba.com'=>[
+		'http://www.mp4ba.com/search.php?keyword=###QUERY###',
 		2,
 	],
 );
@@ -108,7 +114,7 @@ foreach my $QUERY(@ARGV) {
 		my $url = $engine{$_}[0];
 		my $level = $engine{$_}[1];
 		$url =~ s/###QUERY###/$QUERY/g;
-		my @prog = ('urlrule_action','--prompt',"$_:$QUERY",$url,$level,'!DATABASE');
+		my @prog = ('urlrule_action','--history','--prompt',"$_:$QUERY",$url,$level,'!DATABASE');
 		system(@prog);
 	}
 }

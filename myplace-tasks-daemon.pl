@@ -14,12 +14,16 @@ my @OPTIONS = qw/
 	no-pull
 	debug
 	no-push
+	runonce
+	no-download
 /;
 my %OPTS;
 if(@ARGV)
 {
     require Getopt::Long;
-    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    if(!Getopt::Long::GetOptions(\%OPTS,@OPTIONS)) {
+		die("Error, invalid option specified\n");
+	}
 }
 if($OPTS{'help'} or $OPTS{'manual'}) {
 	require Pod::Usage;
@@ -49,13 +53,15 @@ if(! -d $CONFIGDIR) {
 }
 
 our $CONFIGURATION = File::Spec->catdir($CONFIGDIR,"config");
-our $MYSETTING = sc_from_file($CONFIGURATION);
+our $MYSETTING = $OPTS{runonce} ? {} :  sc_from_file($CONFIGURATION);
 
 
 $MYSETTING->{_DIR} = $CONFIGDIR;
 print STDERR "CONFIG : $CONFIGDIR\n" if($OPTS{debug});
 
 my $TASKER;
+
+######DISABLE GIT
 if(!$OPTS{"no-git"}) {
 	app_message "Checking GIT ... \n";
 	if(system('git','--version') == 0) {		
@@ -70,6 +76,7 @@ else {
 	$TASKER = MyPlace::Tasks::Center->new($MYSETTING);
 }
 $TASKER->{DEBUG} = 1 if($OPTS{debug});
+$TASKER->runonce(@ARGV) if($OPTS{runonce});
 
 my $F_LOG = File::Spec->catfile($CONFIGDIR,"mtd.log");
 my $FH_LOG;
@@ -128,17 +135,28 @@ sub CONTROL_INPUT {
 }
 
 
-foreach (qw/sleep no-pull no-push/) {
-	$TASKER->{options}{$_} = $OPTS{$_} if(defined $OPTS{$_});
+my @SAVEDKEY = (qw/sleep no-pull no-push no-download no-git/);
+
+foreach (@SAVEDKEY) {
+	$OPTS{$_} = $MYSETTING->{"options.$_"} if(!defined $OPTS{$_});
+}
+
+foreach (@SAVEDKEY) {
+	next unless(defined $OPTS{$_});
+	$MYSETTING->{"options.$_"} = $OPTS{$_};
+	$TASKER->{options}->{$_} = $OPTS{$_};
 }
 
 my $START_DIR = getcwd;
-my $TasksBuilder = MyPlace::Tasks::Builder->new();
+my $TasksBuilder = MyPlace::Tasks::Builder->new(level=>20);
+my $TasksBuilder2 = MyPlace::Tasks::Builder->new(level=>10);
+my $TasksBuilder3 = MyPlace::Tasks::Builder->new(level=>0);
 my @DEFAULT_LISTENERS = (
 		MyPlace::Tasks::Listener->new('dump', 
 			MyPlace::Tasks::Worker->new(
 					name=>'dump',
 					routine=>sub{
+						my $self = shift;
 						use Data::Dumper;
 						print Data::Dumper->Dump(\@_);
 						return $TASK_STATUS->{DONOTHING};
@@ -149,9 +167,32 @@ my @DEFAULT_LISTENERS = (
 			MyPlace::Tasks::Worker->new(
 					name=>'echo',
 					routine=>sub{
+						my $self = shift;
 						my $task = shift;
 						print join(" ",@_),"\n";
 						return $TASK_STATUS->{DONOTHING};
+					}
+			)
+		),
+		MyPlace::Tasks::Listener->new('mdown',
+			MyPlace::Tasks::Worker->new(
+					name=>'mdown',
+					'no-download'=>$OPTS{'no-download'},
+					routine=>sub{
+						my $self = shift;
+						if($self->{'no-download'}) {
+							app_message "NO-DOWNLOAD mode, do nothing\n";
+							return $TASK_STATUS->{DONOTHING};
+						}
+						my $task = shift;
+						my @prog = ('mdown',@_);
+						print STDERR join(" ",@_),"\n";
+						if(system(@prog) == 0) {
+							return $TASK_STATUS->{FINISHED};
+						}
+						else {
+							return $TASK_STATUS->{ERROR};
+						}
 					}
 			)
 		),
@@ -180,27 +221,36 @@ sub abort {
 	chdir $START_DIR;
 	$TASKER->abort();
 	app_error "X"x10 . " " . ($_[0] || "PROGRAM KILLED!!!") . " " . "X"x10 ."\n";
-	app_warning "Write configuration to $CONFIGURATION\n";
-	$TASKER->exit();
-	sc_to_file($CONFIGURATION,$MYSETTING);
+	if(!$OPTS{runonce}) {
+		app_warning "Write configuration to $CONFIGURATION\n";
+	#$TASKER->exit();
+		sc_to_file($CONFIGURATION,$MYSETTING);
+	}
 	if($FH_LOG) {
 		print $FH_LOG "[" . strtime() . "] PROGRAM ABORTED\n";
 	}
+	exit 1;
 }
 $SIG{INT} = \&abort;
 
 app_warning "[" . strtime() . "] Start\n";
 app_warning "Directory: $START_DIR\n";
 
+my @LISTENER = @DEFAULT_LISTENERS;
 
 my $F_LISTENER = File::Spec->catfile($CONFIGDIR,'listener');
 $MYSETTING->{_LISTENER} = $F_LISTENER;
-do $F_LISTENER;
 
-my @LISTENER = (
-		@DEFAULT_LISTENERS,
-		listener_init($TASKER,$TasksBuilder)
-);
+if(-f $F_LISTENER) {
+	do $F_LISTENER;
+	if($@) {
+		app_error "Error loading $F_LISTENER:\n";
+		die($@,"\n");
+	}
+	else {
+		push @LISTENER,listener_init(\%OPTS,$TASKER,$TasksBuilder,$TasksBuilder2,$TasksBuilder3);
+	}
+}
 
 app_warning scalar(@LISTENER) . " listener initilized\n";
 foreach(@LISTENER) {
@@ -219,6 +269,10 @@ while(!$TASKER->end()) {
 	if ($remain = $TASKER->more()) {
 		$last_task = $task;
 		$task = $TASKER->next();
+#		if($task->to_string() =~ m/vlook.cn/) {
+#			app_warning "SKIP VLOOK.CN TASKS NOW!!!\n";
+#			next;
+#		}
 		$TASKER->{status} = 'RUNNING';
 		app_warning "Tasks $count DONE, $remain REMAIN:\n";
 		app_warning "Working on task:\n";
@@ -230,8 +284,11 @@ while(!$TASKER->end()) {
 		foreach my $listener (@LISTENER) {
 			if($listener->check($task)) {
 				$fired = 1;
-				$listener->fire_event($task);
+				my $r = $listener->fire_event($task);
 				chdir $START_DIR;
+				if($r and ( $r  == $TASK_STATUS->{FATALERROR})) {
+					exit abort("FATALERROR");
+				}
 			}
 		}
 		sleep 1;
@@ -242,15 +299,33 @@ while(!$TASKER->end()) {
 			print $FH_LOG "[" . strtime() . "] PROGRAM DEBUG END\n"; 
 			exit $TASKER->exit();
 		}
+		if($count and !($count % 10)) {
+			#$TASKER->save();
+			app_warning "Write configuration to $CONFIGURATION\n";
+			sc_to_file($CONFIGURATION,$MYSETTING);
+		}
 		sleep 1;
+	}
+	elsif($OPTS{runonce}) {
+		last;
 	}
 	elsif($TasksBuilder->more()) {
 		app_message2 "[" . strtime() . "] Queuing scheduled task\n";
-		$TASKER->queue($TasksBuilder->next());
+		$TASKER->queue($TasksBuilder->{level},$TasksBuilder->next());
+	}
+	elsif($TasksBuilder2->more()) {
+		app_message2 "[" . strtime() . "] Queuing scheduled task\n";
+		$TASKER->queue($TasksBuilder2->{level},$TasksBuilder2->next());
+	}
+	elsif($TasksBuilder3->more()) {
+		app_message2 "[" . strtime() . "] Queuing scheduled task\n";
+		$TASKER->queue($TasksBuilder3->{level},$TasksBuilder3->next());
 	}
 } 
-$TASKER->exit();
-sc_to_file($CONFIGURATION,$MYSETTING);
+if(!$OPTS{runonce}) {
+	$TASKER->exit();
+	sc_to_file($CONFIGURATION,$MYSETTING);
+}
 print $FH_LOG "[" . strtime() . "] PROGRAM END\n"; 
 exit 0;
 
