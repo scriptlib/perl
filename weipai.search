@@ -1,0 +1,274 @@
+#!/usr/bin/perl -w
+# $Id$
+package MyPlace::Script::weipai_search;
+use strict;
+
+our $VERSION = 'v0.1';
+my @OPTIONS = qw/
+	help|h|? 
+	manual|man
+	download|d
+	output|o=s
+	file|f=s
+	fullname
+	append|a
+	saveurl|u
+	search|s
+	input|i=s
+/;
+my %OPTS;
+if(@ARGV)
+{
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+}
+else {
+	$OPTS{'help'} = 1;
+}
+if($OPTS{'help'} or $OPTS{'manual'}) {
+	require Pod::Usage;
+	my $v = $OPTS{'help'} ? 1 : 2;
+	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
+    exit $v;
+}
+
+my @prog = qw/google --web/;
+sub search {
+	my $key = shift;
+	my $page = shift;
+	my @result;
+	print STDERR "Search $key page $page\n";
+		my @p = (@prog,$key,$page);
+		print STDERR join(" ",@p),"\n";
+		open FI,"-|",@p or die("Error running<@p>: $!\n");
+		foreach(<FI>) {
+			chomp;
+			push @result,$_;
+		}
+		close FI;
+	print STDERR "\tGet " . scalar(@result) . " results\n";
+	return @result;
+}
+
+sub search_pages {
+	my $key = shift;
+	my $pages = shift;
+	my @result;
+	my %holder;
+	my $dirty;
+	for my $page (1 .. $pages) {
+		push @result,"#Search $key $page";
+		foreach(&search($key,$page)) {
+			next if($holder{$_});
+			$holder{$_} = 1;
+			$dirty = 1;
+			push @result,$_;
+		}
+	}
+	return $dirty,@result;
+}
+sub search_auto {
+	my $name = shift;
+	my $page = 1;
+	my $dup = undef;
+	my %holder;
+	my $dirty;
+	my @result;
+	my @r = &search($name,$page);
+	while(@r) {
+		push @result,"#Search $name $page";
+		foreach(@r) {
+			if($holder{$_}) {
+				$dup = 1;
+			}
+			else {
+				$holder{$_} = 1;
+				$dirty = 1;
+				push @result,$_;
+			}
+		}
+		last if($dup);
+		$page++;
+		@r = &search($name,$page);
+	}
+	return $dirty,@result;
+}
+
+sub run {
+	print STDERR join(" ",@_),"\n";
+	return (system(@_) == 0);
+}
+my @names;
+if($OPTS{input}) {
+	open FI,'<',$OPTS{input} or die("Error reading $OPTS{input}: $!\n");
+	while(<FI>) {
+		chomp;
+		push @names,$_ if($_);
+	}
+	close FI;
+}
+elsif(@ARGV) {
+	push @names,shift(@ARGV);
+}
+
+my $pages = shift;
+my @result;
+#my %holder;
+my $dirty;
+$OPTS{file} = 'weipai.search.txt' unless($OPTS{file});
+
+if($OPTS{file}) {
+	if(open FI,"<",$OPTS{file}) {
+		while(<FI>) {
+			chomp;
+			next unless($_);
+			push @result,$_;
+#			$holder{$_} = 1;
+		}
+		close FI;
+	}
+	else {
+		print STDERR "Error file not exists <$OPTS{file}>\n";
+	}
+	$OPTS{output} = $OPTS{file} unless($OPTS{output});
+}
+
+
+if(!@result) {
+	$OPTS{search} = 1;
+}
+elsif($OPTS{append}) {
+	$OPTS{search} = 1;
+}
+
+if(!$OPTS{search}) {
+	print STDERR "Skip searching\n";
+}
+elsif(!@names) {
+	die("Usage:\n\t$0 [--input Ids.txt | name] [pages]\n");
+}
+else {
+	my $status;
+	my @r;
+	foreach my $name(@names) {
+		my %holder = ();
+		if($pages) {
+			($status,@r) = search_pages($name . '+site:weipai.cn',$pages);
+			$dirty = 1 if($status);
+			push @result,@r if(@r);
+			($status,@r) = search_pages('intitle:' . $name . '+site:9sgx.com',$pages);
+			$dirty = 1 if($status);
+			push @result,@r if(@r);
+		}
+		else {
+			($status,@r) = search_auto($name . '+site:weipai.cn',$pages);
+			$dirty = 1 if($status);
+			push @result,@r if(@r);
+			($status,@r) = search_auto('intitle:' . $name . '+site:9sgx.com',$pages);
+			$dirty = 1 if($status);
+			push @result,@r if(@r);
+		}
+	}
+}
+
+if($OPTS{output} and $dirty) {
+	print STDERR "Write to file <$OPTS{output}> ...";
+	if($OPTS{append}) {
+		open FO,">",$OPTS{output} or die("\n\tError write to file <$OPTS{output}>:$!\n");
+	}
+	else {
+		open FO,">",$OPTS{output} or die("\n\tError write to file <$OPTS{output}>:$!\n");
+	}
+	print FO join("\n",@result),"\n";
+	close FO;
+	print STDERR "\t[OK]\n";
+}
+
+if($OPTS{download} || $OPTS{saveurl}) {
+	my @r = @result;
+	my @result = ();
+	foreach(@r) {
+		if(m/^#/) {
+			print STDERR $_,"\n";
+		}
+		elsif(m/weipai\.cn|9sgx\.com/) {
+			push @result,$_;
+		}
+		else {
+			print STDERR "Skip $_\n";
+		}
+	}
+	if(!@result) {
+		print STDERR "Nothing to download\n";
+		exit 0;
+	}
+	my $idx = 1;
+	my $count = @result;
+	foreach(@result) {
+		my $url = $_;
+		$url =~ s/\t.+$//;
+		$url = $url . "#FULLNAME" if($OPTS{fullname});
+		print STDERR "[$idx/$count]$url\n";
+		&run("urlrule_action",$url,0,'DATABASE');
+		$idx++;
+	}
+	if($count and !$OPTS{saveurl}) {
+		&run('mdown');
+	}
+}
+
+exit 0;
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+weipai.search - PERL script
+
+=head1  SYNOPSIS
+
+weipai.search [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2015-02-13 00:57  xiaoranzzz  <xiaoranzzz@MyPlace>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@MyPlace>
+
+=cut
+
+#       vim:filetype=perl
