@@ -1,0 +1,208 @@
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.8.0;
+our $VERSION = 'v1.2';
+BEGIN
+{
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/\/+$//;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
+    unshift @INC, 
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
+}
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man simple|s stdin|i stdout|o/;
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
+our $PROGRAM_DIR;
+my $source_directory=$ENV{XR_SHELL_SOURCE_DIR};
+
+my $NAME = shift;
+die("Invalid usage.\n") unless($NAME);
+
+my $fname = $NAME;
+
+if(-f "$source_directory/$fname") {
+    $fname="$source_directory/$fname";
+}
+elsif(-f "$source_directory/$fname.sh") {
+    $fname="$source_directory/$fname.sh";
+}
+elsif( $fname =~ /\.[^\.]*$/) {
+    $fname="$source_directory/$fname";
+}
+else {
+    $fname=$source_directory . "/" . $fname . ".sh";
+    #$fname=$source_directory . "/" . $fname;
+}
+
+
+my $editor="r-edit";
+#$editor = "notepad++" if($^O =~ /win/i);
+
+if (-f $fname) {
+    print STDERR "$fname exists,will be open for editing instead.\n";
+    exec $editor,$fname;
+    exit 0;
+}
+if($OPTS{stdout}) {
+    open PIPE,">&STDOUT" or die("fatal: can't dupilicate STDOUT\n");
+}
+else {
+    die "Can't not locate script directory.\n" if(!$source_directory);
+    die "Direcoty not exists:\"$source_directory\"\n" if (! -d $source_directory);
+    open PIPE,">:utf8",$fname or die("$!\n");
+}
+
+my @TEXT;
+if($OPTS{simple}) {
+    @TEXT = ("#!/bin/sh\n");
+}
+elsif($OPTS{stdin}) {
+    @TEXT=<STDIN>;
+}
+elsif(open FI,"<",$source_directory  . "/NEWSCRIPT_TEMPLATE") {
+    @TEXT=<FI>;
+    close FI;
+}
+
+    use Env qw(USER HOSTNAME);
+    use POSIX qw/strftime/;
+    my $DATE= strftime("%Y-%m-%d %H:%M",localtime());
+    $USER="xiaoranzzz" unless($USER);
+    my $EMAIL="$USER\@" . (defined $HOSTNAME ? $HOSTNAME : "myplace.hell");
+	my $PACKAGE = "MyPlace::Script::$NAME";
+	$PACKAGE =~ s/-/_/g;
+	$PACKAGE =~ s/\//::/g;
+foreach(@TEXT) {
+    s/___EMAIL___/$EMAIL/g;
+    s/___AUTHOR___/$USER/g;
+    s/___NAME___/$NAME/g;
+    s/___DATE___/$DATE/g;
+	s/___PACKAGE___/$PACKAGE/g;
+    print PIPE $_;
+}
+close PIPE;
+
+
+if(-f $fname)
+{
+    use File::stat;
+    my $oldst = stat($fname);
+    system("\"$editor\" \"$fname\"");
+    my $newst = stat($fname);
+    if($oldst->mtime < $newst->mtime) {
+        print STDERR "$fname modified.\n";
+        print STDERR "make it executable.\n";
+        chmod(0775,$fname) or print STDERR "$!\n";
+        if($ENV{XR_SHELL_BINARY_DIR}) {
+            system("ln","-sfv",$fname,"$ENV{XR_SHELL_BINARY_DIR}/$NAME");
+        }
+    }
+    else {
+        print STDERR "$fname remain the same.\nunlink it.\n";
+        unlink($fname) or print STDERR "$!\n";
+    }
+}
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+plnew - create new script
+
+=head1  SYNOPSIS
+
+plnew [options] <script name>
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<-i>,B<--stdin>
+
+Read template from STDIN
+
+=item B<-o>,B<--stdout>
+
+Write to STDOUT
+
+=item B<-s>,B<--simple>
+
+Disable using template.
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  FILES
+
+=item B<$XR_SHELL_SOURCE_DIR>
+
+    Output directory environment variable
+
+=item $XR_SHELL_SOURCE_DIR\B<NEWSCRIPT_TEMPLATE>
+
+    Script template file
+
+=back
+
+=head1  DESCRIPTION
+
+create new shell script with custumized template. By 
+default, script will be saved in $XR_SHELL_SOURCE_DIR
+
+=head1  CHANGELOG
+
+    2010-06-06  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * recreated from new template
+        * set version 1.1
+
+    2010-11-09  21:47 xiaoranzzz <xiaoranzzz@myplace.hell>
+
+        * rewrote
+        * set version 1.2
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+
+#vim:info filetype=perl
+
