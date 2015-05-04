@@ -59,18 +59,20 @@ sub gitacommit {
 	else {
 		run("git",$cmds,@gitarg,"--",@files);
 	}
-	my $message;
-	my $count = @files;
+	my $message = $OPTS{message};
+	if(!$message) {
+		my $count = @files;
 	
-	if($count > 2) {
-		$message = "$action $count files:\n\n\t";
-		$message .= join("\n\t",@files);
-	}
-	elsif($count == 2) {
-		$message = "$action files:" . join(",",@files);
-	}
-	else {
-		$message = "$action file: $files[0]";
+		if($count > 2) {
+			$message = "$action $count files:\n\n\t";
+			$message .= join("\n\t",@files);
+		}
+		elsif($count == 2) {
+			$message = "$action files:" . join(",",@files);
+		}
+		else {
+			$message = "$action file: $files[0]";
+		}
 	}
 	run(qw/git commit -m/,$message);
 }

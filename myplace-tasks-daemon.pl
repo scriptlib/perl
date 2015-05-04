@@ -16,14 +16,18 @@ my @OPTIONS = qw/
 	no-push
 	runonce
 	no-download
+	include|I:s
+	exclude|X:s
 /;
 my %OPTS;
+my $USE_LAST_CONFIG = 1;
 if(@ARGV)
 {
     require Getopt::Long;
     if(!Getopt::Long::GetOptions(\%OPTS,@OPTIONS)) {
 		die("Error, invalid option specified\n");
 	}
+	$USE_LAST_CONFIG = undef;
 }
 if($OPTS{'help'} or $OPTS{'manual'}) {
 	require Pod::Usage;
@@ -55,6 +59,21 @@ if(! -d $CONFIGDIR) {
 our $CONFIGURATION = File::Spec->catdir($CONFIGDIR,"config");
 our $MYSETTING = $OPTS{runonce} ? {} :  sc_from_file($CONFIGURATION);
 
+my @CONFIG_KEYS = qw/sleep/;
+my @CMDLINE_OPTS = qw/no-pull no-push no-download no-git include exclude/;
+my @OPTS_KEYS = ($USE_LAST_CONFIG ? (@CONFIG_KEYS,@CMDLINE_OPTS) : @CONFIG_KEYS);
+foreach (@OPTS_KEYS) {
+	$OPTS{$_} = $MYSETTING->{"options.$_"} if(!defined $OPTS{$_});
+}
+foreach(@CONFIG_KEYS,@CMDLINE_OPTS) {
+	if(defined $OPTS{$_}) {
+		$MYSETTING->{"options.$_"} = $OPTS{$_};
+	}
+	else {
+		delete $MYSETTING->{"options.$_"};
+	}
+}
+
 
 $MYSETTING->{_DIR} = $CONFIGDIR;
 print STDERR "CONFIG : $CONFIGDIR\n" if($OPTS{debug});
@@ -74,6 +93,14 @@ if(!$OPTS{"no-git"}) {
 }
 else {
 	$TASKER = MyPlace::Tasks::Center->new($MYSETTING);
+}
+foreach(@CONFIG_KEYS,@CMDLINE_OPTS) {
+	if(defined $OPTS{$_}) {
+		$TASKER->{options}->{$_} = $OPTS{$_};
+	}
+	else {
+		delete $TASKER->{options}->{$_};
+	}
 }
 $TASKER->{DEBUG} = 1 if($OPTS{debug});
 $TASKER->runonce(@ARGV) if($OPTS{runonce});
@@ -135,17 +162,6 @@ sub CONTROL_INPUT {
 }
 
 
-my @SAVEDKEY = (qw/sleep no-pull no-push no-download no-git/);
-
-foreach (@SAVEDKEY) {
-	$OPTS{$_} = $MYSETTING->{"options.$_"} if(!defined $OPTS{$_});
-}
-
-foreach (@SAVEDKEY) {
-	next unless(defined $OPTS{$_});
-	$MYSETTING->{"options.$_"} = $OPTS{$_};
-	$TASKER->{options}->{$_} = $OPTS{$_};
-}
 
 my $START_DIR = getcwd;
 my $TasksBuilder = MyPlace::Tasks::Builder->new(level=>20);
@@ -199,7 +215,6 @@ my @DEFAULT_LISTENERS = (
 );
 
 
-
 sub control {
 	my $cmd = shift;
 	return unless($cmd);
@@ -237,6 +252,14 @@ app_warning "[" . strtime() . "] Start\n";
 app_warning "Directory: $START_DIR\n";
 
 my @LISTENER = @DEFAULT_LISTENERS;
+sub find_worker {
+	my $namespace = shift;
+	foreach my $listener (@LISTENER) {
+		if($listener->check({'namespace'=>$namespace})) {
+			return $listener->{worker};
+		}
+	}
+}
 
 my $F_LISTENER = File::Spec->catfile($CONFIGDIR,'listener');
 $MYSETTING->{_LISTENER} = $F_LISTENER;
