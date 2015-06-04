@@ -1,4 +1,5 @@
 #!/usr/bin/perl -w
+package Babes;
 # $Id$
 use strict;
 our $VERSION = 'v0.1';
@@ -15,71 +16,378 @@ my @OPTIONS = qw/
 	trash
 	reposter
 	retry
+	reverse
+	revert
+	move
+	images
+	videos
+	include
+	exclude
+	into=s
+	follow
+	unfollow
+	enable
+	disable
 /;
-my %OPTS;
-if(@ARGV)
-{
-    require Getopt::Long;
-    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+sub strtime {
+	my $time =  shift(@_) || time();
+	my $style = shift;
+	my $sep1 = shift(@_); 
+	my $sep2 = shift(@_);
+	my $sep3 = shift(@_);
+	$sep1 = "/" unless(defined $sep1); #seperator for date (year/month/day)
+	$sep2 = ":" unless(defined $sep2); #seperator for time (hour::minute::second)
+	$sep3 = " " unless(defined $sep3); #seperator seperated date and time
+	my @r = localtime($time);
+	my $year   = $r[5] + 1900;
+	my $month  = $r[4]  > 9  ? ($r[4] + 1) : '0' . ($r[4]+1);
+	my $day    = $r[3] > 9 ? $r[3] : '0' . $r[3];
+	my $hour   = $r[2] > 9 ? $r[2] : '0' . $r[2];
+	my $minute = $r[1] > 9 ? $r[1] : '0' . $r[1];
+	my $second = $r[0] > 9 ? $r[0] : '0' . $r[0];
+	my $clock = "$hour$sep2$minute$sep2$second";
+	if((!$style) or ($style == 4)) {
+		return "$year$sep1$month$sep1$day$sep3$clock";
+	}
+	elsif($style == 3) {
+		return "$month$sep1$day$sep3$clock";
+	}
+	elsif($style == 2) {
+		return "$day $clock";
+	}
+	elsif($style == 1) {
+		return $clock;
+	}
+	elsif($style == -1) {
+		return "$year$sep1$month$sep1$day";
+	}
+	elsif($style == -2) {
+		return "$month$sep1$day";
+	}
+	else {
+		return "$year$sep1$month$sep1$day$sep3$clock";
+	}
 }
-else {
-	$OPTS{'help'} = 1;
-}
-if($OPTS{'help'} or $OPTS{'manual'}) {
-	require Pod::Usage;
-	Pod::Usage::pod2usage(-exitval=>"NOEXIT",-verbose=>1);
-}
-
 sub run {
-	print STDERR "\t@_\n";
+	#print STDERR "\t@_\n";
 	return (system(@_) == 0);
 	return 1;
 }
+sub execute {
+	my %OPTS;
+	my @ARGV = @_;
+	if(@ARGV)
+	{
+	    require Getopt::Long;
+	    Getopt::Long::GetOptionsFromArray(\@ARGV,\%OPTS,@OPTIONS);
+	}
+	else {
+		$OPTS{'help'} = 1;
+	}
+	if($OPTS{'help'} or $OPTS{'manual'}) {
+		require Pod::Usage;
+		exit Pod::Usage::pod2usage(-exitval=>"NOEXIT",-verbose=>1);
+	}
+	
+	
+	my $cmd = shift(@ARGV);
+	my $CMD = uc($cmd) if($cmd);
+	foreach(@ARGV) {
+		s/\/+$//;
+	}
+	my %COMMANDS = (
+		List=>'List videos in specified directory',
+		Move=>'Move specified directory',
+		Clean=>'Delete videos in specified directory',
+		Close=>'Clean, and move specified directory',
+		Update=>'Update profile',
+		Download=>'Run downloader in directories',
+	);
+	if(!$CMD) {
+		print STDERR "Commands:\n";
+		print STDERR "    $_\n                $COMMANDS{$_}\n" foreach(keys %COMMANDS);
+		exit 0;
+	}
+	elsif($CMD eq 'LIST') {
+		exit Babes::List::process(\%OPTS,@ARGV);
+	}
+	elsif($CMD eq 'MOVE') {
+		#require Babes::Move;
+		exit Babes::Move::process(\%OPTS,@ARGV);
+	}
+	elsif($CMD eq 'CLEAN') {
+		exit Babes::Clean::process(\%OPTS,@ARGV);
+	}
+	elsif($CMD eq 'UPDATE') {
+		exit Babes::Update::process(\%OPTS,@ARGV);
+	}
+	elsif($CMD eq 'CLOSE') {
+		exit Babes::Close::process(\%OPTS,@ARGV);
+	}
+	elsif($CMD eq 'DOWNLOAD') {
+		exit Babes::Download::process(\%OPTS,@ARGV);
+	}
+	elsif($CMD eq 'RENAME') {
+		exit Babes::Rename::process(\%OPTS,@ARGV);
+	}
+	elsif($CMD eq 'FOLLOW') {
+		exit Babes::Follow::process(\%OPTS,@ARGV);
+	}
+	else {
+		die("Command not found: $cmd\n");
+	}
 
-my $cmd = shift;
-my $CMD = uc($cmd) if($cmd);
-foreach(@ARGV) {
-	s/\/+$//;
 }
-my %COMMANDS = (
-	List=>'List videos in specified directory',
-	Move=>'Move specified directory',
-	Clean=>'Delete videos in specified directory',
-	Close=>'Clean, and move specified directory',
-	Update=>'Update profile',
-	Download=>'Run downloader in directories',
-);
-if(!$CMD) {
-	print STDERR "Commands:\n";
-	print STDERR "    $_\n                $COMMANDS{$_}\n" foreach(keys %COMMANDS);
-	exit 0;
-}
-elsif($CMD eq 'LIST') {
-	exit Babes::List::process(\%OPTS,@ARGV);
-}
-elsif($CMD eq 'MOVE') {
-	#require Babes::Move;
-	exit Babes::Move::process(\%OPTS,@ARGV);
-}
-elsif($CMD eq 'CLEAN') {
-	exit Babes::Clean::process(\%OPTS,@ARGV);
-}
-elsif($CMD eq 'UPDATE') {
-	exit Babes::Update::process(\%OPTS,@ARGV);
-}
-elsif($CMD eq 'CLOSE') {
-	exit Babes::Close::process(\%OPTS,@ARGV);
-}
-elsif($CMD eq 'DOWNLOAD') {
-	exit Babes::Download::process(\%OPTS,@ARGV);
-}
-else {
-	die("Command not found: $cmd\n");
-}
-
 
 1;
 #######################################################################
+package Babes::Follow;
+sub edit_file {
+	my $id = shift;
+	my $name = shift;
+	my $disable = shift;
+	my $edited;
+	foreach my $file (@_) {
+		my $modified;
+		my @data;
+		#print STDERR "    $file ...\n";
+		if(! -f $file) {
+			print STDERR "    Ignored, file not exist: $file\n";
+			next;
+		}
+		elsif(open FI,'<',$file) {
+			foreach my $line (<FI>) {
+				my $linechanged;
+				chomp($line);
+				my @cols = split(/\s*\t\s*/,$line);
+				foreach my $col(@cols) {
+					if($col eq $id) {
+						$modified = 1;
+						$linechanged = 1;
+					}
+				}
+				if($linechanged) {
+					my $newline = join("\t",@cols);
+					print STDERR "    $line\n  =>",join("\t",@cols),"\n";  
+					$line = $newline;
+				}
+				push @data,$line,"\n";
+			}
+			close FI;
+			if($modified) {
+				$edited = 1;
+				if(open FO,'>',$file) {
+					print FO @data;
+					close FO;
+					print STDERR "  Modified $file\n";
+				}
+				else {
+					print STDERR "  Error opening $file: $!\n";
+				}
+				
+			}
+		}
+		else {
+			print STDERR "  Error opening $file: $!\n";
+			next;
+		}
+	}
+	return $edited ? 0 : 1;
+}
+
+sub run {
+	goto &Babes::run;
+}
+
+sub collect_files {
+	my $OPTS = shift;
+	my $dirname = shift;
+	
+	my @EXPS;
+	foreach my $dir(@Babes::Rename::DBDIR) {
+		push @EXPS,catdir($dir,'*','database.sq');
+		push @EXPS,catdir($dir,'*','follows.sq');
+		push @EXPS,catdir($dir,'*','follows.txt');
+	}
+	my @files;
+	foreach my $exp(@EXPS) {
+		foreach my $file(bsd_glob($exp)) {
+			if($OPTS->{hosts}) {
+				if($file !~ m/$OPTS->{hosts}/i) {
+					#print STDERR "  Not match /$OPTS->{hosts}/, ignored: $file\n";
+					next;
+				}
+			}
+			#print STDERR "  Collected file: $file\n";
+			push @files,$file;
+		}
+	}
+	return @files;
+}
+
+sub process {
+	my $OPTS = shift;
+	my $oldname = shift;
+	my $newname = shift;
+	if($OPTS->{reposter}) {
+		if(!$newname) {
+			$newname = "#Reposter/$oldname";
+		}
+		else {
+			$newname = "#Reposter/$newname";
+		}
+	}
+	if($OPTS->{revert} or $OPTS->{reverse}) {
+		($oldname,$newname) = ($newname,$oldname);
+	}
+	print STDERR "Renaming $oldname => $newname\n";
+	my @files = collect_files($OPTS,$oldname);
+	my $exit1 = edit_file($oldname,$newname,@files);
+	
+	my $exit2 = 0;
+
+	if($OPTS->{move}) {
+		delete $OPTS->{reposter};
+		print STDERR "Moving directory $oldname => $newname\n";
+		$exit2 = run('mv','-v','--',$oldname,$newname) ? 0 : 1;
+	}
+	return 1 if($exit1 or $exit2);
+	return 0;
+}
+
+1;
+#######################################################################
+package Babes::Rename;
+use File::Spec::Functions qw/catfile catdir/;
+use File::Glob qw/bsd_glob/;
+use strict;
+
+#/myplace/workspace/perl/urlrule/sites
+our @DBDIR = qw{
+	sites
+	../sites
+	../../sites
+	urlrule/sites
+	../urlrule/sites
+	../../urlrule/sites
+};
+
+sub edit_file {
+	my $old = shift;
+	my $new = shift;
+	my $edited;
+	foreach my $file (@_) {
+		my $modified;
+		my @data;
+		#print STDERR "    $file ...\n";
+		if(! -f $file) {
+			print STDERR "    Ignored, file not exist: $file\n";
+			next;
+		}
+		elsif(open FI,'<',$file) {
+			foreach my $line (<FI>) {
+				my $linechanged;
+				chomp($line);
+				my @cols = split(/\s*\t\s*/,$line);
+				foreach my $col(@cols) {
+					if($col eq $old) {
+						$col = $new;
+						$modified = 1;
+						$linechanged = 1;
+					}
+				}
+				if($linechanged) {
+					my $newline = join("\t",@cols);
+					print STDERR "    $line\n  =>",join("\t",@cols),"\n";  
+					$line = $newline;
+				}
+				push @data,$line,"\n";
+			}
+			close FI;
+			if($modified) {
+				$edited = 1;
+				if(open FO,'>',$file) {
+					print FO @data;
+					close FO;
+					print STDERR "  Modified $file\n";
+				}
+				else {
+					print STDERR "  Error opening $file: $!\n";
+				}
+				
+			}
+		}
+		else {
+			print STDERR "  Error opening $file: $!\n";
+			next;
+		}
+	}
+	return $edited ? 0 : 1;
+}
+
+sub run {
+	goto &Babes::run;
+}
+
+sub collect_files {
+	my $OPTS = shift;
+	my $dirname = shift;
+	
+	my @EXPS;
+	foreach my $dir(@Babes::Rename::DBDIR) {
+		push @EXPS,catdir($dir,'*','database.sq');
+		push @EXPS,catdir($dir,'*','follows.sq');
+		push @EXPS,catdir($dir,'*','follows.txt');
+	}
+	my @files;
+	foreach my $exp(@EXPS) {
+		foreach my $file(bsd_glob($exp)) {
+			if($OPTS->{hosts}) {
+				if($file !~ m/$OPTS->{hosts}/i) {
+					#print STDERR "  Not match /$OPTS->{hosts}/, ignored: $file\n";
+					next;
+				}
+			}
+			#print STDERR "  Collected file: $file\n";
+			push @files,$file;
+		}
+	}
+	return @files;
+}
+
+sub process {
+	my $OPTS = shift;
+	my $oldname = shift;
+	my $newname = shift;
+	if($OPTS->{reposter}) {
+		if(!$newname) {
+			$newname = "#Reposter/$oldname";
+		}
+		else {
+			$newname = "#Reposter/$newname";
+		}
+	}
+	if($OPTS->{revert}) {
+		($oldname,$newname) = ($newname,$oldname);
+	}
+	print STDERR "Renaming $oldname => $newname\n";
+	my @files = collect_files($OPTS,$oldname);
+	my $exit1 = edit_file($oldname,$newname,@files);
+	
+	my $exit2 = 0;
+
+	if($OPTS->{move}) {
+		delete $OPTS->{reposter};
+		print STDERR "Moving directory $oldname => $newname\n";
+		$exit2 = run('mv','-v','--',$oldname,$newname) ? 0 : 1;
+	}
+	return 1 if($exit1 or $exit2);
+	return 0;
+}
+
+1;
+#######################################################################
+
 package Babes::Move;
 use File::Spec::Functions qw/catfile catdir/;
 use strict;
@@ -88,38 +396,67 @@ our $MOVE_TRASH_DIR = '#Trash';
 our $MOVE_CLIPS_DIR = '#Clips';
 our $MOVE_REPOSTER_DIR = '#Reposter';
 sub run {
-	goto &main::run;
+	goto &Babes::run;
 }
 
 sub move_to {
 	my $OPTS = shift;
 	my $dstd = shift;
 	my %clips;
-	my $exit;
-	foreach my $srcd (@_) {
-#		print STDERR $srcd,"\n";
-		foreach my $file (glob("$srcd/*/*/*.*")) {
-#			print STDERR $file,"\n";
-			if($file =~ m/([^\/]+)\/[^\/]+\/([^\/]+)\/([^\/]+\.(?:jpg|mov|flv|mp4|f4v|mpeg|png|gif))$/) {
-				$clips{$file} = "$1_$2_$3";
+	my $exit = 0;
+	if($OPTS->{clips} or $OPTS->{trash} or $OPTS->{into}) {
+		foreach my $srcd (@_) {
+#			print STDERR $srcd,"\n";
+			foreach my $file (glob("$srcd/*/*/*.*")) {
+#				print STDERR $file,"\n";
+				if($file =~ m/([^\/]+)\/[^\/]+\/([^\/]+)\/([^\/]+?)\.(mov\.3in1\.jpg|mov|flv|mp4|f4v|mpeg|png|gif|jpg)$/) {
+					$clips{$file} = "$1_$3_$2.$4";
+				}
 			}
 		}
 	}
 
-	if($OPTS->{clips}) {
-		foreach my $src (keys %clips) {
-			my $dst = catfile($dstd,$clips{$src});
-			$exit = run('mv','-v','--',$src,$dst);
-		}
-		$dstd = $MOVE_TRASH_DIR;
-	}
-	elsif($OPTS->{trash}) {
-		foreach my $src (keys %clips) {
-			$exit = run('rm','-v','--',$src);
-		}
+	unless(-d $dstd or mkdir $dstd) {
+		print STDERR "Error creating $dstd\n";
+		return 2;
 	}
 
-	foreach(@_) {$exit = run('mv','-v','-t',$dstd,'--',$_)};
+	if($OPTS->{clips} or $OPTS->{into}) {
+		print STDERR "Move files into <$dstd>:\n";
+		foreach my $src (keys %clips) {
+			my $dst = catfile($dstd,$clips{$src});
+			print STDERR "    <= " . $clips{$src} . "\n";
+			$exit = run('mv','--',$src,$dst);
+		}
+		$dstd = $MOVE_TRASH_DIR if($OPTS->{clips});
+		unless(-d $dstd or mkdir $dstd) {
+			print STDERR "Error creating directory <$dstd>\n";
+			return 2;
+		}
+	}
+	elsif($OPTS->{trash}) {
+		print STDERR "Delete files in:\n";
+		foreach my $src (keys %clips) {
+			print STDERR "    XX $src\n";
+			$exit = run('rm','--',$src);
+		}
+	}
+	if($OPTS->{into}) {
+		foreach(@_) {
+			if(open FO,'>>',catfile($_,'move_into.txt')) {
+				print FO '' . &Babes::strtime() . ": <" . $dstd . ">\n";
+				print FO "\t" . join("\n\t",keys %clips) . "\n";
+				close FO;
+			}
+		}
+	}
+	else {
+		print STDERR "Move directories into <$dstd>:\n";
+		foreach(@_) {
+			print STDERR "    <= $_\n";
+			$exit = run('mv','-v','-t',$dstd,'--',$_);
+		};
+	}
 
 	return ($exit == 0);
 }
@@ -146,7 +483,17 @@ our $MOVE_REPOSTER_DIR = '#Reposter';
 		return move_to($OPTS,$MOVE_TRASH_DIR,@_);
 	}
 
+	if($OPTS->{into}) {
+		return move_to($OPTS,$OPTS->{into},@_);
+	}
+
 	my $DST = shift;
+	unless(-d $DST or mkdir $DST) {
+		print STDERR "Error creating $DST\n";
+		return 2;
+	}
+
+
 	my $exit = 0;
 	if(!@_) {
 		die("Usage: \n" .
@@ -209,7 +556,7 @@ $SIG{INT} = sub {
 	die();
 };
 sub run {
-	goto &main::run;
+	goto &Babes::run;
 }
 sub list_dup_site {
 	my $site = shift;
@@ -465,26 +812,32 @@ package Babes::Close;
 sub process {
 	my $OPTS = shift;
 	my $DST;
-	if($OPTS->{trash} or $OPTS->{reposter} or $OPTS{clips}) {
-		delete $OPTS{junction};
+	if($OPTS->{trash} or $OPTS->{reposter} or $OPTS->{clips}) {
+		delete $OPTS->{junction};
 	}
 	else {
-		$OPTS{junction} = 1;
+		$OPTS->{junction} = 1;
 		$DST = shift;
 	}
+
+	my $INTO = $OPTS->{into};
+	delete $OPTS->{into};
 
 	if(!@_) {
 		die("Usage: $0 close [options] target_directory source_directory\n");
 	}
 	
 	foreach my $SRC (@_) {
-		Babes::Clean::process($OPTS,$SRC) if($OPTS{'clean'});
+		Babes::Clean::process($OPTS,$SRC) if($OPTS->{'clean'});
 		Babes::Update::process($OPTS,$SRC);
 		if($DST) {
 			Babes::Move::process($OPTS,$DST,$SRC);
 		}
 		else {
 			Babes::Move::process($OPTS,$SRC);
+		}
+		if($OPTS->{junction} and $INTO) {
+			Babes::Move::process({'into'=>$INTO},$SRC);
 		}
 	}
 }
@@ -502,15 +855,19 @@ sub process {
 	}
 	my @prog = ('mdown','--recursive');
 	push @prog,'--retry' if($OPTS->{retry});
+	push @prog,'--images' if($OPTS->{images});
+	push @prog,'--videos' if($OPTS->{videos});
+	push @prog,'--include',$OPTS->{include} if($OPTS->{include});
+	push @prog,'--exclude',$OPTS->{exclude} if($OPTS->{exclude});
 	my $exit = 0;
 	foreach(@_) {
-		$exit = &main::run(@prog,'-d',$_);
+		$exit = &Babes::run(@prog,'-d',$_);
 	}
 	return $exit;
 }
 1;
 #######################################################################
-
+&Babes::execute(@ARGV);
 
 __END__
 

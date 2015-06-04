@@ -10,14 +10,15 @@ my @OPTIONS = qw/
 	start
 	stop
 	sleep=i
-	no-git
-	no-pull
-	debug
+	no-git|ng
+	no-pull|np
+	debug|D
 	no-push
-	runonce
-	no-download
+	runonce|run
+	no-download|nd
 	include|I:s
 	exclude|X:s
+	no-saveurl|ns
 /;
 my %OPTS;
 my $USE_LAST_CONFIG = 1;
@@ -60,7 +61,7 @@ our $CONFIGURATION = File::Spec->catdir($CONFIGDIR,"config");
 our $MYSETTING = $OPTS{runonce} ? {} :  sc_from_file($CONFIGURATION);
 
 my @CONFIG_KEYS = qw/sleep/;
-my @CMDLINE_OPTS = qw/no-pull no-push no-download no-git include exclude/;
+my @CMDLINE_OPTS = qw/no-pull no-push no-download no-git include exclude no-saveurl/;
 my @OPTS_KEYS = ($USE_LAST_CONFIG ? (@CONFIG_KEYS,@CMDLINE_OPTS) : @CONFIG_KEYS);
 foreach (@OPTS_KEYS) {
 	$OPTS{$_} = $MYSETTING->{"options.$_"} if(!defined $OPTS{$_});

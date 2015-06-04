@@ -12,6 +12,7 @@ my @OPTIONS = qw/
 	history|hist
 	overwrite|o
 	exts:s
+	mtm
 /;
 my %OPTS;
 if(@ARGV)
@@ -32,7 +33,7 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 my $baseurl = shift;
 my $basename = shift;
 
-exit download($baseurl,$basename,$OPTS{history},$OPTS{overwrite},$OPTS{exts});
+exit download({%OPTS},$baseurl,$basename);
 
 __END__
 

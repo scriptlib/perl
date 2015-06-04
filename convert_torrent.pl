@@ -86,6 +86,7 @@ my %DICT = qw/
 	裸聊	"裸_聊"
 	视频聊天	"视讯"
 	性交	交媾
+	肉蒲团	肉浦团
 /;
 
 my %HZPY = qw/
@@ -424,7 +425,7 @@ foreach(keys %DICT) {
 }
 
 
-print STDERR to_string(\%filter,"filter"),"\n";
+print STDERR to_string(\%filter,"filter"),"\n" if($OPTS{'verbose'});
 my %ufilter = ();
 use Encode qw/find_encoding/;
 my $utf8 = find_encoding("utf-8");

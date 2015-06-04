@@ -147,7 +147,8 @@ sub read_rules {
 	return \@rules;
 }
 
-my %Actions = (
+my %Actions;
+%Actions = (
 	'keyword'=>{
 		'name'=>'keyword',
 		'do'=>sub {
@@ -174,6 +175,25 @@ my %Actions = (
 		'check'=>sub {
 			return 1;
 		},
+		'NOFILES'=>1,
+	},
+	'rules'=>{
+		'name'=>'rules',
+		'init'=>0,
+		'do'=>sub {
+			if(!$Actions{'rules'}->{init}) {
+				$Actions{'rules'}->{init} = 1;
+				print "\nResult:\n\n";
+			}
+			my($files,$rule,$idx) = @_;
+			printf "%4d.%s\n",$idx,$rule->{name};
+			if($rule->{keyword}) {
+				print "        $_\n" foreach(@{$rule->{keyword}});
+			}
+			print "\n";
+			return 1;
+		},
+		'check'=>sub{1;},
 		'NOFILES'=>1,
 	},
     'print'=>{
@@ -326,9 +346,7 @@ sub system_run {
     return system(@_)==0;
 }
 sub do_action {
-    my $files = shift;
-    my $rule = shift;
-    return $ACTION->{do}->($files,$rule);
+    return $ACTION->{do}->(@_);
 }
 
 sub test {
@@ -374,8 +392,10 @@ sub process_nofiles {
 	else {
 		@match = (@$rules);
 	}
+	my $idx = 0;
 	foreach my $rule(@match) {
-		do_action($files,$rule);
+		$idx++;
+		do_action($files,$rule,$idx);
 	}
 }
 
