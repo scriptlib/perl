@@ -1,1 +1,153 @@
-rtorrent-action.pl
+#!/usr/bin/perl -w
+###APPNAME:     rtorrent-action
+###APPAUTHOR:   duel
+###APPDATE:	2008-10-19 02:43:05
+###APPVER:	0.1
+###APPDESC:     rtorrent-action	
+###APPUSAGE:	
+###APPEXAMPLE:	rtorrent-action
+###APPOPTION:	
+use strict;
+
+use MyPlace::Script::Usage qw/help_required help_even_empty/;
+exit 0 if(help_required($0,@ARGV));
+use IO::File;
+local *CATCHERR = IO::File->new_tmpfile;
+open(SAVEDERR,">&STDERR");
+open(STDERR,"<&CATCHERR");
+
+my ($action,$name,$torrent,$file,$tied,$hash) = @ARGV;
+$torrent = $tied unless(-f $torrent);
+#=shift;
+#my $file=shift;
+
+my $BT_DIR = "$ENV{HOME}/bt";
+
+my $INCOME_DIR = "$BT_DIR/completed";
+my $TOR_DIR = "$BT_DIR/torrents";
+my $TOR_DELETED = "$TOR_DIR/deleted";
+my $TOR_COMPLETED = "$TOR_DIR/completed";
+my $TOR_BACKUP = "$TOR_DIR/backups";
+
+my @msger = ("zenity","--title", $action ? "rTorrent-action($action)" : "rTorrent-action");
+sub message {
+    return not system(@msger,"--info","--text",join(" ",@_));
+}
+sub ask {
+    return not system(@msger,"--question","--text",join(" ",@_));
+}
+sub warn {
+    return not system(@msger,"--warning","--text",join(" ",@_));
+}
+sub abort {
+    system(@msger,"--error","--text",join(" ",@_));
+	goto ExitPoint;
+    exit 0;
+}
+
+sub system_or_warn {
+	my $msg = "Error runing commands:\n" . join(" ",@_);
+	system(@_) and &warn($msg);
+}
+
+sub select {
+    open FI,"-|",@msger,"--width=480","--height=240","--list","--column=Action",@_;
+    my $result=join("",<FI>);
+    chomp($result);
+    return $result;
+}
+my %SELECT = (
+    move=>"1.Move to incoming/completed.",
+    delete=>"2.Delete it."
+);
+
+abort("No action specified.\n") unless($action);
+foreach($BT_DIR,$INCOME_DIR,$TOR_DIR,$TOR_DELETED,$TOR_COMPLETED) {
+    next if(-d $_);
+    system("mkdir","-vp",'--',$_) and abort("mkdir -vp $_ :\n$!");
+}
+
+my $date_prefix=`date "+%Y%m%d%H%M%S"`;
+chop($date_prefix);
+
+my $name_suffix="";
+if($torrent and $torrent =~ m/\/([^\/]+)\.[^\.]+$/) {
+    $name_suffix = "_$1";
+}
+#message("action=$action\nname=$name\ntorrent=$torrent\nfile=$file\n");
+
+my $text_head = "";
+$text_head .= "Name:\n\t$name\n" if($name);
+$text_head .= "Torrent:\n\t$torrent\n" if($torrent);
+$text_head .= "File:\n\t$file\n" if($file);
+
+
+if($action eq "erased") {
+AskErase:
+    my $answer = &select("--text","$text_head" . "Select action:",values %SELECT);
+    $answer = "" unless($answer);
+    if($answer eq $SELECT{move}) {
+        if(&ask("$text_head" . "Move to :\n\t$INCOME_DIR'\n?")) {
+            system_or_warn("cp","-fv","--",$torrent,"$TOR_COMPLETED/${date_prefix}_${name}.torrent") if($torrent);
+            &abort("$text_head" . "No file specified!") unless($file); 
+			system_or_warn('touch','--',$file);
+            system_or_warn("mv","-fv","--",$file,$INCOME_DIR);
+        }
+        else {
+            goto AskErase;
+        }
+    }
+    elsif($answer eq $SELECT{delete}) { 
+        if(&ask("${text_head}Delete ?\n")) {
+            system_or_warn("cp","-fv","--",$torrent,"$TOR_DELETED/${date_prefix}_${name}.torrent" )if($torrent);
+            &abort("file $file not exists!\n") unless(-e $file); 
+            system_or_warn("rm","-fr","--",$file);
+        }
+        else {
+            goto AskErase;
+        }
+    }
+}
+elsif($action eq 'new') {
+#	print STDERR "Backup $torrent ...";
+#	&message("Backing up $torrent ...");
+    system_or_warn("cp","-fv","--",$torrent,"$TOR_BACKUP/${date_prefix}_${name}.torrent" ) if($torrent);
+#	print STDERR "\n";
+}
+elsif($action eq "mc") {
+    system_or_warn("xterm -e mc '$file' '$file'&");
+}
+elsif($action eq "insert") {
+}
+elsif($action eq "open") {
+}
+elsif($action eq "close") {
+}
+elsif($action eq "finished") {
+    system_or_warn("cp","-fv","--",$torrent,"$TOR_COMPLETED/${date_prefix}_${name}.torrent") if($torrent);
+    &abort("$text_head" . "No file specified!") unless($file); 
+	system_or_warn('touch','--',$file);
+    system_or_warn("mv","-fv","--",$file,$INCOME_DIR);
+}
+elsif($action eq "start") {
+}
+elsif($action eq "stop") {
+}
+else {
+   &warn("Action \"$action\" not implemented\n");
+}
+
+ExitPoint:
+
+seek \*CATCHERR,0,0;
+close STDERR;
+open STDERR,">&SAVEDERR";
+
+
+my @msg = <CATCHERR>;
+if(@msg) {
+	&warn(join("\n",@msg));
+}
+close SAVEDERR;
+readline;
+exit 0;
