@@ -78,7 +78,7 @@ if(@ARGV) {
 	my $tmpfile = shift;
 	if(-f $tmpfile) {
 		%ps = parse_file($tmpfile);
-		unlink $tmpfile;
+		unlink $tmpfile unless($OPTS{debug});
 	}
 	else {
 		unshift @ARGV,$tmpfile;
@@ -116,6 +116,7 @@ if($OPTS{debug}) {
 use Data::Dumper;
 print  Data::Dumper->Dump([\%ps],['*ps']),"\n";
 close FO;
+exit 0;
 }
 
 die("Invalid file format\n") unless($ps{item});

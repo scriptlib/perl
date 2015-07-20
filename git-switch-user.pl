@@ -7,6 +7,8 @@ our $VERSION = 'v0.1';
 my @OPTIONS = qw/
 	help|h|? 
 	manual|man
+	global
+	local
 /;
 my %OPTS;
 if(@ARGV)
@@ -26,8 +28,9 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 my $user = shift;
 my $sshdir = "$ENV{HOME}/.ssh/";
 my $users = {
-	"eotect"=>['Eotect Nahn','eotect#gxxxx.com','xiaoranzzz'],
+	"eotect"=>['Eotect Nahn','eotect#gxxxx.com','eotect'],
 	"afun"=>['Afun Nahn','afun#myplace.hell','afun'],
+	'nahncm'=>['Coding Machine','nahncm#gxxxx.com','nahncm'],
 };
 if(not $users->{$user}) {
 	print STDERR "User not exists: $user\n";
@@ -38,10 +41,13 @@ my $email = $users->{$user}->[1];
 $email =~ s/#/@/g;
 $email =~ s/gxxxx\./gmail./g;
 my $ssh = $users->{$user}->[2];
+my @gitopts;
+push @gitopts, ($OPTS{global} ? '--global' : '--local');
+
 print STDERR "Config user name to [$name]\n";
-system("git","config","--global","user.name",$name);
+system("git","config",@gitopts,"user.name",$name);
 print STDERR "Config uesr email to [$email]\n";
-system("git","config","--global","user.email",$email);
+system("git","config",@gitopts,"user.email",$email);
 for my $file (qw/id_rsa id_rsa.pub/) {
 	print STDERR "Coping [$sshdir/$ssh/$file] ...\n";
 	system("cp","-a","$sshdir/$ssh/$file","$sshdir/$file");

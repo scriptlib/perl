@@ -1,1 +1,1 @@
-../urlrule/bin/urlrule_worker
+modules/MyPlace/Tasks/Worker/URLRule.pm

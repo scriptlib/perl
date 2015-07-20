@@ -38,7 +38,7 @@ sub search {
 	my $page = shift;
 	my @result;
 	print STDERR "Search $key page $page\n";
-		my @p = (@prog,$key,$page);
+		my @p = (@prog,'--',$key,$page);
 		print STDERR join(" ",@p),"\n";
 		open FI,"-|",@p or die("Error running<@p>: $!\n");
 		foreach(<FI>) {

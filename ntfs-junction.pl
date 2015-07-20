@@ -40,7 +40,7 @@ sub get_basename {
 
 sub ms_path {
 	my $src = shift;
-	my $dst = `cygpath -w "$src"`;
+	my $dst = `cygpath -w  -- "$src"`;
 	chomp($dst);
 	return $dst;
 }

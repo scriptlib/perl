@@ -13,6 +13,7 @@ my @OPTIONS = qw/
 	overwrite|o
 	exts:s
 	mtm
+	no-download|nd
 /;
 my %OPTS;
 if(@ARGV)
