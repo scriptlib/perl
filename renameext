@@ -53,6 +53,26 @@ sub strnum {
 my $INTPOOL=1;
 
 my %RULES = (
+	'torrentname' => sub {
+		my $old = shift;
+		my $new = $old;
+		my $tn = `torrent_info --pipe --key 'info->name.utf-8' "$old"`;
+		chomp($tn);
+		if($tn) {
+			$tn = $utf8->decode($tn);
+		}
+		else {
+			return $old;
+		}
+		if($new =~ m/\//) {
+			$new =~ s/\/[^\/]+$/\//;
+		}
+		else {
+			$new = '';
+		}
+		$new = $new . $tn . ".torrent";
+		return $new;
+	},
 	'autonumber'=>sub {
 		my $old = shift;
 		my $new = $old;

@@ -88,7 +88,7 @@ AskErase:
     $answer = "" unless($answer);
     if($answer eq $SELECT{move}) {
         if(&ask("$text_head" . "Move to :\n\t$INCOME_DIR'\n?")) {
-            system_or_warn("cp","-fv","--",$torrent,"$TOR_COMPLETED/${date_prefix}_${name}.torrent") if($torrent);
+            system_or_warn("cp","-fv","--",$torrent,"$TOR_COMPLETED/${name}.torrent") if($torrent);
             &abort("$text_head" . "No file specified!") unless($file); 
 			system_or_warn('touch','--',$file);
             system_or_warn("mv","-fv","--",$file,$INCOME_DIR);
@@ -99,7 +99,7 @@ AskErase:
     }
     elsif($answer eq $SELECT{delete}) { 
         if(&ask("${text_head}Delete ?\n")) {
-            system_or_warn("cp","-fv","--",$torrent,"$TOR_DELETED/${date_prefix}_${name}.torrent" )if($torrent);
+            system_or_warn("cp","-fv","--",$torrent,"$TOR_DELETED/${name}.torrent" )if($torrent);
             &abort("file $file not exists!\n") unless(-e $file); 
             system_or_warn("rm","-fr","--",$file);
         }
@@ -111,7 +111,7 @@ AskErase:
 elsif($action eq 'new') {
 #	print STDERR "Backup $torrent ...";
 #	&message("Backing up $torrent ...");
-    system_or_warn("cp","-fv","--",$torrent,"$TOR_BACKUP/${date_prefix}_${name}.torrent" ) if($torrent);
+    system_or_warn("cp","-fv","--",$torrent,"$TOR_BACKUP/${name}.torrent" ) if($torrent);
 #	print STDERR "\n";
 }
 elsif($action eq "mc") {
@@ -124,7 +124,7 @@ elsif($action eq "open") {
 elsif($action eq "close") {
 }
 elsif($action eq "finished") {
-    system_or_warn("cp","-fv","--",$torrent,"$TOR_COMPLETED/${date_prefix}_${name}.torrent") if($torrent);
+    system_or_warn("cp","-fv","--",$torrent,"$TOR_COMPLETED/${name}.torrent") if($torrent);
     &abort("$text_head" . "No file specified!") unless($file); 
 	system_or_warn('touch','--',$file);
     system_or_warn("mv","-fv","--",$file,$INCOME_DIR);
