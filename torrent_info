@@ -1,0 +1,177 @@
+#!/usr/bin/perl -w
+# $Id$
+package MyPlace::Script::torrent_info;
+use strict;
+
+our $VERSION = 'v0.1';
+my @OPTIONS = qw/
+	help|h|? 
+	manual|man
+	key=s
+	pipe
+/;
+my %OPTS;
+if(@ARGV)
+{
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+}
+else {
+	$OPTS{'help'} = 1;
+}
+if($OPTS{'help'} or $OPTS{'manual'}) {
+	require Pod::Usage;
+	my $v = $OPTS{'help'} ? 1 : 2;
+	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
+    exit $v;
+}
+
+use Bencode qw/bencode bdecode/;
+use Data::Dumper;
+use MyPlace::Debug qw/to_string/;
+use utf8;
+
+
+#use Encode qw/find_encoding/;
+#my $utf8 = find_encoding("utf-8");
+#binmode STDOUT, 'utf8';
+
+sub show_info {
+	my $tor = shift;
+	my $position = shift(@_) || "ROOT";
+	my $type = ref $tor;
+	
+	if($position =~ m/\{(?:pieces|filehash|ed2k)\}/) {
+		print "$position => [DATA]\n";
+		return $tor;
+	}
+	#if($all or $key =~ m/publisher|path|publisher|created by|name|comment|files/i) {
+	
+	if($type eq 'ARRAY') {
+		my @values;
+		my $idx = 0;
+		foreach(@{$tor}) {
+			my $d;
+			$_  = show_info($_,$position . "\[$idx\]");
+			$idx++;
+			push @values,$_;
+		}
+		return \@values;
+	}
+	elsif($type eq 'HASH') {
+		foreach my $key (keys %$tor) {
+			$tor->{$key} = show_info($tor->{$key},$position . "->\{$key\}");
+		}
+	}
+	else {
+		return "" if($tor =~ m/_____padding_file_/);
+#		$tor = $utf8->decode($tor);
+		if($OPTS{pipe}) {
+			print $tor,"\n";
+		}
+		else {
+			print "$position => $tor\n";
+		}
+	}
+	return $tor;
+}
+sub process {
+	my $filename = shift;
+	my $chunks = '';
+	open FI,'<:raw',$filename or die("Error opening $filename: $!\n");
+	my $ok = undef;
+	my $chunk = undef;
+	my $bufsize = 1024;
+	while($ok = read FI,$chunk,$bufsize) {
+		$chunks .= $chunk if($chunk);
+	}
+	close FI;
+	if(!(defined $ok)) {
+		die("Error reading $filename: $!\n");
+	}
+	my $torrent = bdecode($chunks);
+	
+	if($torrent) {
+		if($OPTS{key}) {
+			my @keych = split("->",$OPTS{key});
+			my $target = $torrent;
+			foreach(@keych) {
+				last unless($target);
+				$target = $target->{$_};
+			}
+			if(!$target) {
+				print STDERR "Error key not exists in torrent\n";
+				return undef;
+			}
+			else {
+				show_info($target,$OPTS{key});
+			}
+		}
+		else {
+			show_info($torrent,"torrent");
+		}
+		return 1;
+	}
+	else {
+		print STDERR "Error opening $filename as torrent\n";
+		return undef;
+	}
+}
+
+foreach(@ARGV) {
+	process($_);
+}
+
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+torrent_info - PERL script
+
+=head1  SYNOPSIS
+
+torrent_info [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2014-06-18 23:53  xiaoranzzz  <xiaoranzzz@MyPlace>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@MyPlace>
+
+=cut
+
+#       vim:filetype=perl
