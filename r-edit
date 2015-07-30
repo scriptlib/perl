@@ -14,6 +14,7 @@ if($OS =~ m/Windows/i) {
         foreach(@ARGV) {
             #die("cygpath $_");
             $_ = `cygpath -w "$_"`;
+			chomp($_);
 #            if(m/^\//);
         }
     }

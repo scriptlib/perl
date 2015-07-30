@@ -64,12 +64,13 @@ my %RULES = (
 		else {
 			return $old;
 		}
-		if($new =~ m/\//) {
-			$new =~ s/\/[^\/]+$/\//;
+		if($new) {
+			$new =~ s/\.[^\.]+$//;
 		}
 		else {
 			$new = '';
 		}
+		$new = $new . "_" if($new);
 		$new = $new . $tn . ".torrent";
 		return $new;
 	},

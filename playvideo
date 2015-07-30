@@ -14,7 +14,7 @@ BEGIN
 }
 
 my %OPTS;
-my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man input|i=s list rebuild/;
 
 if(@ARGV)
 {
@@ -42,32 +42,57 @@ my $option = "";
 $option = join(" ",@options) if(@options);
 
 push @dirs,'.' unless(@dirs);
-my @videos;
-open FI,'-|','find','-L',@dirs,'-type','f';#,'-printf','%P\n';
-while(<FI>) {
-    chomp;
-    push @videos,$_ if(/\.(?:rmvb|rm|avi|mkv|asf|3gp|flv|wmv|mp4|mpg|mpeg)$/i);
-}
-close FI;
-my $index = 0;
-@videos = shuffle(@videos);
-my $count = @videos;
 
-my $player = `which smplayer`;
-if($player) {
-   chomp($player); 
-   require File::Temp;
-   my $fh = File::Temp->new(DIR=>'.',UNLINK=>1,SUFFIX=>'.m3u');
-   my $filename=$fh->filename();
-   print $fh join("\n",@videos),"\n";
-   close $fh;
-#   print STDERR "$filename\n";
-#   system('cat',$filename);
-   system("smplayer $option $filename&");
-   sleep 10;
-#   print STDERR "hello,\n";
+my $playlist;
+if($OPTS{input} and -f $OPTS{input} and (!$OPTS{rebuild})) {
+	$playlist = $OPTS{input};
 }
 else {
+	my @videos;
+	open FI,'-|','find','-L',@dirs,'-type','f';#,'-printf','%P\n';
+	while(<FI>) {
+		chomp;
+	    push @videos,$_ if(/\.(?:rmvb|rm|avi|mkv|asf|3gp|flv|wmv|mp4|mpg|mpeg|ts)$/i);
+	}
+	close FI;
+	my $index = 0;
+	@videos = shuffle(@videos);
+	my $count = @videos;
+	my $fh;
+	if($OPTS{input}) {
+		$playlist = $OPTS{input};
+		open $fh,">",$playlist;
+	}
+	else {
+		require File::Temp;
+		$fh = File::Temp->new(DIR=>'.',UNLINK=>1,SUFFIX=>'.m3u');
+	    $playlist=$fh->filename();
+	}
+	print $fh join("\n",@videos),"\n";
+	close $fh;
+}
+if($OPTS{list}) {
+	open FI,"<",$playlist or die("$!\n");
+	print $_ foreach(<FI>);
+	close FI;
+	exit 0;
+}
+
+my $player = `which gnome-mplayer`;
+my $r;
+if($player) {
+   chomp($player); 
+   $r = system("$player $option $playlist&");
+}
+else {
+    my $r = system("mplayer",'-really-quiet',@options,$_);
+}
+if($r and ($r == 256 or $? == 256)) {
+        die ":Mplayer killed, Aborting\n";
+}
+__END__
+
+{
 foreach(@videos) {
     $index++;
     print STDERR ":[$index|$count] playing $_\n";

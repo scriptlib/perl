@@ -25,7 +25,7 @@ my $clip_name=shift;
 my $profile=shift;
 
 die("File not exists:$input\n") unless(-f $input);
-$profile="avi" unless($profile);
+$profile="" unless($profile);
 
 
 require MyPlace::Filename;
@@ -44,11 +44,21 @@ unless($clip_name) {
 }
 my $output="$basename-$clip_name.$ext";
 
-my $encoder="ffmpeg";
-unless(`which "$encoder"`) {
-    $encoder = 'mencoder';
+my $encoder;
+my $enctype;
+foreach(qw/ffmpeg mencoder/) {
+	foreach my $ext(("",'.exe','.bat')) {
+		my $loc = `which "$_$ext" &2>/dev/null`;
+		chomp($loc) if($loc);
+		if($loc) {
+			$encoder = "$_$ext";
+			$enctype = $_;
+			last;
+		}
+	}
+	last if($encoder);
 }
-die("Both encoder \"ffmpeg\" and \"mencoder\" not installed!\n") unless(`which "$encoder"`);
+die("Both encoder \"ffmpeg\" and \"mencoder\" not installed!\n") unless($encoder);
 
 #my $comment=`date +%x`;
 #chomp($comment);
@@ -63,10 +73,10 @@ sub fix_time_arg {
 my @enarg;
 push @enarg,'-ss',fix_time_arg($start) if($start);
 $encoder = 'mencoder' if($profile =~ m/^avi$/i);
-if($encoder eq 'ffmpeg') {
+if($enctype eq 'ffmpeg') {
     push @enarg,'-t',fix_time_arg($length) if($length);
     push @enarg,'-i',$input;
-	push @enarg,'-q','1';
+#	push @enarg,'-q','1';
     if($profile =~ m/^(?:3gp|mp4)$/i) {
         push @enarg,'-s','320x240','-vf','scale=-1:-1';
     }
@@ -78,6 +88,9 @@ if($encoder eq 'ffmpeg') {
 	}
 	elsif($profile =~ m/^(\d+)[xX](\d+)$/) {
 		push @enarg,'-s',"$1x$2",'-vf','scale=-1:-1';
+	}
+	else {
+		push @enarg,'-acodec','copy','-vcodec','copy';
 	}
     push @enarg,@ARGV if(@ARGV);
     push @enarg,$output;

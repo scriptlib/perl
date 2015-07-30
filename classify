@@ -397,6 +397,7 @@ sub process_nofiles {
 		$idx++;
 		do_action($files,$rule,$idx);
 	}
+	exit 0;
 }
 
 sub process_file {

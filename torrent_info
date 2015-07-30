@@ -9,6 +9,8 @@ my @OPTIONS = qw/
 	manual|man
 	key=s
 	pipe
+	name
+	info
 /;
 my %OPTS;
 if(@ARGV)
@@ -92,8 +94,21 @@ sub process {
 	my $torrent = bdecode($chunks);
 	
 	if($torrent) {
+		my $keystr;
 		if($OPTS{key}) {
-			my @keych = split("->",$OPTS{key});
+			$keystr = $OPTS{key};
+		}
+		elsif($OPTS{name}) {
+			$keystr = "info->name.utf-8";
+		}
+		elsif($OPTS{info}) {
+			$keystr = "info";
+		}
+		elsif($OPTS{all}) {
+			$keystr = undef;
+		}
+		if($keystr) {
+			my @keych = split("->",$keystr);
 			my $target = $torrent;
 			foreach(@keych) {
 				last unless($target);
@@ -104,7 +119,7 @@ sub process {
 				return undef;
 			}
 			else {
-				show_info($target,$OPTS{key});
+				show_info($target,$keystr);
 			}
 		}
 		else {

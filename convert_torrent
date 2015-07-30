@@ -8,6 +8,9 @@ my @OPTIONS = qw/
 	help|h|? 
 	manual|man
 	overwrite
+	name=s
+	find=s
+	replace=s
 /;
 my %OPTS;
 if(@ARGV)
@@ -520,11 +523,16 @@ my %ufilter = ();
 use Encode qw/find_encoding/;
 my $utf8 = find_encoding("utf-8");
 my @ukeys;
+if($OPTS{find}) {
+	push @ukeys,$OPTS{find};
+	$ufilter{$OPTS{find}} = $OPTS{replace} || "";
+}
 foreach(@keys) {
 	my $ukey = $utf8->encode($_);
 	push @ukeys,$ukey;
 	$ufilter{$ukey} = $utf8->encode($filter{$_});
 }
+
 
 sub clean_text {
 	my $text = shift;
@@ -620,6 +628,13 @@ sub process {
 
 	
 	if($torrent) {
+		if($OPTS{name}) {
+			foreach(qw/name name.utf-8/) {
+				$torrent->{info}->{$_} = $OPTS{name};
+			}
+			$dirty = 1;
+			print STDERR "Set torrent->{info}->{name} = $torrent->{info}->{name}\n";
+		}
 #		if($torrent->{info}->{name} && !($torrent->{info}->{name} eq $basename)) {
 #			$torrent->{info}->{name} = $basename;
 #			$dirty = 1;
@@ -627,9 +642,6 @@ sub process {
 #		if($torrent->{info}->{"name.utf-8"} && !($torrent->{info}->{"name.utf-8"} eq $basename)) {
 #			$torrent->{info}->{"name.utf-8"} = $basename;
 #			$dirty = 1;
-#		}
-#		if($dirty) {
-#			print STDERR "Set torrent->{info}->{name} = $basename\n";
 #		}
 		my $d = undef;
 		($torrent,$d) = clean($torrent,"torrent");

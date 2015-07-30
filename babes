@@ -22,8 +22,8 @@ my @OPTIONS = qw/
 	move
 	images
 	videos
-	include
-	exclude
+	include=s
+	exclude=s
 	into=s
 	follow
 	unfollow
@@ -50,6 +50,8 @@ my @OPTIONS = qw/
 	into-prefix=s
 	close-prefix=s
 	move-prefix=s
+	worker
+	sites=s
 /;
 our %CONF;
 our @DATABASE_DIR = qw{
@@ -1229,17 +1231,26 @@ sub process {
 	if(!@_) {
 		die("Usage:\n  $0 download [options] directories...\n");
 	}
-	my @prog = ('mdown','--recursive');
+	my @prog;
 	push @prog,'--no-download' if($OPTS->{'no-download'});
 	push @prog,'--retry' if($OPTS->{retry});
 	push @prog,'--images' if($OPTS->{images});
-	push @prog,'--touch' if($OPTS->{touch});
 	push @prog,'--videos' if($OPTS->{videos});
 	push @prog,'--include',$OPTS->{include} if($OPTS->{include});
 	push @prog,'--exclude',$OPTS->{exclude} if($OPTS->{exclude});
+	if($OPTS->{worker}) {
+		my $sites = $OPTS->{sites} || '*';
+		unshift @prog,('urlrule_worker','sites',$sites,'DOWNLOADER');	
+		push @prog,'--';
+	}
+	else {
+		unshift  @prog,('mdown','--recursive');
+		push @prog,'--touch' if($OPTS->{touch});
+		push @prog,'-d';
+	}
 	my $exit = 0;
 	foreach(@_) {
-		$exit = &Babes::run(@prog,'-d',$_);
+		$exit = &Babes::run(@prog,$_);
 	}
 	return $exit;
 }
