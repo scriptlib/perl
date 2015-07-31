@@ -27,10 +27,10 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 
 
 my %ENGINES = (
-#	'torrentproject'=>[
-#		'http://torrentproject.se/?safe=off&t=###QUERY###',
-#		2,
-#	],
+	'torrentproject'=>[
+		'https://torrentproject.se/?safe=off&t=###QUERY###',
+		2,
+	],
 	'bitsnoop'=>[
 		'http://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
 		2,
@@ -45,14 +45,18 @@ my %ENGINES = (
 	],
 
 	#Mirror btkitty.org
+	'btkitty'=>[
+		'http://btkitty.la/?###QUERY###',
+		3,
+	],
 	'btdigg.me'=>[
 		'http://btdigg.me/?###QUERY###',
 		3,
 	],
-	'storetorrent.org'=>[
-		'http://www.storetorrent.org/s/###QUERY###',
-		2,
-	],
+#	'storetorrent.org'=>[
+#		'http://www.storetorrent.org/s/###QUERY###',
+#		2,
+#	],
 	'mp4ba.com'=>[
 		'http://www.mp4ba.com/search.php?keyword=###QUERY###',
 		2,
@@ -109,11 +113,13 @@ if($OPTS{dest}) {
 	app_warning "Enter $OPTS{dest} ...\n";
 }
 foreach my $QUERY(@ARGV) {
+	my $k = $QUERY;
+	$k =~ s/\s+/+/g;
 	foreach(keys %engine) {
 		app_message2 "Search \<$QUERY\> using engine \[$_\]\n";
 		my $url = $engine{$_}[0];
 		my $level = $engine{$_}[1];
-		$url =~ s/###QUERY###/$QUERY/g;
+		$url =~ s/###QUERY###/$k/g;
 		my @prog = ('urlrule_action','--history','--prompt',"$_:$QUERY",$url,$level,'!DATABASE');
 		system(@prog);
 	}
