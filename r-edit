@@ -1,30 +1,53 @@
 #!/usr/bin/perl
 use Env qw/OS XAUTHORITY DISPLAY/;
 #my @w=qw/notepad++.bat/;
-my @w=qw/gvim.exe/;
-my @g=qw/gvim -f/;
-my @c=qw/vim/;
-@g = @c;
-my @editor;
 
-if($OS =~ m/Windows/i) {
-	@editor= @w;
-    shift @ARGV if(@ARGV and $ARGV[0] eq '-b');
-    if(-f "/bin/cygpath.exe") {
-        foreach(@ARGV) {
-            #die("cygpath $_");
-            $_ = `cygpath -w "$_"`;
+my %EDITORS = (
+	windows=>[['gvim.exe'],['vim.exe']],
+	cygwin=>[['vim'],['vim']],
+	linux=>[['gvim','-f'],['vim']],
+);
+
+my $os = 'linux';
+my $OSTYPE = $^O;
+if(!$OSTYPE) {
+	$os = 'windows';
+}
+elsif($OSTYPE eq 'cygwin') {
+	$os = 'cygwin';
+}
+elsif($OS =~ m/Windows/i) {
+	$os = 'windows';
+}
+else {
+	$os = 'linux';
+}
+
+my $x = 0;
+if($XAUTHORITY or $DISPLAY) {
+	$x = 1;
+}
+my $bg = 0;
+
+my @args;
+foreach(@ARGV) {
+	if($_ eq '-b') {
+		$bg = 1;
+	}
+	else {
+		push @args,$_;
+	}
+}
+
+my @cmds = @{$EDITORS{$os}->[$x]};
+if($cmds[0] and $cmds[0] =~ m/\.(?:exe|bat)$/) {
+	if(-f "/bin/cygpath.exe") {
+		foreach(@args) {
+			$_ = `/bin/cygpath.exe -w "$_"`;
 			chomp($_);
-#            if(m/^\//);
-        }
-    }
+		}
+	}
 }
-elsif($XAUTHORITY or $DISPLAY) {
-	@editor= @g;
-}
-else{
-	@editor = @c;
-}
-print STDERR join(" ",@editor,@ARGV),"\n";
-exec @editor,@ARGV;
+print STDERR join(" ",@cmds,@args),"\n";
+exec @cmds,@args;
 

@@ -119,6 +119,8 @@ my %DICT = qw/
 	口Jiao	吹喇叭
 	口交	吹喇叭
 	乳交	插奶
+	招妓	叫鸡
+	你懂的	懂的
 /;
 
 my %HZPY = qw/
@@ -389,6 +391,10 @@ discuss.com.hk
 	天上人间
 	BT工厂
 	国产自拍
+	上門服務
+	神器
+	台灣
+	香蕉魔盒
 /;
 =cut
 =qustionable 
@@ -399,6 +405,9 @@ discuss.com.hk
 my @indoubt = qw/
 /;
 my @dirty = qw/
+	18p2p
+	你懂的 
+	招妓
 	乳交
 	大尺度
 	涩工厂

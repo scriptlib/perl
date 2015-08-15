@@ -46,12 +46,12 @@ my @OPTIONS = qw/
 	vlook
 	no-download
 	DI
-	prefix|pre|P
 	into-prefix=s
 	close-prefix=s
 	move-prefix=s
 	worker
 	sites=s
+	norc|nr
 /;
 our %CONF;
 our @DATABASE_DIR = qw{
@@ -112,10 +112,7 @@ sub junction {
 	my $DST = shift;
 	my $exit = 0;
 	if($ENV{OS} and $ENV{OS} =~ m/Windows/i) {
-		my $target=`cygpath -w "$DST/$SRC"`;
-		chomp($target);
-		my $junction=$SRC;
-		if(run("junction.exe",$junction,$target)) {
+		if(run("ntfs-link","$DST/$SRC",$SRC)) {
 			print STDERR "\t [OK]\n";
 			$exit = 0;
 		}
@@ -197,11 +194,17 @@ sub execute {
 		$OPTS{images} = 1;
 		$CMD = 'DOWNLOAD';
 	}
+	elsif($CMD eq 'DW') {
+		$OPTS{worker} = 1;
+		$OPTS{sites} ||= 'weipai.cn'; 
+		$CMD = 'DOWNLOAD';
+	}
 	elsif($CMD eq 'D') {
 		$CMD = 'DOWNLOAD';
 	}
 	
-	if(-f ".babes.rc" and open FI,'<',".babes.rc") {
+	if((!$OPTS{norc}) and -f ".babes.rc" and open FI,'<',".babes.rc") {
+		print STDERR "Reading .babes.rc ...\n";
 		foreach(<FI>) {
 			chomp;
 			next unless($_);
@@ -215,7 +218,8 @@ sub execute {
 			}
 		}
 		close FI;
-		print STDERR "$_ : $CONF{$_}\n" foreach(keys %CONF);
+		printf STDERR "  %-20s %s\n","<$_> :",$CONF{$_} foreach(keys %CONF);
+		print STDERR "OK.\n";
 	}
 	my $pref_dbdir = Babes::get_pref('database-dir');
 	if($pref_dbdir) {
@@ -667,7 +671,7 @@ sub move_to {
 		print STDERR "Move directories into <$dstd>:\n";
 		foreach(@_) {
 			print STDERR "    <= $_\n";
-			$exit = run('mv','-v','-t',$dstd,'--',$_);
+			$exit = run('mv','-t',$dstd,'--',$_);
 		};
 	}
 
@@ -681,38 +685,41 @@ our $MOVE_TRASH_DIR = Babes::get_pref('trash-dir','#Trash');
 our $MOVE_CLIPS_DIR = Babes::get_pref('clips-dir','#Clips');
 our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 
-	if(!@_) {
+	my $DST = shift;
+	my $exit;
+
+	if(!$DST) {
 		die("Usage: \n" .
 			"  $0 move [options] target_directory source_directory ...\n" .
 			"  $0 move [--clips|--reposter|--trash] directories ...\n"
 		);
 	}
-	if($OPTS->{clips}) {
-		return move_to($OPTS,$MOVE_CLIPS_DIR,@_);
-	}
-	elsif($OPTS->{reposter}) {
-		return move_to($OPTS,$MOVE_REPOSTER_DIR,@_);
-	}
-	elsif($OPTS->{trash}) {
-		return move_to($OPTS,$MOVE_TRASH_DIR,@_);
-	}
+
 
 	if($OPTS->{into}) {
 #		die($OPTS->{into});
-		if($OPTS->{prefix}) {		
 			my $dpre = $OPTS->{'into-prefix'} || Babes::get_pref("into-prefix");
 			$OPTS->{into} = catdir($dpre,$OPTS->{into}) if($dpre);
-		}
-#		print STDERR "INTO: $OPTS->{into}\n";return;
-		return move_to($OPTS,$OPTS->{into},@_);
+		my $exit = move_to($OPTS,$OPTS->{into},$DST);
+		delete $OPTS->{into};
 	}
 #	die();
+	if($OPTS->{clips}) {
+		return move_to($OPTS,$MOVE_CLIPS_DIR,$DST,@_);
+	}
+	elsif($OPTS->{reposter}) {
+		return move_to($OPTS,$MOVE_REPOSTER_DIR,$DST,@_);
+	}
+	elsif($OPTS->{trash}) {
+		return move_to($OPTS,$MOVE_TRASH_DIR,$DST,@_);
+	}
+	if(defined $exit and !@_) {
+		return $exit;
+	}
 
-	my $DST = shift;
-	if($OPTS->{prefix}) {		
+	
 		my $dpre = $OPTS->{'move-prefix'} || Babes::get_pref("move-prefix");
 		$DST = catdir($dpre,$DST) if($dpre);
-	}
 #	print STDERR "DST: $DST\n";return;
 	unless(-d $DST or mkdir $DST) {
 		print STDERR "Error creating $DST\n";
@@ -720,12 +727,12 @@ our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 	}
 
 
-	my $exit = 0;
 	if(!@_) {
-		die("Usage: \n" .
+		print STDERR ("Usage: \n" .
 			"  $0 move [options] target_directory source_directory ...\n" .
 			"  $0 move [--clips|--reposter|--trash] directories ...\n"
 		);
+		return 1;
 	}
 	foreach my $SRC (@_) {
 		print STDERR "[$SRC] Moving to $DST/\n";
@@ -741,10 +748,10 @@ our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 			print STDERR "	Error, [$DST] directory not exist\n";
 			next;
 		}
-		elsif(run("mv","-v","-t",$DST,"--",$SRC)) {
+		elsif(run("mv","-t",$DST,"--",$SRC)) {
 			print STDERR "\t [OK]\n";
 			if(!$OPTS->{'no-junction'}) {
-				print STDERR "[$SRC] LINK=> $DST ";
+#				print STDERR "[$SRC] LINK=> $DST \n";
 				$exit = Babes::junction($SRC,$DST);
 			}
 		}
@@ -908,6 +915,9 @@ sub get_images_without_videos {
 			.mpeg
 			.3gp
 			.ts
+			.wmv
+			.rmvb
+			.rm
 		/
 	);
 }
@@ -916,7 +926,7 @@ sub get_videos_without_images {
 	my $dir = shift;
 	return list_files_exclude_exts(
 		$dir,
-		qr/^(.+)\.(?:mov|mp4|avi|flv|f4v|mpg|mpeg|3gp|ts)$/,
+		qr/^(.+)\.(?:mov|mp4|avi|flv|f4v|mpg|mpeg|3gp|ts|wmv|rmvb|rm)$/,
 		qw/
 			.mov.3in1.jpg
 			.jpg
@@ -1195,8 +1205,8 @@ sub process {
 		$DST = shift;
 	}
 
-	my $INTO = $OPTS->{into};
-	delete $OPTS->{into};
+	#my $INTO = $OPTS->{into};
+	#delete $OPTS->{into};
 
 	if(!@_) {
 		die("Usage: $0 close [options] target_directory source_directory\n");
@@ -1211,12 +1221,12 @@ sub process {
 		else {
 			Babes::Move::process($OPTS,$SRC);
 		}
-		if($OPTS->{junction} and $INTO) {
-			my %llopts = (%$OPTS);
-			delete $llopts{junction};
-			$llopts{into} = $INTO;
-			Babes::Move::process(\%llopts,$SRC);
-		}
+#		if($OPTS->{junction} and $INTO) {
+#			my %llopts = (%$OPTS);
+#			delete $llopts{junction};
+#			$llopts{into} = $INTO;
+#			Babes::Move::process(\%llopts,$SRC);
+#		}
 	}
 }
 1;
