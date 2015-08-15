@@ -3,6 +3,9 @@
 package MyPlace::Script::search_torrents;
 use strict;
 use MyPlace::Script::Message;
+use MyPlace::Program;
+use MyPlace::URLRule::OO;
+our %EXIT_CODE = %MyPlace::Program::EXIT_CODE;
 
 our $VERSION = 'v0.1';
 my @OPTIONS = qw/
@@ -112,6 +115,38 @@ if($OPTS{dest}) {
 	chdir $OPTS{dest} or die("Error changing to directory $OPTS{dest}: $!\n");
 	app_warning "Enter $OPTS{dest} ...\n";
 }
+
+sub do_action {
+	my $OPTS = shift;
+	my $action = shift;
+	my @request = @_;
+	my $idx = 0;
+	my $URLRULE = new MyPlace::URLRule::OO(
+			'action'=>$action,
+			'thread'=>$OPTS->{thread},
+			'createdir'=>$OPTS->{createdir},
+			'options'=>{
+				fullname=>$OPTS->{fullname},
+			},
+			'include'=>$OPTS->{include},
+			'exclude'=>$OPTS->{exclude},
+	);
+	my $count = @request;
+	foreach(@request) {
+		$idx++;
+		$_->{progress} = "[$idx/$count]";
+		$URLRULE->autoApply($_);
+		$URLRULE->reset();
+	}
+	if($URLRULE->{DATAS_COUNT}) {
+		return $EXIT_CODE{OK};
+	}
+	else {
+		return $EXIT_CODE{DO_NOTHING};
+	}
+}
+
+my @request;
 foreach my $QUERY(@ARGV) {
 	my $k = $QUERY;
 	$k =~ s/\s+/+/g;
@@ -120,16 +155,24 @@ foreach my $QUERY(@ARGV) {
 		my $url = $engine{$_}[0];
 		my $level = $engine{$_}[1];
 		$url =~ s/###QUERY###/$k/g;
-		my @prog = ('urlrule_action','--history','--prompt',"$_:$QUERY",$url,$level,'!DATABASE');
-		system(@prog);
+		push @request,{
+			count=>1,
+			url=>$url,
+			level=>$level,
+			prompt=>"$_:$QUERY",
+		};
 	}
 }
+
+my $exit;
+if(@request) {
+	$exit = do_action(\%OPTS,'DATABASE',@request);
+}
+
 if($OPTS{download}) {
-	exit system("mdown","--input","urls.lst","--title",join(" ",@ARGV));
+	system("mdown","--input","urls.lst","--title",join(" ",@ARGV));
 }
-else {
-	exit 0;
-}
+exit $exit;
 
 __END__
 
