@@ -50,7 +50,7 @@ my @OPTIONS = qw/
 	close-prefix=s
 	move-prefix=s
 	worker
-	sites=s
+	sites|hosts=s
 	norc|nr
 /;
 our %CONF;
@@ -189,6 +189,17 @@ sub execute {
 	elsif($CMD eq 'TRASH' || $CMD eq 'T') {
 		$OPTS{trash} = 1;
 		$CMD = 'CLOSE';
+	}
+	elsif($CMD eq 'TM') {
+		$OPTS{trash} = 1;
+		$CMD = 'CLOSE';
+		my $arg1 = shift(@ARGV);
+		if(@ARGV) {
+			$OPTS{into} = $arg1;
+		}	
+		else {
+			@ARGV = ($arg1);
+		}
 	}
 	elsif($CMD eq 'DI') {
 		$OPTS{images} = 1;
@@ -435,9 +446,9 @@ sub collect_files {
 	my @files;
 	foreach my $exp(@EXPS) {
 		foreach my $file(bsd_glob($exp)) {
-			if($OPTS->{hosts}) {
-				if($file !~ m/$OPTS->{hosts}/i) {
-					#print STDERR "  Not match /$OPTS->{hosts}/, ignored: $file\n";
+			if($OPTS->{sites}) {
+				if($file !~ m/$OPTS->{sites}/i) {
+					#print STDERR "  Not match /$OPTS->{sites}/, ignored: $file\n";
 					next;
 				}
 			}
@@ -558,9 +569,9 @@ sub collect_files {
 	my @files;
 	foreach my $exp(@EXPS) {
 		foreach my $file(bsd_glob($exp)) {
-			if($OPTS->{hosts}) {
-				if($file !~ m/$OPTS->{hosts}/i) {
-					#print STDERR "  Not match /$OPTS->{hosts}/, ignored: $file\n";
+			if($OPTS->{sites}) {
+				if($file !~ m/$OPTS->{sites}/i) {
+					#print STDERR "  Not match /$OPTS->{sites}/, ignored: $file\n";
 					next;
 				}
 			}
@@ -1191,6 +1202,119 @@ sub process {
 1;
 
 #######################################################################
+package Babes::Editor;
+
+sub process {
+	my $OPTS = shift;
+	my $find = shift;
+	my $replace = shift;
+	my $edited;
+	print STDERR ("Searching: $find \nReplace with: $replace\n");
+	foreach my $file (@_) {
+		my $modified;
+		my @data;
+		#print STDERR "    $file ...\n";
+		if(! -f $file) {
+			print STDERR "    Ignored, file not exist: $file\n";
+			next;
+		}
+		elsif(open FI,'<',$file) {
+			foreach my $line (<FI>) {
+				chomp($line);
+				if($modified and $OPTS->{once}) {
+				}
+				elsif($line =~ m/$find/) {
+					my $newline = $line;
+					eval "\$newline =~ s/$find/$replace/g;";
+					warn $@ if $@;	
+					if($newline eq $line) {
+					}
+					else {
+						print STDERR "    $line\n  =>\t$newline\n";
+						$line = $newline;
+						$modified = 1;
+					}
+				}
+				push @data,$line,"\n";
+			}
+			close FI;
+			if($modified) {
+				$edited = 1;
+				if(open FO,'>',$file) {
+					print FO @data;
+					close FO;
+					print STDERR "  Modified $file\n";
+				}
+				else {
+					print STDERR "  Error opening $file: $!\n";
+				}
+				
+			}
+		}
+		else {
+			print STDERR "  Error opening $file: $!\n";
+			next;
+		}
+		$edited = 1 if($modified);
+	}
+	return $edited ? 0 : 1;
+}
+1;
+
+#######################################################################
+package Babes::Database;
+use File::Spec;
+use File::Glob qw/bsd_glob/;
+sub collect_files {
+	my $OPTS = shift;
+	my @basenames = @_ ? @_ : (qw/database.sq follows.sq follows.txt/);
+	my @EXPS;
+	foreach my $dir(@Babes::DATABASE_DIR) {
+		foreach(@basenames) {
+			push @EXPS,File::Spec->catdir($dir,'*',$_);
+		}
+	}
+	my @files;
+	foreach my $exp(@EXPS) {
+		foreach my $file(bsd_glob($exp)) {
+			if($OPTS->{sites}) {
+				if($file !~ m/$OPTS->{sites}/i) {
+					#print STDERR "  Not match /$OPTS->{sites}/, ignored: $file\n";
+					next;
+				}
+			}
+			print STDERR "  Collected file: $file\n";
+			push @files,$file;
+		}
+	}
+#	die(join("\n",@files),"\n");
+	return @files;
+}
+1;
+
+#######################################################################
+
+package Babes::Trash;
+sub process {
+	my $OPTS = shift;
+	my @names = @_;
+	my @files = Babes::Database::collect_files($OPTS,'follows.txt','follows.sq');
+	my $edit = 0;
+	foreach(@names) {
+		my $r = Babes::Editor::process({once=>1},'^([^\s]+\s+' . $_ . ')$','#$1',@files);
+		if($r == 0) {
+			$edit = 1;
+		}
+		else {
+			print STDERR "Warning: $_ not found in files!\n";
+		}
+	}
+	return 0 if($edit);
+	return 1;
+}
+1;
+
+#######################################################################
 package Babes::Close;
 sub process {
 	my $OPTS = shift;
@@ -1214,7 +1338,12 @@ sub process {
 	
 	foreach my $SRC (@_) {
 		Babes::Clean::process($OPTS,$SRC) if($OPTS->{'clean'});
-		Babes::Update::process($OPTS,$SRC);
+		if($OPTS->{'trash'}) {
+			Babes::Trash::process($OPTS,$SRC);
+		}
+		else {
+			Babes::Update::process($OPTS,$SRC);
+		}
 		if($DST) {
 			Babes::Move::process($OPTS,$DST,$SRC);
 		}
