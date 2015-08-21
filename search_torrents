@@ -34,17 +34,17 @@ my %ENGINES = (
 		'https://torrentproject.se/?safe=off&t=###QUERY###',
 		2,
 	],
-	'bitsnoop'=>[
-		'http://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
-		2,
-	],
+#	'bitsnoop'=>[
+#		'http://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
+#		2,
+#	],
 	'torrentkitty.org'=>[
 		'http://www.torrentkitty.org/search/###QUERY###/',
 		2,
 	],
-	'sobt.org'=>[
-		'http://www.sobt.org/Query/###QUERY###',
-		2,
+	'sobt5.com'=>[
+		'http://www.sobt5.com/q/###QUERY###',
+		1,
 	],
 
 	#Mirror btkitty.org

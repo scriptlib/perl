@@ -130,6 +130,12 @@ sub read_rules {
 			s/^<//;
 			$r{name} = $_;
 			$r{exp} = join('|',@value);
+			$r{exclude_name} = 1;
+		}
+		elsif($_ =~ m/^-(.+)$/) {
+			$r{name} = $1;
+			$r{exp} = join('|',@value);
+			$r{exclude_name} = 1;
 		}
 		else {
 			s/^\/</</;
@@ -162,7 +168,8 @@ my %Actions;
 			my @suf = ();
 			push @suf,split(/\s+/,$OPTS{suffix}) if($OPTS{suffix});
 			print STDERR "Execute @prog ...\n" if(@prog);
-			my @keywords = ($rule->{name});
+			my @keywords;
+			push @keywords,$rule->{name} unless($rule->{exclude_name});
 			push @keywords, @{$rule->{keyword}} if($rule->{keyword});
 			my $CWD = getcwd;
 			chdir $target;

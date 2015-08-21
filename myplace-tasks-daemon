@@ -165,9 +165,13 @@ sub CONTROL_INPUT {
 
 
 my $START_DIR = getcwd;
-my $TasksBuilder = MyPlace::Tasks::Builder->new(level=>20);
-my $TasksBuilder2 = MyPlace::Tasks::Builder->new(level=>10);
-my $TasksBuilder3 = MyPlace::Tasks::Builder->new(level=>0);
+my @TasksBuilders;
+push @TasksBuilders,
+	MyPlace::Tasks::Builder->new(level=>20);
+push @TasksBuilders,
+	MyPlace::Tasks::Builder->new(level=>10);
+push @TasksBuilders,
+	MyPlace::Tasks::Builder->new(level=>0);
 my @DEFAULT_LISTENERS = (
 		MyPlace::Tasks::Listener->new('dump', 
 			MyPlace::Tasks::Worker->new(
@@ -272,9 +276,28 @@ if(-f $F_LISTENER) {
 		die($@,"\n");
 	}
 	else {
-		push @LISTENER,listener_init(\%OPTS,$TASKER,$TasksBuilder,$TasksBuilder2,$TasksBuilder3);
+		push @LISTENER,listener_init(\%OPTS,$TASKER,\@TasksBuilders);
 	}
 }
+
+my $TBCOUNT = $#TasksBuilders;
+foreach(reverse 0 .. $TBCOUNT) {
+	if(!$TasksBuilders[$_]) {
+		app_warning("TasksBuilder #$_ Removed\n");
+		delete $TasksBuilders[$_];
+	}
+	elsif($TasksBuilders[$_]->{disabled}) {
+		print STDERR "Remove TasksBuilder #$_\n";
+		$TasksBuilders[$_] = undef;
+		delete $TasksBuilders[$_];
+	}
+	else {
+		app_warning('Tasks Builder activated: #$_ ' . $TasksBuilders[$_]);
+	}
+}
+
+my $NO_TASKS_BUILDER = ($TBCOUNT <= 0);
+
 
 app_warning scalar(@LISTENER) . " listener initilized\n";
 foreach(@LISTENER) {
@@ -333,17 +356,14 @@ while(!$TASKER->end()) {
 	elsif($OPTS{runonce}) {
 		last;
 	}
-	elsif($TasksBuilder->more()) {
-		app_message2 "[" . strtime() . "] Queuing scheduled task\n";
-		$TASKER->queue($TasksBuilder->{level},$TasksBuilder->next());
-	}
-	elsif($TasksBuilder2->more()) {
-		app_message2 "[" . strtime() . "] Queuing scheduled task\n";
-		$TASKER->queue($TasksBuilder2->{level},$TasksBuilder2->next());
-	}
-	elsif($TasksBuilder3->more()) {
-		app_message2 "[" . strtime() . "] Queuing scheduled task\n";
-		$TASKER->queue($TasksBuilder3->{level},$TasksBuilder3->next());
+	elsif(@TasksBuilders) {
+		foreach(@TasksBuilders) {
+			if($_ and $_->{more}) {
+				app_message2 "[" . strtime() . "] Queuing scheduled task\n";
+				$TASKER->queue($_->{level},$_->next());
+				last;
+			}
+		}
 	}
 } 
 if(!$OPTS{runonce}) {

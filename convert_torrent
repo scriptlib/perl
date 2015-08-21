@@ -121,6 +121,9 @@ my %DICT = qw/
 	乳交	插奶
 	招妓	叫鸡
 	你懂的	懂的
+	心有花	心_有_花
+	yumi-kazama	Yumi_Kazama
+	Yumi\s+Kazama	Yumi_Kazama
 /;
 
 my %HZPY = qw/
