@@ -12,8 +12,10 @@ my @OPTIONS = qw/
 	help|h|? 
 	manual|man
 	download|d
+	no-download|nd
 	engine|e:s
-	dest:s
+	dest|directory:s
+	worker
 /;
 my %OPTS;
 if(@ARGV)
@@ -87,6 +89,19 @@ if(!%engine) {
 	exit 1;
 }
 
+if($OPTS{worker}) {
+	require MyPlace::Tasks::Worker::SearchTorrents;
+	my $worker = new MyPlace::Tasks::Worker::SearchTorrents::Program;
+	my @args;
+	if($OPTS{'no-download'}) {
+		push @args,'--no-download';
+	}
+	elsif($OPTS{download}) {
+	}
+	push @args,'--engine',$OPTS{engine} if($OPTS{engine});
+	push @args,'--dest',$OPTS{dest} if($OPTS{dest});
+	exit $worker->execute(@args,@ARGV);
+}
 
 if(!@ARGV) {
 	foreach my $fk(qw/keywords.lst keywords.txt search.ini/) {

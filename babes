@@ -26,7 +26,7 @@ my @OPTIONS = qw/
 	exclude=s
 	into=s
 	follow
-	unfollow
+	unfollow|uf
 	enable
 	disable
 	dryrun
