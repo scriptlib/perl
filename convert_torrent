@@ -124,6 +124,8 @@ my %DICT = qw/
 	心有花	心_有_花
 	yumi-kazama	Yumi_Kazama
 	Yumi\s+Kazama	Yumi_Kazama
+	波多野结衣	波多YE结衣
+	三级片	三级
 /;
 
 my %HZPY = qw/
