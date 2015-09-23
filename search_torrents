@@ -16,6 +16,7 @@ my @OPTIONS = qw/
 	engine|e:s
 	dest|directory:s
 	worker
+	group|g=s
 /;
 my %OPTS;
 if(@ARGV)
@@ -68,6 +69,20 @@ my %ENGINES = (
 	],
 );
 
+my %GROUPS = (
+	'NSFW'=>[qw/
+		torrentproject
+		torrentkitty.org
+		sobt5.com
+		btkitty
+		btdigg.me
+		/
+	],
+	'SAFE'=>[qw/
+		mp4ba.com
+	/],
+);
+
 
 
 my %engine;
@@ -79,6 +94,14 @@ if($OPTS{engine}) {
 			$engine{$_} = $ENGINES{$_};
 		}
 	}
+}
+elsif($OPTS{group}) {
+	if(defined $GROUPS{$OPTS{group}}) {
+		foreach(@{$GROUPS{$OPTS{group}}}) {
+			$engine{$_} = $ENGINES{$_} if($ENGINES{$_});
+		}
+	}
+	#die(join("\n",(keys %engine)),"\n");
 }
 else {
 	%engine = %ENGINES;
@@ -179,13 +202,13 @@ foreach my $QUERY(@ARGV) {
 	}
 }
 
-my $exit;
+my $exit = 0;
 if(@request) {
 	$exit = do_action(\%OPTS,'DATABASE',@request);
 }
 
 if($OPTS{download}) {
-	system("mdown","--input","urls.lst","--title",join(" ",@ARGV));
+	$exit = system("mdown","--input","urls.lst","--title",join(" ",@ARGV));
 }
 exit $exit;
 

@@ -11,6 +11,7 @@ my @OPTIONS = qw/
 	name=s
 	find=s
 	replace=s
+	move
 /;
 my %OPTS;
 if(@ARGV)
@@ -618,7 +619,10 @@ sub clean {
 sub process {
 	my $filename = shift;
 	my $chunks = '';
-	open FI,'<:raw',$filename or die("Error opening $filename: $!\n");
+	if(!open FI,'<:raw',$filename) {
+		print STDERR "Error opening $filename: $!\n";
+		return undef,'E_OPENING';
+	}
 	my $ok = undef;
 	my $chunk = undef;
 	my $bufsize = 1024;
@@ -627,9 +631,15 @@ sub process {
 	}
 	close FI;
 	if(!(defined $ok)) {
-		die("Error reading $filename: $!\n");
+		print STDERR ("Error reading $filename: $!\n");
+		return undef,'E_READING';
 	}
-	my $torrent = bdecode($chunks);
+	my $torrent;
+	eval '$torrent = bdecode($chunks);';
+	if(!$torrent) {
+		print STDERR "Decode failed, maybe invalid torrent file: $filename\n";
+		return undef,'E_DATA';
+	}
 	#print STDERR to_string($torrent,"torrent",0,"  ","piece");
 	my $dirty = undef;
 	my $basename = $filename;
@@ -669,23 +679,49 @@ sub process {
 			$output =~ s/^.*[\/\\]+//;
 			$output =~ s/\.([^\.]+)$/.MASKED.$1/;
 		}
-		print STDERR "Wrting $output ...\n";
-		open FO,">:raw",$output or die("Error opening $output for writting:$!\n");
-		print FO bencode($torrent);
-		close FO;
-		return 1;
+		print STDERR "Writting $output ...\n";
+		if(open FO,">:raw",$output) {
+			print FO bencode($torrent);
+			close FO;
+			return 1,$output;
+		}
+		else {
+			print STDERR ("Error opening $output for writting:$!\n");
+			return undef,'E_OUTPUT';
+		}
 	}
 	else {
 		print STDERR "No changes made to $filename\n";
-		return undef;
+		return undef,'E_NOCHANGE';
 	}
 	#print STDERR to_string($torrent,"torrent",0,"  ","piece");
 	#die(Data::Dumper->Dump([$torrent->{info}->{files}],['torrent->files']),"\n");
 }
 
+my $exit = 0;
 foreach(@ARGV) {
-	process($_);
+	my ($ok,$error) = process($_);
+	my $targetd;
+	if(!$ok) {
+		$exit = $exit+1;
+		$targetd = $error;
+	}
+	else {
+		$targetd = "E_OK";
+	}
+	next unless($OPTS{move});
+	if(!-d $targetd) {
+		mkdir $targetd;
+	}
+	print STDERR "Moving files to $targetd/\n";
+	my @files = ($_);
+	my $txtfile = $_;
+	$txtfile =~ s/\.[^\.]+$/.txt/;
+	push @files,$txtfile if(-f $txtfile);
+	print STDERR "	<= $_\n" foreach(@files);
+	system("mv",'-t',$targetd,'--',@files);
 }
+exit $exit;
 
 
 

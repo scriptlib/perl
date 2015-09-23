@@ -1,4 +1,9 @@
 #!/usr/bin/perl -w
+use MyPlace::Script::Message;
+sub dddd {
+	die();
+}
+
 package Babes;
 # $Id$
 use strict;
@@ -52,6 +57,7 @@ my @OPTIONS = qw/
 	worker
 	sites|hosts=s
 	norc|nr
+	same-directory
 /;
 our %CONF;
 our @DATABASE_DIR = qw{
@@ -65,6 +71,17 @@ our @DATABASE_DIR = qw{
 
 sub get_pref {
 	return $CONF{$_[0]};
+}
+sub create_dir {
+	my $DST = shift;
+	my $msg = shift(@_) || "Error creating $DST\n";
+	return 1 unless($DST);
+	return 1 if(-d $DST);
+	if(!mkdir $DST) {
+		print STDERR $msg;
+		return undef;
+	}
+	return 1;
 }
 
 sub strtime {
@@ -190,6 +207,10 @@ sub execute {
 		$OPTS{trash} = 1;
 		$CMD = 'CLOSE';
 	}
+	elsif($CMD eq 'TW') {
+		$CMD = 'TOUCH';
+		$OPTS{weipai} = 1;
+	}
 	elsif($CMD eq 'TM') {
 		$OPTS{trash} = 1;
 		$CMD = 'CLOSE';
@@ -276,6 +297,14 @@ sub execute {
 	}
 
 }
+
+sub Import {
+	foreach(keys %main::) {
+		print STDERR $_,"\n";	
+
+	}
+}
+
 
 1;
 #######################################################################
@@ -556,33 +585,41 @@ sub move_to {
 #			print STDERR $srcd,"\n";
 			foreach my $file (glob("$srcd/*/*/*.*")) {
 #				print STDERR $file,"\n";
-				if($file =~ m/([^\/]+)\/[^\/]+\/([^\/]+)\/([^\/]+?)\.(mov\.3in1\.jpg|mov|flv|mp4|f4v|mpeg|png|gif|jpg|ts)$/) {
-					$clips{$file} = "$1_$3_$2.$4";
+				if($file =~ m/^(.*?([^\/]+)\/[^\/]+\/([^\/]+))\/([^\/]+?)\.(mov\.3in1\.jpg|mov|flv|mp4|f4v|mpeg|png|gif|jpg|ts)$/) {
+					if($OPTS->{'same-directory'}) {
+						$clips{$file} = "$1/$2_$4_$3.$5";
+					}
+					else {
+						$clips{$file} = "$2_$4_$3.$5";
+					}
 				}
 			}
 		}
 	}
 
-	unless(-d $dstd or mkdir $dstd) {
-		print STDERR "Error creating $dstd\n";
-		return 2;
+	if(!$OPTS->{'same-directory'}) {
+		return 2 unless(&Babes::create_dir($dstd,"  Error creating $dstd\n"));
+	}
+	else {
+		$dstd = '#SAME DIRECTORY#';
 	}
 
 	if($OPTS->{clips} or $OPTS->{into}) {
-		print STDERR "Move files into <$dstd>:\n";
+		print STDERR "  Move files into <$dstd>:\n";
+		print STDERR "\tNothing to do,  files not found\n" unless(%clips);
 		foreach my $src (keys %clips) {
-			my $dst = catfile($dstd,$clips{$src});
+			my $dst = $OPTS->{'same-directory'} ? $clips{$src} : catfile($dstd,$clips{$src});
 			print STDERR "    <= " . $clips{$src} . "\n";
 			$exit = run('mv','--',$src,$dst);
 		}
-		$dstd = $MOVE_TRASH_DIR if($OPTS->{clips});
-		unless(-d $dstd or mkdir $dstd) {
-			print STDERR "Error creating directory <$dstd>\n";
-			return 2;
+		if($OPTS->{clips}) {
+			$dstd = $MOVE_TRASH_DIR;
+			return 2 unless(&Babes::create_dir($dstd));
 		}
 	}
 	elsif($OPTS->{trash}) {
-		print STDERR "Delete files in:\n";
+		print STDERR "  Delete files in:\n";
+		print STDERR "\tNothing to do,  files not found\n" unless(%clips);
 		foreach my $src (keys %clips) {
 			print STDERR "    XX $src\n";
 			$exit = run('rm','--',$src);
@@ -598,7 +635,7 @@ sub move_to {
 		}
 	}
 	else {
-		print STDERR "Move directories into <$dstd>:\n";
+		print STDERR "  Move directories into <$dstd>:\n";
 		foreach(@_) {
 			print STDERR "    <= $_\n";
 			$exit = run('mv','-t',$dstd,'--',$_);
@@ -615,10 +652,15 @@ our $MOVE_TRASH_DIR = Babes::get_pref('trash-dir','#Trash');
 our $MOVE_CLIPS_DIR = Babes::get_pref('clips-dir','#Clips');
 our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 
-	my $DST = shift;
 	my $exit;
 
-	if(!$DST) {
+	my $DST = shift;
+	if(!@_) {
+		unshift @_,$DST;
+		$DST = '';
+	}
+
+	if(!@_) {
 		die("Usage: \n" .
 			"  $0 move [options] target_directory source_directory ...\n" .
 			"  $0 move [--clips|--reposter|--trash] directories ...\n"
@@ -626,49 +668,40 @@ our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 	}
 
 
+	print STDERR "[",join("] [",@_),"] \n";
 	if($OPTS->{into}) {
-#		die($OPTS->{into});
 			my $dpre = $OPTS->{'into-prefix'} || Babes::get_pref("into-prefix");
 			$OPTS->{into} = catdir($dpre,$OPTS->{into}) if($dpre);
-		my $exit = move_to($OPTS,$OPTS->{into},$DST);
-		delete $OPTS->{into};
+			$exit = move_to($OPTS,$OPTS->{into},@_);
+			delete $OPTS->{into};
 	}
-#	die();
+
 	if($OPTS->{clips}) {
-		return move_to($OPTS,$MOVE_CLIPS_DIR,$DST,@_);
+		return move_to($OPTS,$MOVE_CLIPS_DIR,@_);
 	}
 	elsif($OPTS->{reposter}) {
-		return move_to($OPTS,$MOVE_REPOSTER_DIR,$DST,@_);
+		return move_to($OPTS,$MOVE_REPOSTER_DIR,@_);
 	}
 	elsif($OPTS->{trash}) {
-		return move_to($OPTS,$MOVE_TRASH_DIR,$DST,@_);
+		return move_to($OPTS,$MOVE_TRASH_DIR,@_);
 	}
-	if(defined $exit and !@_) {
+	if(!$DST) {
 		return $exit;
 	}
 
 	
-		my $dpre = $OPTS->{'move-prefix'} || Babes::get_pref("move-prefix");
-		$DST = catdir($dpre,$DST) if($dpre);
+	my $dpre = $OPTS->{'move-prefix'} || Babes::get_pref("move-prefix");
+	$DST = catdir($dpre,$DST) if($dpre);
 #	print STDERR "DST: $DST\n";return;
-	unless(-d $DST or mkdir $DST) {
-		print STDERR "Error creating $DST\n";
-		return 2;
-	}
 
-
-	if(!@_) {
-		print STDERR ("Usage: \n" .
-			"  $0 move [options] target_directory source_directory ...\n" .
-			"  $0 move [--clips|--reposter|--trash] directories ...\n"
-		);
-		return 1;
-	}
 	foreach my $SRC (@_) {
-		print STDERR "[$SRC] Moving to $DST/\n";
+		print STDERR "  [$SRC] Moving to $DST/\n";
 		if(-l $SRC) {
 			print STDERR "	Ignored, [$SRC] is a symbol link\n";
 			next;
+		}
+		elsif((!-d $SRC) and (-d $DST) and (!$OPTS->{'no-junction'})) {
+			$exit = Babes::junction($SRC,$DST);
 		}
 		elsif(! -d $SRC) {
 			print STDERR "	Ignored, [$SRC] is not a directory\n";
@@ -678,17 +711,20 @@ our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 			print STDERR "	Error, [$DST] directory not exist\n";
 			next;
 		}
-		elsif(run("mv","-t",$DST,"--",$SRC)) {
-			print STDERR "\t [OK]\n";
-			if(!$OPTS->{'no-junction'}) {
-#				print STDERR "[$SRC] LINK=> $DST \n";
-				$exit = Babes::junction($SRC,$DST);
-			}
-		}
 		else {
-			print STDERR "\t [FAILED]\n";
-			$exit = 1;
-		}
+			return 2 unless(&Babes::create_dir($DST));
+			if(run("mv","-t",$DST,"--",$SRC)) {
+				print STDERR "\t [OK]\n";
+				if(!$OPTS->{'no-junction'}) {
+#					print STDERR "[$SRC] LINK=> $DST \n";
+					$exit = Babes::junction($SRC,$DST);
+				}
+			}
+			else {
+				print STDERR "\t [FAILED]\n";
+				$exit = 1;
+			}
+		}	
 	}
 	return $exit;
 }
@@ -893,11 +929,19 @@ sub get_files_empty {
 sub get_files {
 	goto &list_files;
 }
+sub get_dirs {
+	my $dir = shift;
+	my $filter = shift;
+	my $msg = shift;
+	return list_files($dir,$filter,$msg,{directory=>1});
 
+}
 sub list_files {
 	my $dir = shift;
 	my $filter = shift;
 	my $msg = shift;
+	my $opts = shift(@_) || {};
+
 	print STDERR "Processing $dir  " if($msg);
 	my @subdirs;
 	my @result;
@@ -905,7 +949,10 @@ sub list_files {
 		next if(m/\.$/);
 		if(-d $_) {
 			push @subdirs,$_;
-			next;
+			next unless($opts->{directory});
+		}
+		else {
+			next if($opts->{directory});
 		}
 		if(!$filter) {
 			push @result,$_;
@@ -916,7 +963,7 @@ sub list_files {
 	}
 	print STDERR "[" . scalar(@result) . " file(s)]\n" if($msg);
 	foreach(@subdirs) {
-		push @result,list_files($_,$filter,$msg);
+		push @result,list_files($_,$filter,$msg,$opts);
 	}
 	return @result;
 }
@@ -963,6 +1010,9 @@ sub get {
 			push @result,Babes::List::get_videos_without_images($_);
 		}
 		if($done) {
+		}
+		elsif($OPTS->{directories}) {
+			push @result,Babes::List::get_dirs($_,$OPTS->{filter});
 		}
 		elsif($OPTS->{all}) {
 			push @result,Babes::List::get_files($_);
@@ -1045,7 +1095,7 @@ sub process {
 	my $OPTS = shift;
 	foreach(@_) {
 		if(-d $_) {
-#			print STDERR "\nProcessing $_\n";
+			#	print STDERR "\nProcessing $_\n";
 			process_dir($OPTS,$_);
 		}
 		else {
@@ -1157,7 +1207,12 @@ sub process {
 						print STDERR "    $line\n  =>\t$newline\n";
 						$line = $newline;
 						$modified = 1;
-						unshift @data,$line,"\n" if($OPTS->{ontop});
+						if($OPTS->{ontop}) {
+							unshift @data,$line,"\n";
+						}
+						else {
+							push @data,$line,"\n";
+						}
 					}
 				}
 				else {
@@ -1211,7 +1266,7 @@ sub collect_files {
 					next;
 				}
 			}
-			print STDERR "  Collected file: $file\n";
+#			print STDERR "  Collected file: $file\n";
 			push @files,$file;
 		}
 	}
@@ -1221,14 +1276,23 @@ sub collect_files {
 1;
 
 #######################################################################
+package Babes::Shared;
+use MyPlace::Script::Message;
+sub ddd {
+	die();
+}
 
+1;
+
+#######################################################################
 package Babes::Trash;
+use MyPlace::Script::Message;
+MyPlace::Script::Message::prompt('Babes::Trash>');
 sub process {
 	my $OPTS = shift;
 	my @names = @_;
-	my @files = Babes::Database::collect_files($OPTS,'follows.txt','follows.sq');
+	my @files = Babes::Database::collect_files($OPTS,'follows.txt','follows.sq','database.sq');
 	my $edit = 0;
-	print STDERR "Writting names to <#TRASH.txt> ...\n";
 	my $FO;
 	if(open $FO,'>>','#TRASH.txt') {
 	}
@@ -1236,7 +1300,7 @@ sub process {
 		print STDERR "Error: $!\n";
 	}
 	foreach(@names) {
-		my $r = Babes::Editor::process({once=>1,ontop=>1},'^([^#][^\s]+\s+' . $_ . ')$','#$1',@files);
+		my $r = Babes::Editor::process({once=>1},'^([^#][^\s]+)\s+(' . $_ . ')$','$1' . "\t" . '#Trash\/$2',@files);
 		if($r == 0) {
 			$edit = 1;
 		}
@@ -1244,8 +1308,14 @@ sub process {
 			print STDERR "Warning: $_ not found in files!\n";
 		}
 		if(defined $FO) {
-			print STDERR "\t#TRASH.txt <$_\n";
-			print $FO $_,"\n";
+			my @dirs = ($_,Babes::List::get_dirs($_));
+			&app_warning("Writting names to <#TRASH.txt> ...\n");
+			&app_warning("#TRASH.txt <<<\n");
+			foreach my $subdir(@dirs) {
+				&app_warning("    ",$subdir,"\n");
+				print $FO $subdir,"\n";
+			}
+			&app_warning("<<<\n");
 		}	
 
 	}
