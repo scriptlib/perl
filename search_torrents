@@ -39,9 +39,14 @@ my %ENGINES = (
 		'http://btkitty.la/?###QUERY###',
 		3,
 	],
-	'torrentkitty.org'=>[
-		'http://www.torrentkitty.org/search/###QUERY###/',
+	'torrentkitty'=>[
+		#'http://www.torrentkitty.org/search/###QUERY###/',
+		'http://www.torrentkitty.net/search/###QUERY###/',
 		2,
+	],
+	'torrentkittyzw.com'=>[
+		'http://www.torrentkittyzw.com/###QUERY###',
+		3,
 	],
 	'torrentproject'=>[
 		'https://torrentproject.se/?safe=off&t=###QUERY###',
@@ -79,11 +84,12 @@ my %ENGINES2  = (
 my %GROUPS = (
 	'NSFW'=>[qw/
 		torrentproject
-		torrentkitty.org
+		torrentkitty
 		sobt5.com
 		btkitty
 		btdigg.me
 		btbibi.com
+		torrentkittyzw.com
 		/
 	],
 	'SAFE'=>[qw/
