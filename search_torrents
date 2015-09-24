@@ -17,6 +17,7 @@ my @OPTIONS = qw/
 	dest|directory:s
 	worker
 	group|g=s
+	all|a
 /;
 my %OPTS;
 if(@ARGV)
@@ -33,40 +34,46 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 
 
 my %ENGINES = (
+	#Mirror btkitty.org
+	'btkitty'=>[
+		'http://btkitty.la/?###QUERY###',
+		3,
+	],
+	'torrentkitty.org'=>[
+		'http://www.torrentkitty.org/search/###QUERY###/',
+		2,
+	],
 	'torrentproject'=>[
 		'https://torrentproject.se/?safe=off&t=###QUERY###',
+		2,
+	],
+	'mp4ba.com'=>[
+		'http://www.mp4ba.com/search.php?keyword=###QUERY###',
 		2,
 	],
 #	'bitsnoop'=>[
 #		'http://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
 #		2,
 #	],
-	'torrentkitty.org'=>[
-		'http://www.torrentkitty.org/search/###QUERY###/',
-		2,
+);
+
+my %ENGINES2  = (
+	'btdigg.me'=>[
+		'http://btdigg.me/?###QUERY###',
+		3,
 	],
 	'sobt5.com'=>[
 		'http://www.sobt5.com/q/###QUERY###',
 		1,
 	],
-
-	#Mirror btkitty.org
-	'btkitty'=>[
-		'http://btkitty.la/?###QUERY###',
-		3,
-	],
-	'btdigg.me'=>[
-		'http://btdigg.me/?###QUERY###',
+	'btbibi.com'=>[
+		'http://btbibi.com/###QUERY###',
 		3,
 	],
 #	'storetorrent.org'=>[
 #		'http://www.storetorrent.org/s/###QUERY###',
 #		2,
 #	],
-	'mp4ba.com'=>[
-		'http://www.mp4ba.com/search.php?keyword=###QUERY###',
-		2,
-	],
 );
 
 my %GROUPS = (
@@ -76,6 +83,7 @@ my %GROUPS = (
 		sobt5.com
 		btkitty
 		btdigg.me
+		btbibi.com
 		/
 	],
 	'SAFE'=>[qw/
@@ -102,6 +110,9 @@ elsif($OPTS{group}) {
 		}
 	}
 	#die(join("\n",(keys %engine)),"\n");
+}
+elsif($OPTS{all}) {
+	%engine = (%ENGINES,%ENGINES2);
 }
 else {
 	%engine = %ENGINES;
