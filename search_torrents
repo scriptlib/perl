@@ -75,6 +75,10 @@ my %ENGINES2  = (
 		'http://btbibi.com/###QUERY###',
 		3,
 	],
+	'breadsearch.com'=>[
+		'http://www.breadsearch.com/search/###QUERY###',
+		1,
+	],
 #	'storetorrent.org'=>[
 #		'http://www.storetorrent.org/s/###QUERY###',
 #		2,
@@ -90,6 +94,7 @@ my %GROUPS = (
 		btdigg.me
 		btbibi.com
 		torrentkittyzw.com
+		breadsearch.com
 		/
 	],
 	'SAFE'=>[qw/

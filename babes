@@ -546,6 +546,40 @@ sub process {
 	if($OPTS->{revert}) {
 		($oldname,$newname) = ($newname,$oldname);
 	}
+	if($OPTS->{weipai}) {
+		my $dir = $oldname;
+		my $prefix = $newname || $oldname;
+		my @files = Babes::List::get_medias($oldname);
+		foreach(@files) {
+			my $old = $_;
+			my $new = $old;
+			if(m/^(.+)\/${prefix}_([^\/]+)$/) {
+				print STDERR "  Nothing to do for $_\n";
+				next;
+			}
+			elsif(m/^${prefix}_([^\/]+)$/) {
+				print STDERR "  Nothing to do for $_\n";
+				next;
+			}
+			elsif(m/^(.+)\/${oldname}_([^\/]+)$/) {
+				$new = $1 . '/' . $prefix . '_' . $2;
+			}
+			elsif(m/^${oldname}_([^\/]+)$/) {
+				$new = $1 . '/' . $prefix . '_' . $2;
+			}
+			elsif(m/^(.+)\/([^\/]+)$/) {
+				$new = $1 . '/' . $prefix . '_' . $2;
+			}
+			else {
+				$new = $prefix . '_' . $old;
+			}
+			if(!($new eq $old)) {
+				print STDERR "Renaming $old\n  => $new\n";
+				system("mv",'--',$old,$new);
+			}
+		}
+		return 0;
+	}
 	print STDERR "Renaming $oldname => $newname\n";
 	my @files = collect_files($OPTS,$oldname);
 	my $exit1 = edit_file($oldname,$newname,@files);
@@ -848,17 +882,22 @@ sub list_files_exclude_exts {
 			$selected{$_} = $1;
 		}
 	}
-	foreach(keys %files) {
-		next unless ($selected{$_});
-		my $basename = $selected{$_};
-		my $excluded;
-		foreach my $ext(@exts) {
-			if($files{$basename . $ext}) {
-				$excluded = 1;
-				last;
+	if(@exts) {
+		foreach(keys %files) {
+			next unless ($selected{$_});
+			my $basename = $selected{$_};
+			my $excluded;
+			foreach my $ext(@exts) {
+				if($files{$basename . $ext}) {
+					$excluded = 1;
+					last;
+				}
 			}
+			push @result,$_ unless($excluded);
 		}
-		push @result,$_ unless($excluded);
+	}
+	else {
+		push @result,keys %selected;
 	}
 	foreach(@subdirs) {
 		push @result,list_files_exclude_exts($_,$include,@exts);
@@ -970,6 +1009,12 @@ sub list_files {
 sub get_videos {
 	my $dir = shift;
 	my $filter = shift(@_) || '\.(?:mov|mp4|avi|flv|f4v|mpg|mpeg|3gp|ts)$';
+	return get_files($dir,$filter);
+}
+
+sub get_medias {
+	my $dir = shift;
+	my $filter = shift(@_) || '\.(?:mov|mp4|avi|flv|f4v|mpg|mpeg|3gp|ts|jpg|png|gif)$';
 	return get_files($dir,$filter);
 }
 
