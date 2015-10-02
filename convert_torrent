@@ -127,6 +127,7 @@ my %DICT = qw/
 	Yumi\s+Kazama	Yumi_Kazama
 	波多野结衣	波多YE结衣
 	三级片	三级
+	体宴	Ti宴
 /;
 
 my %HZPY = qw/

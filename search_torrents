@@ -35,18 +35,30 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 
 my %ENGINES = (
 	#Mirror btkitty.org
-	'btkitty'=>[
-		'http://btkitty.la/?###QUERY###',
-		3,
+	#'btkitty'=>[
+	#	'http://btkitty.so/?###QUERY###',
+	#	3,
+	#],
+	'sobt5.com'=>[
+		'http://www.sobt5.com/q/###QUERY###',
+		1,
 	],
 	'torrentkitty'=>[
 		#'http://www.torrentkitty.org/search/###QUERY###/',
 		'http://www.torrentkitty.net/search/###QUERY###/',
 		2,
 	],
-	'torrentkittyzw.com'=>[
-		'http://www.torrentkittyzw.com/###QUERY###',
+	#'torrentkittyzw.com'=>[
+	#	'http://www.torrentkittyzw.com/###QUERY###',
+	#	3,
+	#],
+	'btdigg.me'=>[
+		'http://btdigg.me/?###QUERY###',
 		3,
+	],
+	'ganluzhe.com'=>[
+		'http://www.ganluzhe.com/###QUERY###',
+		2,
 	],
 	'torrentproject'=>[
 		'https://torrentproject.se/?safe=off&t=###QUERY###',
@@ -63,14 +75,6 @@ my %ENGINES = (
 );
 
 my %ENGINES2  = (
-	'btdigg.me'=>[
-		'http://btdigg.me/?###QUERY###',
-		3,
-	],
-	'sobt5.com'=>[
-		'http://www.sobt5.com/q/###QUERY###',
-		1,
-	],
 	'btbibi.com'=>[
 		'http://btbibi.com/###QUERY###',
 		3,
@@ -95,6 +99,7 @@ my %GROUPS = (
 		btbibi.com
 		torrentkittyzw.com
 		breadsearch.com
+		ganluzhe.com
 		/
 	],
 	'SAFE'=>[qw/
