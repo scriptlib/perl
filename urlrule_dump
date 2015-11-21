@@ -1,1 +1,197 @@
-../urlrule/bin/urlrule_dump
+#!/usr/bin/perl -w
+###APPNAME:     urlrule_dump
+###APPAUTHOR:   duel
+###APPDATE:	Mon Mar 24 06:25:31 2008
+###APPVER:	2.0
+###APPDESC:     dump urlrule result	
+###APPUSAGE:	URL [0-5]
+###APPEXAMPLE:	urlrule_dump http://www.sina.com.cn 0
+our $VERSION = 'v2.0';
+use strict;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use Data::Dumper;
+use utf8;
+#binmode STDOUT,':utf8';
+#binmode STDERR,':utf8';
+#binmode STDIN,':utf8';
+#use Encode qw/find_encoding/;
+#my $utf8 = find_encoding("utf8");
+my @OPTIONS = qw/
+	help|h|? 
+	manual|man
+	info|i
+/;
+my %OPTS;
+if(@ARGV)
+{
+#	map {
+#	$_=$utf8->decode($_)
+#	} @ARGV;
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+}
+else {
+	$OPTS{'help'} = 1;
+}
+if($OPTS{'help'} or $OPTS{'manual'}) {
+	require Pod::Usage;
+	my $v = $OPTS{'help'} ? 1 : 2;
+	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
+    exit $v;
+}
+
+use MyPlace::URLRule;
+use Data::Dumper;
+my $url = shift;
+my $level = shift;
+if(!$level) {
+	$level = 0;
+}
+elsif($level =~ m/^:(.+)$/) {
+	$level = ":$1";
+}
+elsif($level !~ /^\d+$/) {
+	unshift @ARGV,$level;
+	$level = 0;
+}
+
+my $uh = new MyPlace::URLRule;
+my $rule = $uh->rule($url,$level);
+print STDERR Data::Dumper->Dump([$rule],['*rule']) unless(@ARGV);
+#my ($status,$result) = $uh->process($rule);
+my ($status,$result) = $uh->process($url,$level);
+
+sub error {
+	my $r = shift;
+	return unless($r);
+	if($r && ref $r) {
+		print STDERR "Error: $r->{error}\n";
+	}
+	else {
+		print STDERR "Error: $r\n";
+	}
+}
+
+if(!($status or $result)) {
+	exit 3;
+}
+if(!$result) {
+	error("Empty response");
+	exit 2;
+}
+elsif(!ref $result) {
+	if(!$status) {
+		error($result);
+		exit 1;
+	}
+	else {
+		print 'result = ',$result,"\n";
+		exit 0;
+	}
+}
+
+my $INDENT="    ";
+sub printval {
+	my $r = shift;
+	if($r) {
+		if(ref $r && @{$r}) {
+			print "\n$INDENT",join("\n$INDENT",@{$r}),"\n";
+		}
+		else {
+			print "$r\n";
+		}
+	}
+	else {
+		print "undefined.\n";
+	}
+	return $r;
+}
+
+sub printkey {
+	my $k = shift;
+	my $l = shift(@_) || 0;
+	if($l < 2) {
+		print "$k:\t";
+	}
+	else {
+		print "" . "$INDENT"x($l-1) . "$k:\t";
+	}
+}
+
+print STDERR "\n";
+if($OPTS{info}) {
+	if(@ARGV) {
+		foreach(@ARGV) {
+			my $r = $result->{$_};
+			printkey($_);
+			printval($result->{$_});
+		}
+	}
+	else {
+		foreach(qw/url title base/) {
+			printkey($_);
+			printval($result->{$_}); 
+		}
+		printkey("data");
+		if($result->{data} && @{$result->{data}}) {
+			print "\n";
+			foreach(@{$result->{data}}) {
+				if(m/^(.+)\t(.+)$/) {
+					printkey($2,2);
+					printval($1);
+				}
+				else {
+					printval("\t$_");
+				}
+			}
+		}
+		else {
+			printval("undefined");
+		}
+		printkey("nextlevel");
+		if($result->{nextlevel} && $result->{nextlevel}{count}) {
+			print "\n";
+			foreach(@{$result->{nextlevel}{data}}) {
+				if(m/^(.+)\t(.+)$/) {
+					printkey($2,2);
+					printval($1);
+				}
+				else {
+					printval("\t$_");
+				}
+			}
+		}
+		else {
+			printval("undefined");
+		}
+	}
+}
+else {
+
+		if(@ARGV) {
+			if(@ARGV == 1) {
+				my $r = $result->{$ARGV[0]};
+				if($r) {
+					if(ref $r) {
+						print join("\n",@{$r}),"\n" if(@{$r});
+					}
+					else {
+						print $r,"\n";
+					}
+				}
+			}
+			else {
+				foreach(@ARGV) {
+					print Data::Dumper->Dump([$result->{$_}],['$result->{' . $_ . '}']);
+				}
+			}
+		}
+		else {
+			if($result->{html}) {
+				$result->{html} = "...";
+			}
+	        print Data::Dumper->Dump([$result],['result']);
+		}
+        exit 0;
+}
+

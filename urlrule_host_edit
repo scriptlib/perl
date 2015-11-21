@@ -1,1 +1,4 @@
-../urlrule/bin/urlrule_host_edit
+#!/usr/bin/perl -w
+exec 'editor',$ENV{XR_PERL_SOURCE_DIR} . '/urlrule/HOSTS.URL';
+
+

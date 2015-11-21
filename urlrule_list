@@ -1,1 +1,196 @@
-../urlrule/bin/urlrule_list
+#!/usr/bin/perl -w
+###APPNAME:     urlrule_list
+###APPAUTHOR:   duel
+###APPDATE:	Thu Apr  3 07:46:26 2008
+###APPVER:	0.1
+###APPDESC:     list urlrules	
+###APPUSAGE:    [Level]	
+###APPEXAMPLE:	urlrule_list 1
+###APPOPTION:	
+use strict;
+use utf8;
+use warnings;
+use Getopt::Long;
+use URI::Escape;
+use Data::Dumper;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::Script::Message;
+use MyPlace::URLRule::OO;
+binmode STDOUT,'utf8';
+eval('require ListSource;');
+
+
+
+my @LIST_TEMP;
+my %LIST_NAMES;
+sub list_incoming {
+	my $handler = shift;
+	my $res = shift;
+	my $rule = shift;
+	if($res->{data} && @{$res->{data}}) {
+		foreach(@{$res->{data}}) {
+			push @LIST_TEMP,$_ unless($LIST_NAMES{$_});
+			$LIST_NAMES{$_} = 1;
+		}
+	}
+	return $res->{data};
+}
+sub load_list {
+	if(%ListSource::stars_list) {
+		return \%ListSource::stars_list;
+	}
+	else {
+		return {};
+	}
+}
+
+sub save_list {
+	my $list = shift;
+	my $dumper = new Data::Dumper([$list],[qw/*stars_list/]);
+	$dumper->Purity(1)->Sortkeys(1);
+	open FO,">","ListSource.pm" or die("$!\n");
+	print FO "package ListSource;\n";
+	print FO "our ", $dumper->Dump(), "\n";
+	print FO "1;\n__END__\n";
+	close FO;
+}
+
+sub strnum {
+	my $value = shift(@_);
+	my $length = shift(@_) || 3;
+	if($value <1000 and $value >=0) {
+		$value = substr('0'x$length . $value,-3);
+	}
+	return $value;
+}
+
+my $RULE = new MyPlace::URLRule::OO(
+		buildurl=>1,
+		createdir=>0,
+		callback_process => \&list_incoming,
+);
+sub query_list {
+	@LIST_TEMP = ();
+	my $url = shift(@_) or return;
+	#die("Usage:\n$0 URL [level] [action]\n");
+	my $level = shift(@_) or 0;
+	$RULE->autoApply({url=>$url,level=>$level});
+	return @LIST_TEMP;
+}
+
+my @OPTIONS = qw/
+	help|h
+	save|s
+	output|o:s
+/;
+my %OPTS;
+GetOptions(\%OPTS,@OPTIONS);
+if($OPTS{help}) {
+	app_message <<"USAGE";
+	$0 - Lists  downloader
+	Usage:
+		$0 [--save] [--output filename] [queries|URLs]
+	Synopsis:
+		$0 -s Japan
+		$0 -s -o whatever.txt http://en.wikipedia.org/wiki/AVN_Best_New_Starlet_Award
+		$0 http://en.wikipedia.org/wiki/AVN_Best_New_Starlet_Award
+USAGE
+	exit 1;
+}
+
+
+my %stars_list = %{&load_list};
+my $IGNORE_EXP = qr/$stars_list{'#IGNORE_EXP#'}/ if($stars_list{'#IGNORE_EXP#'});
+my @query;
+if(@ARGV) {
+	foreach(@ARGV) {
+		if(m/^\/(.+)\/$/) {
+			my $exp = $1;
+			foreach my $key (keys %stars_list) {
+				if($key =~ m/$exp/) {
+					push @query,$key;
+				}
+			}
+		}
+		else {
+			push @query,$_;
+		}
+	}
+}
+else {
+	@query = keys %stars_list;
+}
+my %stars;
+my $F_lm;
+foreach my $query (@query) {
+	my $title = $query;
+	my $url = $query;
+	my $level=0;
+	$query = uri_unescape($query);
+	if($query =~ m/^(.+)\|(\d+)$/) {
+		$url = $1;
+		$level = $2;
+	}
+	my @urls;
+	my @names;
+	app_message "Processing list [$query]\n";
+	if(!$stars_list{$query}) {
+		#Treat query as a new url
+		push @urls,"$url|$level";
+		$title = $url;
+		$title =~ s/[\/:]+$//;
+		$title =~ s/^.*[\/:]+//;
+		$title = $url unless($title);
+		my $F_dup = 0;
+		if($stars_list{$title}) {
+			foreach (@{$stars_list{$title}}) {
+				if($_ eq "$url|$level") {
+					$F_dup = 1;
+					last;
+				}
+			}
+			if(!$F_dup) {
+				$F_lm = 1;
+				push @{$stars_list{$title}},"$url|$level";
+			}
+		}
+		else {
+			$stars_list{$title} = ["$url|$level"];
+			$F_lm = 1;
+		}
+	}
+	else {
+		@urls = @{$stars_list{$query}};
+	}
+	my $OUTPUT = $OPTS{output} || "$title.txt";
+	if(defined $OPTS{save}) {
+		app_message "Open $OUTPUT for writting...\n";
+		open FO,">",$OUTPUT or die("$!\n");
+	}
+	else {
+		open FO,">&STDOUT";
+	}
+	foreach(@urls) {
+		app_message "Source: ",$_,"\n";
+		if(m/^(.+)\|(\d+)$/) {
+			$_ = $1;
+			$level = $2;
+		}
+		foreach(query_list($_,$level)) {
+			next if($IGNORE_EXP and $_ =~ $IGNORE_EXP);
+			if(m/^(\d+)\.(.+)$/) {
+				$_ = strnum($1) . ".$2";
+			}
+			push @names,$_;
+		}
+	}
+	$stars{$title} = [@names];
+	print FO join("\n",@{$stars{$title}}),"\n";
+	close FO;
+	app_message scalar(@{$stars{$title}}), $OPTS{save} ? " items saved in $OUTPUT.\n" : " items [OK]\n";
+}
+if($F_lm) {
+	app_message "Saving list to ListSource.pm...";
+	save_list(\%stars_list);
+	print STDERR "\t[OK]\n";
+}

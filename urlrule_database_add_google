@@ -1,1 +1,84 @@
-../urlrule/bin/urlrule_database_add_google
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.8.0;
+our $VERSION = 'v0.1';
+
+BEGIN
+{
+    my $PROGRAM_DIR = $0;
+    $PROGRAM_DIR =~ s/[^\/\\]+$//;
+    $PROGRAM_DIR = "./" unless($PROGRAM_DIR);
+    unshift @INC, 
+        map "$PROGRAM_DIR$_",qw{modules lib ../modules ..lib};
+}
+
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man/;
+
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
+exec("urlrule_database","add",@ARGV,"google.search.image","newly");
+
+__END__
+
+=pod
+
+=head1  NAME
+
+urlrule_database_add_google - PERL script
+
+=head1  SYNOPSIS
+
+urlrule_database_add_google [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2010-06-20  duel  <duel@myplace.hell>
+        
+        * file created.
+
+=head1  AUTHOR
+
+duel <duel@myplace.hell>
+
+=cut
+
+

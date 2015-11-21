@@ -1,1 +1,276 @@
-../urlrule/bin/urlrule_new
+#!/usr/bin/perl -w
+#!/usr/bin/perl -w
+# $Id$
+use strict;
+require v5.8.0;
+our $VERSION = 'v1.2';
+BEGIN
+{
+    our $PROGRAM_DIR = $ENV{XR_PERL_SOURCE_DIR};
+    unless($PROGRAM_DIR) {
+        $PROGRAM_DIR = $0;
+        $PROGRAM_DIR =~ s/[^\/\\]+$//;
+        $PROGRAM_DIR =~ s/\/+$//;
+        $PROGRAM_DIR = "." unless($PROGRAM_DIR);
+    }
+    unshift @INC, 
+        map "$PROGRAM_DIR/$_",qw{modules lib ../modules ..lib};
+}
+my %OPTS;
+my @OPTIONS = qw/help|h|? version|ver edit-me manual|man simple|s stdin|i stdout|o/;
+if(@ARGV)
+{
+    require Getopt::Long;
+    require MyPlace::Usage;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+    MyPlace::Usage::Process(\%OPTS,$VERSION);
+}
+else
+{
+    require MyPlace::Usage;
+    MyPlace::Usage::PrintHelp();
+}
+
+use MyPlace::URLRule qw/parse_rule locate_file/;
+
+my %rule = %{parse_rule(@ARGV)};
+my $url=$rule{url};
+my $level=$rule{level};
+my $fname=$rule{source};
+
+
+if(-f $fname) {
+    print STDERR ("Rule for $url exists,opened for editing instead\n");
+    system("r-vim \"$fname\"");
+    exit 0;
+}
+else {
+	print STDERR $fname,"\n";
+}
+
+my $ftmpl = locate_file('TEMPLATE');
+
+my $editor="r-edit";
+#$editor = "notepad++" if($^O =~ /win/i);
+
+if (-f $fname) {
+    print STDERR "$fname exists,will be open for editing instead.\n";
+    exec $editor,$fname;
+    exit 0;
+}
+
+my @TEXT;
+if($OPTS{simple}) {
+    @TEXT = ("#!/usr/bin/perl -w\n","use strict;\n");
+}
+elsif($OPTS{stdin}) {
+    @TEXT=<STDIN>;
+}
+elsif(-f $ftmpl and open FI,"<",$ftmpl) {
+    @TEXT=<FI>;
+    close FI;
+}
+else {
+	push @TEXT, <<'TMPLINLINE';
+#!/usr/bin/perl -w
+
+#DOMAIN : ___NAME___
+#AUTHOR : ___AUTHOR___ <___EMAIL___>
+#CREATED: ___DATE___
+#UPDATED: ___DATE___
+#TARGET : ___TARGET___
+
+use strict;
+no warnings 'redefine';
+
+
+=method1
+sub apply_rule {
+ return (
+ #Set quick parsing method on
+       '#use quick parse'=>1,
+
+#Specify data mining method
+       'data_exp'=>undef,
+       'data_map'=>undef,
+
+#Specify data mining method for nextlevel
+       'pass_exp'=>undef,
+       'pass_map'=>undef,
+       'pass_name_map'=>undef,
+
+#Specify pages mining method
+       'pages_exp'=>undef,
+       'pages_map'=>undef,
+       'pages_pre'=>undef,
+       'pages_suf'=>undef,
+       'pages_start'=>undef,
+	   'pages_limit'=>undef,
+
+       'title_exp'=>undef,
+       'title_map'=>undef,
+       'charset'=>undef
+ );
+}
+=cut
+
+=method2
+use MyPlace::URLRule::Utils qw/get_url/;
+
+sub apply_rule {
+    my ($url,$rule) = @_;
+	my $html = get_url($url,'-v');
+    my $title = undef;
+    my @data;
+    my @pass_data;
+    #my @html = split(/\n/,$html);
+    return (
+        count=>scalar(@data),
+        data=>\@data,
+        pass_count=>scalar(@pass_data),
+        pass_data=>\@pass_data,
+        base=>$url,
+        title=>$title,
+    );
+}
+
+=cut
+
+1;
+
+__END__
+
+#       vim:filetype=perl
+
+TMPLINLINE
+
+}
+
+    use Env qw(USER HOSTNAME);
+    use POSIX qw/strftime/;
+	my %DEF;
+    $DEF{DATE} = strftime("%Y-%m-%d %H:%M",localtime());
+    $DEF{AUTHOR} = $USER || "eotect";
+    $DEF{EMAIL} = "$USER\@" . (defined $HOSTNAME ? $HOSTNAME : "myplace.hell");
+	$DEF{TARGET} = join(" ",@ARGV);
+	$DEF{NAME} = $rule{domain} || $DEF{TARGET};
+foreach(@TEXT) {
+	foreach my $D(keys %DEF) {
+		s/___${D}___/$DEF{$D}/g;
+	}
+	#s/___EMAIL___/$EMAIL/g;
+	#s/___AUTHOR___/$USER/g;
+	#s/___NAME___/$NAME/g;
+	#s/___DATE___/$DATE/g;
+	#s/___TARGET___/$TARGET/g;
+}
+
+if($OPTS{stdout}) {
+    open PIPE,">&STDOUT" or die("fatal: can't dupilicate STDOUT\n");
+}
+else {
+    open PIPE,">",$fname or die("$!\n");
+}
+print PIPE @TEXT;
+close PIPE;
+
+
+if(-f $fname)
+{
+    use File::stat;
+    my $oldst = stat($fname);
+    system("\"$editor\" \"$fname\"");
+    my $newst = stat($fname);
+    if($oldst->mtime < $newst->mtime) {
+        print STDERR "$fname saved.\n";
+    }
+    else {
+        unlink($fname) or print STDERR "$!\n";
+    }
+}
+
+
+__END__
+
+=pod
+
+=head1  NAME
+
+plnew - create new script
+
+=head1  SYNOPSIS
+
+plnew [options] <script name>
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<-i>,B<--stdin>
+
+Read template from STDIN
+
+=item B<-o>,B<--stdout>
+
+Write to STDOUT
+
+=item B<-s>,B<--simple>
+
+Disable using template.
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  FILES
+
+=item B<$XR_PERL_SOURCE_DIR>
+
+    Output directory environment variable
+
+=item $XR_PERL_SOURCE_DIR\B<perl_script.template>
+
+    Script template file
+
+=back
+
+=head1  DESCRIPTION
+
+create new perl script with custumized template. By 
+default, script will be saved in $XR_PERL_SOURCE_DIR
+
+=head1  CHANGELOG
+
+    2010-06-06  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * recreated from new template
+        * set version 1.1
+
+    2010-11-09  21:47 xiaoranzzz <xiaoranzzz@myplace.hell>
+
+        * rewrote
+        * set version 1.2
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+
+
+

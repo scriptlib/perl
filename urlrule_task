@@ -1,1 +1,671 @@
-../urlrule/bin/urlrule_task
+#!/usr/bin/perl 
+# $Id$
+our $VERSION = 'v2.0';
+use strict;
+use warnings;
+use utf8;
+#binmode STDERR,'utf8';
+#binmode STDOUT,'utf8';
+#binmode STDIN,'utf8';
+use Cwd qw/getcwd/;
+use lib $ENV{XR_PERL_MODULE_DIR};
+use MyPlace::URLRule::OO;
+use MyPlace::ReEnterable;
+use MyPlace::Script::Message;
+use MyPlace::UniqueList;
+use File::Spec;
+use Getopt::Long;
+use Encode qw/find_encoding/;
+my $UTF8 = find_encoding("utf-8");
+
+#use MyPlace::URLRule::HostMap qw/%HOST_MAP get_task valid_hostname add_host get_hosts/;
+
+use constant {
+    TASK_FILE_RESUME	=> '.urlrule_task_resume',
+    TASK_FILE_LOG		=> 'urlrule_task.log',
+	DATA_FILE_LOG		=> 'urlrule_data.log',
+};
+my @OPTIONS = qw/
+		help|h
+		manual|man
+		action|a:s
+		force|f
+		download|d
+		echo|e
+		dump
+		no-urlhist|no-uh
+		overwrite|ow
+		database|db:s
+		hosts:s
+		/;
+my %OPTS;
+GetOptions(\%OPTS,@OPTIONS);
+
+my $phnd;
+my $TASK_LOGGING    = 1;
+my $TASK_DATABASE_NAME   = $OPTS{"database"} || "DATABASE.ud";
+my $HOST_DATABASE_NAME = $OPTS{"hosts"} || "HOSTS.ud";
+my $NAMES_DATABASE = "NAMES.db";
+my @CONFIG_INC = (
+	File::Spec->curdir,
+	File::Spec->catdir($ENV{HOME} ,'.u_task'),
+	File::Spec->catdir($ENV{HOME}),
+);
+my $TASK_DATABASE = File::Spec->catfile($CONFIG_INC[0],$TASK_DATABASE_NAME);
+my $HOST_DATABASE = File::Spec->catfile($CONFIG_INC[0],$HOST_DATABASE_NAME);
+if(!-f $TASK_DATABASE) {
+	foreach(@CONFIG_INC) {
+		my $file = File::Spec->catfile($_,$TASK_DATABASE_NAME);
+		if(-f $file) {
+			$TASK_DATABASE = $file;
+			last;
+		}
+	}
+}
+if(!-f $HOST_DATABASE) {
+	foreach(@CONFIG_INC) {
+		my $file = File::Spec->catfile($_,$HOST_DATABASE_NAME);
+		if(-f $file) {
+			$HOST_DATABASE = $file;
+			last;
+		}
+	}
+}
+my $U_DOWNLOADER = 'batchget --maxtime 600 -U --nc -m 2 -f';#-r \'#URLRULE_HOST#\'';
+my $S_DOWNLOADER = 'batchget --maxtime 600 --nc -m 2 -f';# -r \'#URLRULE_BASE#\'';
+my $TASK_WORKDIR = getcwd();;
+my $TASK_FILEHANDLE_LOG;
+if($OPTS{'help'}) {
+	require Pod::Usage;
+	Pod::Usage::pod2usage('-exitval'=>1,'-verbose'=>1);
+	exit 1;
+}
+elsif($OPTS{'manual'}) {
+	require Pod::Usage;
+	Pod::Usage::pod2usage('-exitval'=>1,'-verbose'=>3);
+	exit 2;
+}
+
+if($OPTS{'force'}) {
+	$OPTS{'overwrite'} = 1;
+	$OPTS{'no-urlhist'} = 1;
+}
+
+if($OPTS{'overwrite'}) {
+	$U_DOWNLOADER =~ s/ --nc / --dl-force /;
+	$S_DOWNLOADER =~ s/ --nc / --dl-force /;
+}
+
+use MyPlace::Config;
+use MyPlace::HashArray;
+my $Database;
+my $Names;
+my $URLRULE;
+my %URLHIST;
+
+
+
+use POSIX qw/strftime/;
+sub NOW {
+	return strftime("%Y-%m-%d %H:%M:%S",localtime);
+}
+
+sub init_database {
+	$Database = MyPlace::Config->new();
+	$Database->read_plainfile($TASK_DATABASE);
+	$Names = MyPlace::HashArray->read($NAMES_DATABASE);
+#print Data::Dumper->Dump([$Names],['*Names']),"\n";
+	$URLRULE = new MyPlace::URLRule::OO(
+		buildurl=>1,
+		createdir=>1,
+		callback_nextlevel=>\&process_passdown_task,
+		process_callback_applyrule=>1,
+		callback_action=>\&callback_do_action,
+	);
+	return 1;
+}
+
+sub init_task {
+    $phnd= MyPlace::ReEnterable->new('main');
+}
+
+
+sub callback_do_action {
+	my ($urlrule,$data,@args) = @_;
+	my @passing;
+	my $topdir = $urlrule->{'UTASK'}->{topdir};
+#	print STDERR "Callback do_action" . ($topdir ? " [$topdir]" : "") . "\n";
+	if(($OPTS{'no-urlhist'}) || (!$topdir) || (!$URLHIST{$topdir})) {
+		return $urlrule->do_action($data,@args);
+	}
+	my $HIST = $URLHIST{$topdir};
+	my $dup = 0;
+	foreach(@{$data}) {
+		if(m/^data:\/\//) {
+			push @passing,$_;
+		}
+		elsif($HIST->add($_)) {
+			push @passing,$_;
+		}
+		else {
+			$dup++;
+		}
+	}
+	if($dup) {
+		app_prompt("[URL History]", with_color(
+			"^(RED)$dup^(YELLOW)" . ($dup > 1 ? " items" : " item") . " ignored.^(RESET)"
+			),"\n");
+	}
+	my @r = $urlrule->do_action(\@passing,@args);
+	$HIST->save;
+	return @r;
+}
+
+sub change_directory {
+    my $path = shift;
+    return 1 unless($path);
+    if(! -d $path) {
+#        app_message("Creating directory $path...");
+        if(mkdir $path) {
+            print STDERR "\t[OK]\n";
+        }
+        else {
+            print STDERR "\t[Failed]\n";
+            return undef;
+        }
+    }
+    app_message("Enter $path ...");
+    if(chdir $path) {
+        print STDERR "\t[OK]\n";
+    }
+    else {
+        print STDERR "\t[Failed]\n";
+        return undef;
+    }
+    return 1;
+}
+
+sub process_passdown_task {
+	my $res = shift;
+    #print Data::Dumper->Dump([$res],['*res']);
+	$phnd->push(getcwd,'load_rule',@{$res}{qw/title url level action/});
+}
+sub execute_rule {
+    my $CWD = getcwd;
+	return if(ignore_this(@_));
+	my ($dir,$url,$level,$action) = @_;
+	my @prog = (qw/urlrule_action/);
+	push @prog,"--directory",$dir if($dir);
+	push @prog,$url,$level,$action;
+	system(@prog);
+    chdir $CWD;
+}
+sub load_rule {
+    my $CWD = getcwd;
+	return if(ignore_this(@_));
+	my ($dir,$url,$level,$action) = @_;
+	$URLRULE->autoApply({url=>$url,level=>$level,action=>$action,title=>$dir});
+    chdir $CWD;
+}
+
+sub name_exp {
+	my $exp = shift;
+	my @values = @_;
+	print STDERR @values,"=>";
+	if($exp =~ m/(\{([LlUu]?)[Nn][Aa]([^\w])?[Mm][Ee]\})/) {
+		my $m = $1;
+		my $case =$2 || "";
+		my $sp = $3;
+		foreach(@values) {
+			if($case eq 'L') {
+				$_ = lc($_);
+			}
+			elsif($case eq 'l') {
+				s/\b(.)/\L$1/g;
+			}
+			elsif($case eq 'U') {
+				$_ = uc($_);
+			}
+			elsif($case eq 'u') {
+				s/\b(.)/\U$1/g;
+			}
+			s/ /$sp/g if($sp);
+		}
+		$exp =~ s/\{[LlUu]?[Nn][Aa][^\w]?[Mm][Ee]\}/{name}/g;
+	}
+	if($exp =~ m/(.)\{name\}\1/) {
+		map {$_ = "$1$_$1";} @values;
+		$exp =~ s/(.)\{name\}\1/\{name\}/g;
+	}
+	my $rpl = join(" OR ",@values);
+	$exp =~s/\{name\}/$rpl/g;
+	return $exp;
+}
+
+sub convert_records {
+    my ($Hosts,@records) = @_;
+    my @r;
+    foreach my $record (@records) {
+        foreach my $path (@{$record}) {
+            my($name,$id,$host) = @{$path};
+            next unless($name);
+            next unless($id);
+            next unless($host);
+			if($id =~ m/\{[LlUu]?[Nn][Aa][^\w]?[Mm][Ee]\}/) {
+				my @values = ($name);
+				if($Names->{$name}) {
+					push @values,@{$Names->{$name}};
+				}
+				$id = name_exp($id,@values);
+			}
+            if($host =~ m/^#/) {
+                push @r,[$name,$id,$host];
+                next;
+            }
+            my $hostname = $host;
+            if($hostname =~ m/^([^\|]+)\|(.*)$/) {
+                $hostname = $1;
+            }
+            my ($url) = $Hosts->propget($hostname);
+            if($url) {
+                my ($level) = $Hosts->propget($hostname,$url);
+                my ($id_name,@id_text);
+				if($id =~ m/^https?:\/\//) {
+					$id_name = $id;
+				}
+				else {
+					($id_name,@id_text) = split(/\s*:\s*/,$id);
+				}
+                $url =~ s/###(?:ID|NAME])###/$id_name/g;
+                $url =~ s/\{(?:ID|NAME])\}/$id_name/g;
+                my $index = 0;
+                foreach(@id_text) {
+                    $index++;
+                    $url =~ s/###TEXT$index###/$_/g;
+                    $url =~ s/\{TEXT$index\}/$_/g;
+                }
+				$url =~ s/###TEXT\d*###//g;
+				$url =~ s/\{TEXT\d*\}//g;
+                push @r,[$name,$id,$host,$url,$level,$path];
+            }
+            else {
+                app_error("HOST $host isn't valid, or not defined in : $HOST_DATABASE\n" .
+					"Source: $name $id $host\n"
+				);
+            }
+        }
+    }
+    return @r;
+}
+
+sub action_ECHO {
+    my $task = shift;
+    my($name,$id,$host,$url,$level) = @{$task};
+    $level=0 unless($level);
+    if($host =~ m/^#(.*)$/) {
+        app_message("$name/$1 = \'$id\'\n");
+        #app_message("$name/$1 $id\n");
+    }
+    else {
+        app_message("$name/$host [$level]$url\n");
+    }
+    return;
+}
+
+
+sub action_DUMP {
+    my $task = shift;
+    my($name,$id,$host,$url,$level) = @{$task};
+    my($status,$rule,$result,@msg) = urlrule_process_args(undef,$url,$level);
+    if($status) {
+        use Data::Dumper;
+        print Data::Dumper->Dump([$result],['*result']);
+        return 1;
+    }
+    else {
+        app_error("Error:",$rule,$result,@msg,"\n");
+        return undef;
+    }
+}
+sub action_DOWNLOAD {
+	my ($name,$hostname,$url,$level,$host) = _preprocess(@_);
+	return unless($name);
+    app_message("Processing $name/$host\n");
+    &log("DOWNLOAD - $name/$host $url\[$level\]");
+	my $dl = $S_DOWNLOADER . ' -r \'#URLRULE_BASE#\'';
+    if($host =~ /google|baidu|yahoo|sogua|search$|searching$/) {
+		$dl = $S_DOWNLOADER;
+    }
+#	elsif($host =~ /href\.img|\|galleries$/) {
+#		load_urlhist($topdir);
+#	}
+#	elsif($prop_urlhist) {
+#		load_urlhist($topdir);
+#	}
+    load_rule("$name/$hostname",$url,$level,$dl);
+#	save_urlhist("$name/$hostname");
+    return 1;
+}
+
+sub _preprocess {
+    my $task = shift;
+    my($name,$id,$host,$url,$level,$path) = @{$task};
+    my $hostname;
+    if($host =~ /^[^\|]+\|(.+)$/)
+    {
+        $hostname = $1;
+    }
+    elsif($host =~ m/^#(.+)$/) {
+        app_message("$name/$1 = \'$id\'\n");
+        return undef;
+    }
+    else
+    {
+        $hostname = $host;
+    }
+	if($path) {
+	    my $Database = MyPlace::Config->new();
+		$Database->read_plainfile($TASK_DATABASE);
+	#	$prop_urlhist = $Database->propget(@{$path}[0,1,2],"urlhist");
+	    $Database->propset(NOW,$path->[0],$path->[1],$path->[2],"last");
+		app_message("Saving database ...\n");
+	    $Database->write_plainfile($TASK_DATABASE);
+	}
+    if(! -d "$name")
+    {
+   #     app_message("Create directory: $name\n");
+        mkdir $name;
+    }
+    if(! -d "$name/$hostname") 
+    {
+    #    app_message("Create directory: $name/$hostname\n");
+        mkdir "$name/$hostname";
+    }
+    if(! -d "$name/$hostname") 
+    {
+        app_error("Can't access $name/$hostname!\n");
+        return undef;
+    }
+	my $topdir = File::Spec->rel2abs("$name/$hostname");
+	$URLRULE->{'UTASK'}->{topdir} = "$topdir";
+	$URLHIST{$topdir} = new MyPlace::UniqueList(
+		file=>File::Spec->catfile($topdir,'URLS.txt'),
+		itemName=>'URL',
+		itemsName=>'URLs',
+		autoAdd=>1,
+		message=>1
+	) unless($URLHIST{$topdir} || $OPTS{'no-urlhist'});
+	
+	return $name,$hostname,$url,$level,$host;
+
+}
+sub action_DOWNLOADER {
+	my ($name,$hostname,$url,$level,$host) = _preprocess(@_);
+	return unless($name);
+    app_message("Processing $name/$host\n");
+    &log("DOWNLOAD - $name/$host $url\[$level\]");
+    execute_rule("$name/$hostname",$url,$level,'DATABASE');
+	use MyPlace::Program::Downloader;
+	my $MD = new MyPlace::Program::Downloader;
+	$MD->execute(
+		'--directory',"$name/$hostname",
+		'--recursive',
+		'--input','urls.lst',
+	);
+    return 1;
+}
+
+sub action_SAVE {
+	my ($name,$hostname,$url,$level,$host) = _preprocess(@_);
+	return unless($name);
+    app_message("Processing $name/$host\n");
+    &log("DOWNLOAD - $name/$host $url\[$level\]");
+    load_rule("$name/$hostname",$url,$level,'SAVE');
+    return 1;
+}
+
+
+sub action_FEED {
+    my $task = shift;
+    my($name,$id,$host,$url,$level) = @{$task};
+    my $hostname;
+    if($host =~ /^[^\|]+\|(.+)$/)
+    {
+        $hostname = $1;
+    }
+    elsif($host =~ m/^#(.+)$/) {
+        app_message("$name/$1 = \'$id\'\n");
+        return 1;
+    }
+    else
+    {
+        $hostname = $host;
+    }
+    if(! -d "$name")
+    {
+        app_message("Create directory: $name\n");
+        mkdir $name;
+    }
+    if(! -d "$name/$hostname") 
+    {
+        app_message("Create directory: $name/$hostname\n");
+        mkdir "$name/$hostname";
+    }
+    if(! -d "$name/$hostname") 
+    {
+        app_error("Can't access $name/$hostname!\n");
+        return undef;
+    }
+    #my $Database = MyPlace::Config->new();
+    $Database->read_plainfile($TASK_DATABASE . "processed");
+    $Database->propset(NOW,$name,$id,$host,"last");
+    app_prompt("Saving database ...\n");
+    $Database->write_plainfile($TASK_DATABASE . "processed");
+    app_prompt('Processing task',"$name/$host\n");
+    &log("DOWNLOAD - $name/$host $url\[$level\]");
+    if($host =~ /google|baidu|yahoo|sogua/) {
+        load_rule("$name/$hostname",$url,$level,$U_DOWNLOADER);
+    }
+    else {
+        load_rule("$name/$hostname",$url,$level,$S_DOWNLOADER);
+    }
+    return 1;
+}
+sub log {
+    open $TASK_FILEHANDLE_LOG,">>",TASK_FILE_LOG;
+    print $TASK_FILEHANDLE_LOG NOW,": ",@_,"\n" if(@_);
+    close $TASK_FILEHANDLE_LOG;
+}
+
+
+sub sig_killed {
+    app_message("saving remained tasks...\n");
+    if($phnd->{lastStack}) {
+        $phnd->unshift(@{$phnd->{lastStack}});
+    }
+    chdir($TASK_WORKDIR) if($TASK_WORKDIR);
+    $phnd->saveToFile(TASK_FILE_RESUME);
+    app_message($phnd->length," task(s) saved to " . TASK_FILE_RESUME . "\n");
+    clean_up();
+    exit 1;
+}
+
+
+$SIG{INT} = \&sig_killed;
+
+sub clean_up {
+}
+
+sub ignore_this {
+	if($OPTS{force}) {
+		return undef;
+	}
+	else {
+		return undef;
+	}
+}
+
+my $action = $OPTS{'action'};
+if((!$action)) {
+	$action = $OPTS{'download'} ? 'DOWNLOAD' : $OPTS{'echo'} ? 'ECHO' : $OPTS{'dump'} ? 'DUMP' : undef;
+}
+
+if(@ARGV) {
+    die("No DATA_FILE(" . $TASK_DATABASE . ") found\n") unless(-r $TASK_DATABASE);
+    $action = shift @ARGV unless($action);
+	my $query = shift @ARGV;
+    if($action eq 'DUMP') {
+    }
+    elsif($action eq 'DOWNLOAD') {
+    }
+    elsif($action eq 'ECHO') {
+    }
+	elsif($action eq 'SAVE') {
+	}
+	elsif($action eq 'DOWNLOADER') {
+	}
+    else {
+        $query = $action;
+        $action = 'ECHO';
+    }
+    my $Hosts = MyPlace::Config->new();
+    $Hosts->read_plainfile($HOST_DATABASE);
+	my @queries = @ARGV;
+	unshift @queries,$query if($query);
+	if(!@queries) {
+		app_prompt('Reading QUERIES','from STDIN',"\n");
+		while(<STDIN>) {
+			chomp;
+			push @queries,$_ if($_);
+		}
+	}
+	@queries = ('/.?/') unless(@queries);
+	my @targets;
+	&init_database;
+	foreach(@queries) {
+		next unless($_);
+		#$_ = $UTF8->decode($_);
+		my @q = split(/\s*,\s*/,$_);
+		foreach(@q) {
+			$_ = '/.?/' unless($_);
+		}
+		$_ = join(",",@q);
+		my @r =  $Database->query($_);
+		if(!@r) {
+			next unless(m/^[^,]+,[^,]+,[^,]+$/);
+		}
+		if((!@r) and $_ !~ m/\/,/) {
+			@r = ([split(/\s*,\s*/,$_),'newly']);
+		}
+		push @targets,@r if(@r);
+	}
+    my @records = $Database->get_records(@targets);
+    my @tasks = convert_records($Hosts,\@records);
+    if($action eq 'DOWNLOAD' || $action eq 'SAVE' || $action eq 'DOWNLOADER') {
+        &init_task;
+		foreach(@queries) {
+			&log($action," - ",$_);
+		}
+        foreach(@tasks) {
+            $phnd->push($TASK_WORKDIR,"action_$action",$_);
+        }
+    }
+    else {
+        foreach(@tasks) {
+            eval("action_$action(\$_)");
+        }
+        exit 0;
+    }
+}
+else {
+	&init_database;
+    &init_task;
+    $phnd->loadFromFile(TASK_FILE_RESUME);
+	$action = 'DOWNLOAD';
+}
+
+unless($phnd->length) {
+    app_error("Nothing to do!\n");
+    exit 0;
+}
+my $idx = 0;
+while(my $tasks = $phnd->length) {
+	$idx ++;
+	app_prompt("[" . NOW . "]",color('RED'),$idx,color('CYAN')," tasks fininshed, ",color('RED'),$tasks,color('CYAN')," remained.\n\n");
+    $phnd->run();
+}
+app_message "All tasks completed.\n";
+unlink TASK_FILE_RESUME if(-f TASK_FILE_RESUME);
+exit 0;
+
+__END__
+
+=pod
+
+=head1  NAME
+
+urlrule_task - DOWNLOAD sites according to urlrule
+
+=head1  SYNOPSIS
+
+urlrule_task [options] QUERIES...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--action>,B<-a>
+
+Specify action
+
+=item B<--download>,B<-d>
+
+Same as B<--action DOWNLOAD>
+
+=item B<--echo>,B<-e>
+
+Same as B<--action ECHO>
+
+=item B<--dump>
+
+Same as B<--action DUMP>
+
+=item B<--overwrite>,B<--ow>
+
+Switch downloader to overwriting mode.
+
+=item B<--no-urlhist>,B<--no-uh>
+
+Disabled URLs history tracking.
+
+=item B<--force>,B<-f>
+
+Same as B<--no-urlhist> B<--overwrite>
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=back
+
+=head1  DESCRIPTION
+
+urlrule database downloader
+
+=head1  CHANGELOG
+
+    2012-01-18 02:34  xiaoranzzz  <xiaoranzzz@myplace.hell>
+        
+        * add manual
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@myplace.hell>
+
+=cut
+
+#       vim:filetype=perl

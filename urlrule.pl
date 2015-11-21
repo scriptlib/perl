@@ -1,1 +1,1 @@
-../urlrule/bin/urlrule
+modules/MyPlace/Program/URLRule.pm

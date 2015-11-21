@@ -1,1 +1,224 @@
-../urlrule/bin/urlrule_action
+#!/usr/bin/perl -w
+###APPNAME:     urlrule_action
+###APPAUTHOR:   eotect@myplace
+###APPDATE:		Mon Mar 24 06:25:31 2008
+###APPVER:		2.0
+###APPDESC:     apply rule for URL,and perform action	
+###APPUSAGE:	urlrule_action URL [0-5] [action args...]
+###APPEXAMPLE:	urlrule_action http://www.sina.com.cn 0 cat
+use strict;
+use utf8;
+#binmode STDOUT,':utf8';
+#binmode STDERR,':utf8';
+#binmode STDIN,':utf8';
+our $VERSION = 'v2.0';
+
+#GLOBAL VARAIBLE
+my @OPTIONS;
+my %OPTS;
+my $CONF;
+my $RULE;
+my $PROGRAM;
+my $HISTORY;
+my $URLIGNORE;
+my $CWD;
+my $MSG;
+
+
+sub after_apply_rule {
+	my $status = shift;
+	my $result = shift;
+	my $rule = shift;
+	if($result && ref $result && !$result->{error}) {
+		if($rule->{level} <= $OPTS{test}) {
+			if($result->{nextlevel}) {
+				my $pcount = $result->{nextlevel}{count};
+				my $ccount = 1;
+				if($ccount < $pcount) {
+					$MSG->warn("TEST MODE: trim PASS_DATA from <$pcount> down to <$ccount>\n");
+					$result->{nextlevel}{data} = [@{$result->{nextlevel}{data}}[0 .. $ccount-1]];
+				}
+			}
+		}
+	}
+	return $status,$result;
+}
+
+sub process_passdown {
+    my $CWD = getcwd();
+	foreach my $resp (reverse @_) {
+		$PROGRAM->push($CWD,'load_rule',@{$resp}{qw/title url level action progress/});
+	}
+}
+
+sub load_rule {
+    my $CWD = getcwd();
+	my ($title,$url,$level,$action,$progress) = @_;
+	my $rep = $url . ($level ? "|$level" : "");
+	if($URLIGNORE->check($rep)) {
+		$MSG->message("Ignored: $rep\n");
+		goto END_LOAD_RULE;
+	}
+	if($OPTS{"history"}) {
+		if($action && (!$level)) {
+			if($HISTORY->check($url)) {
+				$MSG->message("Ignored, URL'd been processed. $url\n");
+				goto END_LOAD_RULE;
+			}
+		}	
+	}
+	my $status;
+	my $retry = 1;
+	while(1) {
+		($status,undef) = $RULE->autoApply($url,$level,$action,$title,$progress);
+		last if($status);
+		last if($retry > 3);
+		$MSG->warning("[$retry/3] Retry in 3 seconds ...\n");
+		$retry++;
+		sleep 3;
+	}
+	if(!$status) {
+		$MSG->error("Failed appling rule to $url \[Level $level\]\n");
+		goto END_LOAD_RULE;
+	}
+	$retry = 0;
+	if($OPTS{"history"}) {
+		#THIS IS BUGGY, Because $status not always return mearningful value.
+		#ESPECIALLY when pass data to child program
+		if($status && (!$level)) {
+			$HISTORY->save($url);
+		}
+	}
+END_LOAD_RULE:
+#print STDERR "Return to $CWD\n";
+    chdir $CWD;
+}
+
+sub sig_killed {
+	delete $SIG{INT};
+	if($OPTS{"history"}) {
+		$HISTORY->write();
+	}
+    $MSG->message("Saving remained tasks...\n");
+    if($PROGRAM->{lastStack}) {
+        $PROGRAM->push(@{$PROGRAM->{lastStack}});
+    }
+    chdir($CWD) if($CWD);
+    $PROGRAM->saveToFile();
+    $MSG->message($PROGRAM->length," tasks saved for resuming\n");
+    exit 1;
+}
+
+sub set_options {
+	my @ARGV = @_;
+	die(join("\t",@ARGV));
+	return @ARGV;
+}
+
+# INIT
+use MyPlace::Script::Message;
+use MyPlace::URLRule::OO;
+use MyPlace::URLRule::Config;
+use Cwd qw//;
+use Encode qw/find_encoding/;
+my $UTF8 = find_encoding("utf8");
+sub getcwd {
+	return $UTF8->decode(Cwd::getcwd());
+}
+@OPTIONS = qw/
+	help|h|? 
+	manual|man
+    verbose|v:i
+	history
+	test|t:i
+	prompt|p:s
+	directory|d=s
+	fullname
+	thread
+	force|f
+/;
+if(@ARGV) {
+	require Getopt::Long;
+	Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+}
+if($OPTS{'help'} or $OPTS{'manual'}) {
+	require Pod::Usage;
+	my $v = $OPTS{'help'} ? 1 : 2;
+	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
+    exit $v;
+}
+
+#$_ = $UTF8->decode($_) foreach(@ARGV);
+
+$CONF = MyPlace::URLRule::Config->new();
+$PROGRAM = $CONF->resume();
+if(@ARGV) {
+    $PROGRAM->push($CWD,'load_rule',$OPTS{directory},@ARGV);
+}
+else {
+    $PROGRAM->loadFromFile();
+	my $opts = $PROGRAM->getState("OPTIONS");
+	if($opts) {
+		%OPTS = (
+			%{$opts},
+			%OPTS,
+		);
+	}
+	$PROGRAM->setState("OPTIONS",\%OPTS);
+	if(!$PROGRAM->length) {
+		print STDERR "Nothing to resume\n";
+		print STDERR "Read tasks from STDIN...\n";
+		while(<STDIN>) {
+			chomp;
+			my $line = shift;
+			my @args = split($line,"\t");
+			$PROGRAM->push('load_rule',undef,@args);
+		}
+	}
+}
+$RULE = new MyPlace::URLRule::OO(
+		buildurl=>1,
+		createdir=>1,
+		callback_nextlevels=>\&process_passdown,
+		thread=>$OPTS{thread},
+		force=>$OPTS{force},
+		options=>{
+			fullname=>$OPTS{fullname},
+		},
+);
+my $appname = $0;
+$appname =~ s/^.+\///;
+$MSG = MyPlace::Script::Message->new($appname . ($OPTS{prompt} ? " [$OPTS{prompt}] " : ''));
+$CWD = getcwd();
+
+if($OPTS{test}) {
+	$OPTS{'history'} = 0;
+	$RULE->{request}->{AfterApplyRule} = \&after_apply_rule;
+}
+
+if($OPTS{'history'}) {
+	$HISTORY = $CONF->history;
+	$HISTORY->load();
+}
+$URLIGNORE = $CONF->ignore();
+$URLIGNORE->load();
+$URLIGNORE->close();
+
+$SIG{INT} = \&sig_killed;
+
+my $TASKSDONE = 0;
+while(my $tasks = $PROGRAM->length) {
+    $MSG->blue("[$tasks] tasks remained\n");
+    $PROGRAM->run();
+	$TASKSDONE++;
+	if(($TASKSDONE % 19) == 0) {
+	    $PROGRAM->saveToFile();
+		$MSG->green($PROGRAM->length . " tasks AUTO saved.\n");
+	}
+}
+$MSG->message("All tasks completed.\n");
+if($OPTS{"history"}) {
+	$HISTORY->save_last();
+	$HISTORY->write();
+}
+exit 0;
