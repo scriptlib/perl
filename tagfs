@@ -23,6 +23,8 @@ my @OPTIONS = qw/
 	root|r=s
 	hard
 	symbol|s
+	date|d
+	junction
 /;
 my %OPTS;
 my @SAVE_ARGV = @ARGV;
@@ -51,6 +53,27 @@ my @files;
 die(format_help($0)) unless(@files);
 
 my @linker = ('ln','-f', ($OPTS{hard} ? () : '-s'), '-t');
+my @ntfs_linker = ('ntfs-link');
+	foreach(qw/symbol hard junction/) {
+		push @ntfs_linker,'--' . $_ if($OPTS{$_});
+	}
+
+sub create_taglink {
+	my $taglink =  shift;
+	my $source = shift;
+	my $is_file = shift;
+	my @cmds;
+	if($ENV{OS} and $ENV{OS} =~ m/Windows/i) {
+		push @cmds,@ntfs_linker,'--target',$taglink;
+		push @cmds,'--symbol' if($is_file);
+		push @cmds,$source;
+	}
+	else {
+		push @cmds,@linker,$taglink,$source;
+	}
+	system_execute(@cmds);
+}
+
 sub get_basename {
     my $fullname = shift;
     return unless($fullname);
@@ -109,7 +132,7 @@ my %tags;
 @tags = split(/\s*,\s*/,$tags);
 %tags = map {$_=>1} @tags;
 die("Empty tag list!\n") unless(%tags);
-$tags{now(1)} = 1 if($tags{new} || $tags{newly} || $tags{income} || $tags{incoming});#unless($tags{retag});
+$tags{now(1)} = 1 if($OPTS{date} || $tags{new} || $tags{newly} || $tags{income} || $tags{incoming});#unless($tags{retag});
 @tags = keys %tags;
 
 my $log_files=$root . "tagfs.logs";
@@ -151,13 +174,18 @@ sub tag_files {
        if(! -e "$saved_in/$basename") {
             system_execute("mv","--",$file,$saved_in);
        }
+	   my @opts;
+	   if(-f "$saved_in/$basename") {
+			push @opts,'--file';
+	   }
        foreach my $tag (@tags) {
             if(! -d "$root$tag") {
                 create_dir("$root$tag") or die("$!\n");
             }
 			my @level = ($tag =~ m/\//g);
 			my $dotdot = scalar(@level) + 1;
-            system_execute(@linker,"$root$tag","../"x$dotdot . "$REALTAG/$basename");
+			create_taglink("$root$tag","../"x$dotdot . "$REALTAG/$basename",@opts);
+#            system_execute(@linker,"$root$tag","../"x$dotdot . "$REALTAG/$basename");
        }
     }
 }

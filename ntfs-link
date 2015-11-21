@@ -4,12 +4,12 @@ package MyPlace::Script::ntfs_junction;
 use strict;
 use Cwd qw/getcwd/;
 use File::Spec::Functions qw/catdir catfile/;
-
+my $UTF8;
 our $VERSION = 'v0.1';
 my @OPTIONS = qw/
 	help|h|? 
 	manual|man
-	target|t
+	target|t=s
 	junction|j
 	symbold|d
 	symbol|s
@@ -30,20 +30,49 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
     exit $v;
 }
 
+sub run {
+	return unless(@_);
+	my $BOUT = *STDOUT;
+	open STDOUT,"<","/dev/null";
+	close STDOUT;
+	my $r = system(@_);
+	open STDOUT,"<",$BOUT;
+	return ($r == 0);
+
+	#return system(@_) == 1;
+#	use Encode qw/from_to find_encoding/;
+	$UTF8 = find_encoding('utf-8') unless($UTF8);
+	if(open FI,'-|',@_) {
+		while(<FI>) {
+			from_to($_,'gbk','utf-8');
+			print STDERR $UTF8->encode($UTF8->decode($_));
+		}
+		close FI;
+		return 1;
+	}
+	else {
+		print STDERR "Error: $!\n";
+		return undef;
+	}
+}
+
 sub create_link {
 	my $OPTS = shift;
 	my $target = shift;
 	my $link = shift;
 	my @prog = (qw/cmd.exe \/c mklink/);
+	
 	if(!$OPTS) {
 		$OPTS={symbold=> 1};
 	}
-	if($OPTS->{junction}) {
+
+	
+	if($OPTS->{symbol} || $OPTS->{file}) {
+		print STDERR "Creating symbol link for files";
+	}
+	elsif($OPTS->{junction}) {
 		print STDERR "Creating junction for directories";
 		push @prog,'/j';
-	}
-	elsif($OPTS->{symbol}) {
-		print STDERR "Creating symbol link for files";
 	}
 	elsif($OPTS->{hard}) {
 		print STDERR "Creating hard link";
@@ -54,7 +83,8 @@ sub create_link {
 		push @prog,'/d';
 	}
 	print STDERR "\n  $link\n  => $target\n";
-	return (system(@prog,$link,$target)==0);
+
+	return (run(@prog,$link,$target)==0);
 }
 
 sub junction {
@@ -63,7 +93,7 @@ sub junction {
 	my $junction = shift;
 	print STDERR "  Create junction $junction\n   =>$target>\n";
 	my @prog = (qw/cmd.exe \/c mklink \/d/);
-	return (system(@prog,$junction,$target)==0);
+	return run(@prog,$junction,$target);
 }
 
 
@@ -99,9 +129,14 @@ if($OPTS{'target'}) {
 		exit 1;
 	}
 	foreach my $src (@ARGV) {
-		my $src = $_;
+		$OPTS{file} = 1 if(-f $src);
+
 		my $name = get_basename($src);
+		$src =~ tr'/'\\';
+
 		$failed = 1 unless(create_link(\%OPTS,$src,$DSTD . "\\" . $name));
+
+		delete $OPTS{file};
 	}
 }
 else {
@@ -117,6 +152,7 @@ else {
 	elsif($junction =~ m/\/$/) {
 		$junction = catfile($junction,get_basename($target));
 	}
+	$OPTS{file} = 1 if(-f $target);
 	$failed=1 unless(create_link(\%OPTS,ms_path($target),ms_path($junction)));
 }
 exit 1 if($failed);

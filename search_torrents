@@ -56,9 +56,13 @@ my %ENGINES = (
 		'http://btdigg.me/?###QUERY###',
 		3,
 	],
-	'ganluzhe.com'=>[
-		'http://www.ganluzhe.com/###QUERY###',
-		2,
+#	'ganluzhe.com'=>[
+#		'http://www.ganluzhe.com/###QUERY###',
+#		2,
+#	],
+	'btbibi.com'=>[
+		'http://btbibi.com/###QUERY###',
+		3,
 	],
 	'torrentproject'=>[
 		'https://torrentproject.se/?safe=off&t=###QUERY###',
@@ -75,10 +79,6 @@ my %ENGINES = (
 );
 
 my %ENGINES2  = (
-	'btbibi.com'=>[
-		'http://btbibi.com/###QUERY###',
-		3,
-	],
 	'breadsearch.com'=>[
 		'http://www.breadsearch.com/search/###QUERY###',
 		1,
