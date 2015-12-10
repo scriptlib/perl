@@ -1,5 +1,14 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl 
 # $Id$
+#===============================================================================
+#         NAME: ___NAME___
+#  DESCRIPTION: 
+#       AUTHOR: ___AUTHOR___ <___EMAIL___>
+# ORGANIZATION: ___COMPANY___
+#      VERSION: 1.0
+#      CREATED: ___DATE___
+#     REVISION: ---
+#===============================================================================
 package ___PACKAGE___;
 use strict;
 
@@ -12,6 +21,7 @@ my %OPTS;
 if(@ARGV)
 {
     require Getopt::Long;
+	#Getopt::Long::Configure('pass_through',1);
     Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
 }
 else {

@@ -97,7 +97,7 @@ use Env qw/USER HOSTNAME/;
 use POSIX qw/strftime/;
 my $DATE= strftime("%Y-%m-%d %H:%M",localtime());
 $USER="xiaoranzzz" unless($USER);
-my $EMAIL="$USER\@" . (defined $HOSTNAME ? $HOSTNAME : "myplace.hell");
+my $EMAIL="$USER\@" . (defined $HOSTNAME ? $HOSTNAME : "MyPlace HEL ORG.");
 foreach(@TEXT) {
     s/___NAME___/$module_name/g;
     s/___AUTHOR___/$USER/g;
