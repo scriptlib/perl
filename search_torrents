@@ -39,6 +39,10 @@ my %ENGINES = (
 	#	'http://btkitty.so/?###QUERY###',
 	#	3,
 	#],
+	'btdigg.org'=>[
+		'https://btdigg.org/?###QUERY###',
+		2,
+	],
 	'sobt5.com'=>[
 		'http://www.sobt5.com/q/###QUERY###',
 		1,
@@ -52,8 +56,8 @@ my %ENGINES = (
 	#	'http://www.torrentkittyzw.com/###QUERY###',
 	#	3,
 	#],
-	'btdigg.me'=>[
-		'http://btdigg.me/?###QUERY###',
+	'btdigg.ws'=>[
+		'http://btdigg.ws/?###QUERY###',
 		3,
 	],
 #	'ganluzhe.com'=>[
@@ -95,7 +99,7 @@ my %GROUPS = (
 		torrentkitty
 		sobt5.com
 		btkitty
-		btdigg.me
+		btdigg.ws
 		btbibi.com
 		torrentkittyzw.com
 		breadsearch.com
