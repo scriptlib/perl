@@ -84,7 +84,7 @@ sub create_link {
 	}
 	print STDERR "\n  $link\n  => $target\n";
 
-	return (run(@prog,$link,$target)==0);
+	return run(@prog,$link,$target);
 }
 
 sub junction {

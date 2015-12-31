@@ -108,8 +108,8 @@ sub download {
 	return 1;
 }
 
+p_tee(join(" ",$0,@OLD_ARGV),"\n");
 p_tee("Start\n");
-p_tee("      For> " . join(" ",@OLD_ARGV),"\n");
 my @ms = $OPTS{mirror} ? split(/\s*,\s*/,$OPTS{mirror}) : values %MIRRORS;
 my @projects;
 my @appends;

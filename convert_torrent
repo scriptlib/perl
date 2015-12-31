@@ -175,6 +175,12 @@ my %HZPY = qw/
 	奸 Jian
 	大	Da
 	涩	Se
+	女	Nv
+	嫖	Piao
+	妓	Ji
+	射	She
+	骚	Sao
+	妻	Qi
 /;
 
 
@@ -402,6 +408,10 @@ discuss.com.hk
 	神器
 	台灣
 	香蕉魔盒
+	破处
+	内内
+	外射
+	后入
 /;
 =cut
 =qustionable 
@@ -410,8 +420,13 @@ discuss.com.hk
 =ok
 =cut
 my @indoubt = qw/
+
 /;
 my @dirty = qw/
+	颜射
+	骚妻
+	嫖妓
+	女主播
 	18p2p
 	你懂的 
 	招妓

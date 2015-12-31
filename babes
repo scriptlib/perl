@@ -44,6 +44,10 @@ my @OPTIONS = qw/
 	taskspool
 	mtm
 	weipai
+	meipai
+	miaopai
+	weibo
+	moko
 	mplayer=s
 	start=i
 	find=s
@@ -58,6 +62,7 @@ my @OPTIONS = qw/
 	sites|hosts=s
 	norc|nr
 	same-directory
+	mkdir|md
 /;
 our %CONF;
 our @DATABASE_DIR = qw{
@@ -153,6 +158,7 @@ sub junction {
 			$exit = 1;
 		}
 	}
+	system("ls","-ld","--",$SRC);
 	return $exit;
 }
 
@@ -731,10 +737,26 @@ our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 	foreach my $SRC (@_) {
 		print STDERR "  [$SRC] Moving to $DST/\n";
 		if(-l $SRC) {
-			print STDERR "	Ignored, [$SRC] is a symbol link\n";
-			next;
+			my $link = readlink($SRC);
+			print STDERR "  [$SRC] is a symbol link to $link\n";
+			return 2 unless(&Babes::create_dir($DST));
+			if(run('mv','-t',$DST,'--',$link)) {
+				print STDERR "  Move $link to $DST/\n";
+			}
+			else {
+				print STDERR "  Error move $link to $DST/\n";
+				next;
+			}
+			if(unlink $SRC) {
+				print STDERR "  Un-link $SRC\n";
+			}
+			else {
+				print STDERR "  Error Un-link $SRC\n";
+				next;
+			}
+			$OPTS->{'no-junction'} = undef;
 		}
-		elsif((!-d $SRC) and (-d $DST) and (!$OPTS->{'no-junction'})) {
+		if((!-d $SRC) and (-d $DST) and (!$OPTS->{'no-junction'})) {
 			$exit = Babes::junction($SRC,$DST);
 		}
 		elsif(! -d $SRC) {
@@ -1393,6 +1415,19 @@ sub process {
 	}
 	
 	foreach my $SRC (@_) {
+		if($OPTS->{'mkdir'}) {
+			if(! -d $SRC) {
+				print STDERR "[$SRC] creating directory";
+				if(mkdir $SRC) {
+					print STDERR "\t[OK]\n";
+				}
+				else {
+					print STDERR "\t[FAILED]\n";
+					next;
+				}
+			}
+
+		}
 		Babes::Clean::process($OPTS,$SRC) if($OPTS->{'clean'});
 
 		if($OPTS->{'trash'}) {
@@ -1439,9 +1474,19 @@ sub process {
 	push @prog,'--videos' if($OPTS->{videos});
 	push @prog,'--include',$OPTS->{include} if($OPTS->{include});
 	push @prog,'--exclude',$OPTS->{exclude} if($OPTS->{exclude});
+
+	my @sites;
+	foreach my $s(qw/miaopai.com weipai.cn meipai.com weibo.com moko.cc/) {
+		my $sn = $s;$sn =~ s/\.[^\.]+$//;
+		if($OPTS->{$s} or $OPTS->{$sn}) {
+			$OPTS->{worker} = 1;
+			push @sites,$s;
+		}
+	}
+	push @sites,split(/\s*,\s*/,$OPTS->{sites}) if($OPTS->{sites});
 	if($OPTS->{worker}) {
-		my $sites = $OPTS->{sites} || '*';
-		unshift @prog,('urlrule_worker','sites',$sites,'DOWNLOADER');	
+		my $sites_exp = @sites ? join(',',@sites) : '*';
+		unshift @prog,('urlrule_worker','sites',$sites_exp,'DOWNLOADER');	
 		push @prog,'--';
 	}
 	else {

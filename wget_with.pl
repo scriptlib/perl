@@ -58,13 +58,26 @@ if(defined $OPTS{tee}) {
 	$FH_LOG = 'ERROR' if($OPTS{tee} eq 'STDERR');
 }
 else {
+	foreach(@ARGV) {
+		next unless(m/^(?:http|ftp|https):\/\/(.+)$/);
+		$OPTS{tee} = $1;
+		$OPTS{tee} =~ s/\//_/g;
+		$OPTS{tee} .= "_wget.log";
+		$OPTS{tee} =~ s/__+/_/g;
+		last;
+	}
+}
+if(!defined $OPTS{tee}) {
 	$OPTS{tee} = 'wget_with.log';
 }
 
 sub tee {
 	if(!defined $FH_LOG) {
 		$LOGFILE = shift;
-		if(open $FH_LOG,'>>',$LOGFILE) {
+		if(!$LOGFILE) {
+			$FH_LOG = 'ERROR';
+		}
+		elsif(open $FH_LOG,'>>',$LOGFILE) {
 			#print STDERR newmsg("Logging to <$LOGFILE>\n");
 			#tee("Open logfile <$LOGFILE>\n");
 		}
@@ -104,9 +117,9 @@ if($profile ne 'default') {
 }
 push @CMDLINE,@{$PROFILE{$profile}};
 
-tee($OPTS{tee},"Start\n") if($OPTS{tee});
-tee("    For> " . join(" ",@OLD_ARGV),"\n");
+tee($OPTS{tee},join(" ",$0,@OLD_ARGV),"\n");
 tee("Command> ",join(" ",@CMDLINE,@ARGV),"\n");
+tee("  Start> \n");
 if(!$OPTS{tee}) {
 	exit system(@CMDLINE,@ARGV) ==0;
 }

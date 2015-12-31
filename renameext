@@ -27,6 +27,7 @@ my @OPTIONS= qw/
 	rule|r:s
 	dir|d:s
 	delete
+	mkdir|md
 /;
 GetOptions(\%OPTS,@OPTIONS);
 exit_usage(0,$0) if($OPTS{'help'});
@@ -202,8 +203,18 @@ sub my_rename {
 		unlink $old or return undef;
 		return 1;
 	}
+	if($OPTS{mkdir}) {
+		if($new =~ m/[\/\\]/) {
+			my $pdir = $new;
+			$pdir =~ s/[\/\\][^\/\\]+$//;
+			system("mkdir","-pv",$pdir) unless(-d $pdir);
+		}
+	}
     rename $old,"$tempname" or return undef;
-    rename "$tempname",$new or return undef;
+	if(!rename $tempname,$new) {
+		rename $tempname,$old;
+		return undef;
+	}
     return 1;
 }
 

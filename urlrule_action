@@ -86,7 +86,7 @@ sub load_rule {
 		#THIS IS BUGGY, Because $status not always return mearningful value.
 		#ESPECIALLY when pass data to child program
 		if($status && (!$level)) {
-			$HISTORY->save($url);
+			$HISTORY->add($url);
 		}
 	}
 END_LOAD_RULE:
@@ -97,15 +97,17 @@ END_LOAD_RULE:
 sub sig_killed {
 	delete $SIG{INT};
 	if($OPTS{"history"}) {
-		$HISTORY->write();
+		$HISTORY->save();
 	}
-    $MSG->message("Saving remained tasks...\n");
     if($PROGRAM->{lastStack}) {
         $PROGRAM->push(@{$PROGRAM->{lastStack}});
     }
     chdir($CWD) if($CWD);
+	if($PROGRAM->length > 0) {
+		$MSG->message("Saving remained tasks...\n");
+		$MSG->message($PROGRAM->length," tasks saved for resuming\n");
+	}
     $PROGRAM->saveToFile();
-    $MSG->message($PROGRAM->length," tasks saved for resuming\n");
     exit 1;
 }
 
@@ -217,8 +219,6 @@ while(my $tasks = $PROGRAM->length) {
 	}
 }
 $MSG->message("All tasks completed.\n");
-if($OPTS{"history"}) {
-	$HISTORY->save_last();
-	$HISTORY->write();
-}
+$HISTORY->save() if($HISTORY);
+$PROGRAM->saveToFile();
 exit 0;

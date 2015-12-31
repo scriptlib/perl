@@ -76,6 +76,10 @@ my %ENGINES = (
 		'http://www.mp4ba.com/search.php?keyword=###QUERY###',
 		2,
 	],
+	'kat.cr'=>[
+		'http://kat.cr/?###QUERY###',
+		2,
+	],
 #	'bitsnoop'=>[
 #		'http://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
 #		2,
@@ -104,6 +108,7 @@ my %GROUPS = (
 		torrentkittyzw.com
 		breadsearch.com
 		ganluzhe.com
+		kat.cr
 		/
 	],
 	'SAFE'=>[qw/
