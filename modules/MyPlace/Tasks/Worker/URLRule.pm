@@ -6,10 +6,12 @@ use parent 'MyPlace::Tasks::Worker';
 use MyPlace::Weipai;
 use MyPlace::Tasks::Task qw/$TASK_STATUS/;
 use MyPlace::Script::Message;
+use MyPlace::URLRule::SimpleQuery qw/usq_test_key usq_locate_db/;
 use MyPlace::Program::SimpleQuery qw/validate_item/;
 use MyPlace::URLRule::Utils qw/get_url/;
 use File::Spec::Functions qw/catfile catdir/;
 use MyPlace::Program qw/EXIT_CODE/;
+my %USQ_HOSTS = usq_locate_db('*');
 my $USQ;
 #	sub set_workdir {
 #		my $wd = shift;
@@ -119,9 +121,18 @@ my $USQ;
 #			}
 #		}
 		if($url =~ m/weipai\.cn/) {
-			require MyPlace::Weipai;
-			my $info = MyPlace::Weipai::extract_info($url);
-			return $info->{uid},$info->{uname},'weipai.cn';
+			use MyPlace::URLRule;
+			my ($status,$result) = MyPlace::URLRule::request($url);
+			if($status) {
+				my $info = $result->{info};
+				if($info) {
+					return 
+					$info->{uid} || $info->{user_id} || $info->{userid}, 
+					$info->{uname} || $info->{user_name} || $info->{username},
+					'weipai.cn'
+					;
+				}
+			}
 		}
 		elsif($url =~ m/vlook\.cn/) {		
 			my ($name,$id);
@@ -165,6 +176,21 @@ my $USQ;
 			return $info->{uid},$info->{uname},'meipai.com';
 		}
 	}
+
+sub _validate_cmd {
+	my $REG_CMD_DOWNLOAD = qr/^(:?SAVE|UPDATE|DOWNLOADER|DOWNLOAD|BATCHGET|SAVER)$/;
+	my $OPTS = shift;
+	my $CMD = shift;
+	return $CMD unless($CMD =~ $REG_CMD_DOWNLOAD);
+	if($OPTS->{'disable-all-download'}) {
+		$CMD = 'DATABASE' unless($OPTS->{REALLYFORCE});
+	}
+	elsif($OPTS->{'disable-download'} || $OPTS->{'no-download'}) {
+		$CMD = 'DATABASE' unless($OPTS->{FORCE});
+	}
+	return $CMD;
+}
+
 
 sub new {
 	my $class = shift;
@@ -340,9 +366,13 @@ sub work {
 		}
 		my $level  = shift(@args) || 0;
 		my $action = shift(@args) || '!DOWNLOADER';
-		if($self->{options}->{'no-download'}) {
-			$action = '!DATABASE' if($action =~ m/^!?(?:SAVE|UPDATE|DOWNLOADER|DOWNLOAD)$/i);
+		my $prefix = '';
+		if($action =~ m/^(\!+)(.+)$/) {
+			$prefix = $1;
+			$action = $2;
 		}
+		$action = $prefix .  _validate_cmd({%{$self->{options}},%OPTS},$action);
+
 		if(!@urls) {
 			return $self->error($task,"No url specified");
 		}
@@ -403,7 +433,79 @@ sub work {
 			$task->{summary} = 'No action assicated';
 			return $self->error($task,$task->{summary});
 		}
-		$hosts_o = 'weipai.cn,vlook.cn,meipai.com,miaopai.com,weibo.com,moko.cc,meitulu.com' if($hosts_o eq '*');
+		my $FROMURL = "";
+		my $HOSTS_FROM_URL = "";
+		my $ARG1 = shift(@_);
+		if(!$ARG1) {
+			return $self->error($task,'Need more arguments');
+		}
+		elsif($ARG1 and $ARG1 =~ m/^https?:/) {
+				
+				my $UURL = expand_url($ARG1);
+				if($UURL) {
+					app_warning("URL => $UURL\n");
+					return work($self,$task,$type,$hosts_o,$command,$UURL,@_);
+				}
+
+				my ($key1,$key2,$key3) = extract_info_from_url($ARG1);
+				if(!($key1 or $key2)) {
+					return $self->error($task,'Extract information from URL failed');
+				}
+				unshift @_,($key1,$key2,$ARG1);
+				$HOSTS_FROM_URL = $key3 if($key3);
+				$FROMURL = join(", ",$key1 || (),$key2 || (),$key3 || ());
+				app_message2 "$ARG1 =>\n";
+				app_message2 "    ",$FROMURL,"\n";
+				#die();
+				$FROMURL = "$ARG1 => $FROMURL ";
+		}
+		else {
+			unshift @_,$ARG1;
+		}					
+	
+		if(!$hosts_o) {
+			$hosts_o = $HOSTS_FROM_URL;
+		}
+		elsif("$hosts_o" eq "$HOSTS_FROM_URL") {
+		}
+		elsif($hosts_o ne '*') {
+			$hosts_o = $hosts_o . ',' . $HOSTS_FROM_URL if($HOSTS_FROM_URL);
+		}
+		else {
+			my $target = $_[0]; #'Never undef';
+			my @qhosts;
+			if($target) {
+				my %dbs = %USQ_HOSTS;
+				if(%dbs) {
+					foreach my $dbname(keys %dbs) {
+						my $dbfile = $dbs{$dbname};
+						if(usq_test_key($dbfile,$target)) {
+							push @qhosts,$dbname;
+							if($dbname eq 'weibo.com') {
+								push @qhosts,'sinacn.weibodangan.com';
+							}
+						}
+					}
+				}
+				else {
+					@qhosts = ('*');
+				}
+			}
+			if(!@qhosts) {
+				@qhosts = qw/
+					weipai.cn
+					vlook.cn
+					meipai.com
+					miaopai.com
+					weibo.com
+					moko.cc
+					meitulu.com
+				/;
+			}
+			print STDERR "HOSTS [$hosts_o] => ";
+			$hosts_o = join(",",@qhosts);
+			print STDERR "[$hosts_o]\n";
+		}
 		my ($hosts,@HOSTS_NEXT) = split(/\s*[,\|]\s*/,$hosts_o);
 
 		if(@HOSTS_NEXT) {
@@ -456,51 +558,19 @@ sub work {
 		}
 
 		if($CMD eq '!UPDATE') {
-			if(lc($hosts) =~ m/weipai.cn|vlook.cn|meipai.com|miaopai.com|meitulu.com/) {
-				$CMD = '!DOWNLOADER';
-			}
-			else {
-				$CMD = 'DOWNLOADER';
-			}
+			$CMD = '!DOWNLOADER';
+#			if(0 and lc($hosts) =~ m/weipai.cn|weibo.com|weishi.com|vlook.cn|meipai.com|miaopai.com|meitulu.com/) {
+#				$CMD = '!DOWNLOADER';
+#			}
+#			else {
+#				$CMD = 'DOWNLOADER';
+#			}
 		}
 		elsif($CMD eq 'UPDATE') {
 			$CMD = 'DOWNLOADER';
 		}
 
 		
-		my $FROMURL = "";
-		my $ARG1 = shift(@_);
-#		if($CMD =~ m/^SAVEURLS?$/) {
-#			if($ARG1 and $ARG1 !~ m/^http/) {
-#				$ARG1 = build_url($hosts,$ARG1);
-#			}
-#		}
-		if(!$ARG1) {
-			return $self->error($task,'Need more arguments');
-		}
-		elsif($ARG1 and $ARG1 =~ m/^https?:/) {
-				
-				my $UURL = expand_url($ARG1);
-				if($UURL) {
-					app_warning("URL => $UURL\n");
-					return work($self,$task,$type,$hosts,$command,$UURL,@_);
-				}
-
-				my ($key1,$key2,$key3) = extract_info_from_url($ARG1);
-				if(!($key1 or $key2)) {
-					return $self->error($task,'Extract information from URL failed');
-				}
-				unshift @_,($key1,$key2,$ARG1);
-				$hosts = $key3 if($key3);
-				$FROMURL = join(", ",$key1 || (),$key2 || (),$key3 || ());
-				app_message2 "$ARG1 =>\n";
-				app_message2 "    ",$FROMURL,"\n";
-				#die();
-				$FROMURL = "$ARG1 => $FROMURL ";
-		}
-		else {
-			unshift @_,$ARG1;
-		}					
 		
 		if(@CMDS_NEXT) {
 			my $taskscount = 1 + scalar(@CMDS_NEXT);
@@ -554,8 +624,13 @@ sub work {
 			}
 			return $TASK_STATUS->{DONOTHING} unless(validate_item($id,$name));
 		}
-
-		if($CMD =~ m/^!(.+)$/) {
+		
+		if($CMD =~ m/^!!(.+)$/) {
+			$OPTS{FORCE} = 1;
+			$OPTS{REALLYFORCE} = 1;
+			$CMD = $1;
+		}
+		elsif($CMD =~ m/^!(.+)$/) {
 			$CMD = $1;
 			$OPTS{FORCE} = 1;
 		}
@@ -564,6 +639,7 @@ sub work {
 			$OPTS{$1} = 1;
 		}
 
+		$CMD = _validate_cmd({%{$self->{options}},%OPTS},$CMD);
 
 		if($CMD eq 'ADD' || $CMD eq 'FOLLOW' || $CMD eq 'LIKES' || $CMD eq 'FOLLOW_LIKES') {
 			$WD = $task->{source_dir} || $task->{workdir} || $self->{source_dir} || "";
@@ -951,11 +1027,11 @@ sub work {
 				}
 			}
 			$self->{URLRULE_LIKES_ALL} = $A;
-			my $URL_CMD = ($FOLLOW_ID ? 'AFD' : 'AD') . ',' . ($OPTS{FORCE} ? '!SAVEURL' : 'SAVEURL');
+			my $URL_CMD = ($FOLLOW_ID ? 'AFD' : 'AD') . ',' . ($OPTS{FORCE} ? '!!SAVEURL' : 'SAVEURL');
 			if(@result) {
 				my @dt;
 				foreach(@result) {
-					printf STDERR "+ %s AD,SAVEURL %s\n",$hosts, $_;
+					printf STDERR "+ %s $URL_CMD %s\n",$hosts, $_;
 					my $newtask = NEW_TASK($task,$task->{namespace},'sites',$hosts,$URL_CMD,$_);
 					push @dt,$newtask;
 				}
@@ -1071,9 +1147,12 @@ sub work {
 		my $url = shift;
 		my $level = shift(@_) || 0;
 		my $action = shift(@_) || 'SAVE';
-		if($self->{options}->{'no-download'}) {
-			$action = 'DATABASE' if($action =~ m/^(?:SAVE|UPDATE|DOWNLOADER|DOWNLOAD)$/i);
+		my $prefix = '';
+		if($action =~ m/^(\!+)(.+)$/) {
+			$prefix = $1;
+			$action = $2;
 		}
+		$action = $prefix .  _validate_cmd({%{$self->{options}},%OPTS},$action);
 		$task->{title} = "[urlrule action] $url $level $action";
 		use MyPlace::URLRule::OO;
 		my $URLRULE = new MyPlace::URLRule::OO('action'=>$action,'thread'=>1);
@@ -1174,6 +1253,8 @@ sub OPTIONS {qw/
 	no-createdir|nc
 	no-recursive|nr
 	no-download|nd
+	disable-download|dd
+	disable-all-download|dad
 	fullname
 	include|I:s
 	exclude|X:s

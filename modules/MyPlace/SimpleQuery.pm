@@ -22,9 +22,32 @@ sub set_options {
 	return $self;
 }
 
+sub _include_file {
+	my $self = shift;
+	my $filename = shift;
+	my $absfile = $filename;
+	print STDERR "#INCLUDE $filename\n";
+	if(!$self->{input}) {
+	}
+	elsif($filename =~ m/^\//) {
+	}
+	else {
+		my $rel = $self->{input};
+		$rel =~ s/\/[^\/]+$/\//;
+		$absfile = $rel . $filename;
+	}
+	if(-f $absfile) {
+		my $newsq = new MyPlace::SimpleQuery;
+		$newsq->feed($absfile,'file');
+		return $newsq;
+	}
+	return;
+}
+
 sub _parse_from_file {
 	my $self = shift;
 	my $input = shift;
+	$self->{input} = $input;
 	my @lines;
 	open FI,'<',$input or return undef,"$!, while opening $input";
 	@lines = <FI>;
@@ -36,7 +59,9 @@ sub _parse_from_text {
 	my $self = shift;
 	my %info;
 	my @sortedId;
-	foreach(@_) {
+	my @text = @_;
+	while(@text) {
+		local $_ = shift(@text);
 		chomp;
 		s/^\s+//;
 		s/\s+$//;
@@ -44,6 +69,18 @@ sub _parse_from_text {
 		#print STDERR "TEXT:[$_]\n";
 		if(m/^\s*\#OUTPUT\s*:\s*(.+?)\s*$/) {
 			push @{$self->{OUTPUT}},$1;
+			push @sortedId,$_;
+			next;
+		}
+		if(m/^\s*\#INCLUDE\s*:\s*(.+?)\s*$/) {
+			push @sortedId,$_;
+			my $newsq = $self->_include_file($1);
+			push @{$self->{INCLUDE}},$newsq;
+			my $ninfo = $newsq->{info};
+			if($ninfo and ref $ninfo and %$ninfo) {
+				%info = (%info,%$ninfo);
+#				$self->{external_info} = $ninfo;
+			}
 			next;
 		}
 		my @va = split(/\s*\t\s*/,$_);
@@ -96,7 +133,65 @@ sub find_items {
 	}
 
 }
-
+sub output_item {
+	my $self = shift;
+	my $ids = shift;
+	my $info = shift;
+	my @formats = @{$self->{OUTPUT}};
+	@formats = ('${KEY}','${VALUE}') unless(@formats);
+	my @translater;
+	my %DATA_INDEX = (
+		ID=>0,
+		KEY=>0,
+		VALUE=>1,
+		NAME=>1,
+		VALUES=>2,
+	);
+	foreach my $fmt (@formats) {
+		my @t = ($fmt);
+		while($fmt =~ m/\$\{(ID|KEY|VALUE|VALUES|NAME)\s*:\s*(.+?)\s*=>\s*(.*?)\s*\}/g) {
+			my $t = {};
+			$t->{key} = $1;
+			$t->{data} = $DATA_INDEX{$1};
+			$t->{exp} = $2;
+			$t->{rpl} = $3 || '';
+			push @t,$t;
+		}
+		while($fmt =~ m/\$\{\s*(ID|KEY|VALUE|VALUES|NAME)\}/g){
+			push @t,{
+				key=>$1,
+				data=>$DATA_INDEX{$1},
+			}
+		}
+		push @translater,\@t;
+	}
+	#use MyPlace::Debug::Dump;print STDERR debug_dump(\@translater),"\n";
+	my @result;
+	foreach my $key (@$ids) {
+		my @values = @{$info->{$key}};
+		my $value = $values[0];
+		my $values = join(",",@values);
+		my @item = ($key,$value);
+		foreach my $gt (@translater) {
+			my @gt = @$gt;
+			my $fmt = shift(@gt);
+			my $output = $fmt;
+			foreach my $t(@gt) {
+				my $data = [$key,$value,$values]->[$t->{data}];
+				if($t->{exp}) {
+					$output =~ s/\$\{$t->{key}\s*:\s*.+?\s*=>\s*.*?\s*\}/$data/g;
+					$output =~ s/$t->{exp}/$t->{rpl}/g;
+				}
+				else {
+					$output =~ s/\$\{$t->{key}\}/$data/g;
+				}
+			}
+			push @item,$output;
+		}
+		push @result,\@item;
+	}
+	return @result;
+}
 sub find_item {
 	my $self = shift;
 	my $strict = shift;
@@ -128,23 +223,8 @@ sub find_item {
 		return undef,"[$idName] match no item";
 	}
 
-	my @result;
-	my @formats = @{$self->{OUTPUT}};
-	@formats = ('${KEY}','${VALUE}') unless(@formats);
-	foreach my $key (@match) {
-		my @values = @{$table{$key}};
-		my $value = $values[0];
-		my $values = join(",",@values);
-		my @item = ($key,$value);
-		foreach my $fmt (@formats) {
-			my $output = $fmt;
-			$output =~ s/\$\{(?:KEY|ID)\}/$key/g;
-			$output =~ s/\$\{(?:VALUE|NAME)\}/$value/g;
-			$output =~ s/\$\{(?:VALUES|NAMES)\}/$values/g;
-			push @item,$output;
-		}
-		push @result,\@item;
-	}
+	my @result = $self->output_item(\@match,\%table);
+
 	if($strict) {
 		return @{$result[0]};
 	}
@@ -233,9 +313,9 @@ sub saveTo {
 		return undef,"No id to save";
 	}
 	open FO,">",$output or return undef,"$!, while writting $output";
-	foreach my $fmt (@{$self->{OUTPUT}}) {
-		print FO "#OUTPUT: $fmt\n";
-	}
+	#foreach my $fmt (@{$self->{OUTPUT}}) {
+	#	print FO "#OUTPUT: $fmt\n";
+	#}
 	foreach my $id (@{$self->{sortedId}}) {
 		#	my $value = $self->{info}->{$id};
 		#next unless($value);
@@ -371,23 +451,8 @@ sub query {
 		%target = %info;
 		@Id = grep(!/^\s*#/,@sortedId);
 	}
-	my @result;
-	my @formats = @{$self->{OUTPUT}};
-	@formats = ('${KEY}','${VALUE}') unless(@formats);
-	foreach my $key (@Id) {
-		my @values = @{$target{$key}};
-		my $value = $values[0];
-		my $values = join(",",@values);
-		my @item = ($key,$value);
-		foreach my $fmt (@formats) {
-			my $output = $fmt;
-			$output =~ s/\$\{(?:KEY|ID)\}/$key/g;
-			$output =~ s/\$\{(?:VALUE|NAME)\}/$value/g;
-			$output =~ s/\$\{(?:VALUES|NAMES)\}/$values/g;
-			push @item,$output;
-		}
-		push @result,\@item;
-	}
+	my @result = $self->output_item(\@Id,\%target);
+
 	return 1,@result;
 }
 

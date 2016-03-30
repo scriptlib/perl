@@ -4,8 +4,9 @@ use Env qw/OS XAUTHORITY DISPLAY/;
 
 my %EDITORS = (
 	windows=>[['gvim.exe'],['vim.exe']],
-	cygwin=>[['vim'],['vim']],
-	linux=>[['gvim','-f'],['vim']],
+	cygwin=>[['np.bat'],['np.bat']],
+#	cygwin=>[['vim','-p'],['vim','-p']],
+	linux=>[['gvim','-p','-f'],['vim','-p']],
 );
 
 my $os = 'linux';

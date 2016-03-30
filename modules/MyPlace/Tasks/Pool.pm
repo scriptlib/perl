@@ -43,7 +43,7 @@ sub more {
 		}	
 	}
 	$self->{MORE} = 1;
-	my @tasks = $self->collect_tasks;
+	my @tasks = $self->collect_tasks($self);
 	my $count = scalar(@tasks);
 	app_warning("Tasks::Pool [" . $self->{name} . "] build $count tasks total\n");
 	my $index;
@@ -112,6 +112,7 @@ sub _parse_data {
 }
 
 sub _collect_data {
+	my $self = shift;
 	my $def = shift;
 	my $data = shift;
 	my $no_recursive = shift;
@@ -129,14 +130,14 @@ sub _collect_data {
 				#next if(/^#/);
 				next if($nodup{$_});
 			}
-			push @r,_collect_data($def,$_,1);
+			push @r,$self->_collect_data($def,$_,1);
 			$nodup{$_} = 1;
 		}
 	}
 	elsif($DATATYPE eq 'HASH') {
 		foreach(keys %$data) {
 			my @prefix = split(/[\/\t]/,$_);
-			my @contents = _collect_data($def,$data->{$_},1);
+			my @contents = $self->_collect_data($def,$data->{$_},1);
 			if(@contents) {
 				foreach my $item (@contents) {
 					if(ref $item) {
@@ -154,8 +155,11 @@ sub _collect_data {
 			push @r,$data;
 		}
 		else {
-			push @r,_collect_data($def,$_,1) foreach(@$data);
+			push @r,$self->_collect_data($def,$_,1) foreach(@$data);
 		}	
+	}
+	elsif($def->{ignore} and $data =~ m/$def->{ignore}/) {
+		print STDERR "Ignored $data by DEF($def->{ignore})\n";
 	}
 	elsif(-f $data) {
 			push @r,_collect_datafile($def,$data);
@@ -209,11 +213,12 @@ sub _collect_datafile {
 }
 
 sub collect_tasks {
+	my $self = shift;
 	my $def = shift;
 	app_message2 "Build tasks from [" . $def->{name} . "]\n";
 	my @prefix = $def->{prefix} ? @{$def->{prefix}} : ();
 	my @suffix = $def->{suffix} ? @{$def->{suffix}} : ();
-	my @data = _collect_data($def,$def->{data});
+	my @data = $self->_collect_data($def,$def->{data});
 	my @tasks;
 	if(@data) {
 		foreach my $current (@data) {

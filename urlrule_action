@@ -54,6 +54,18 @@ sub process_passdown {
 sub load_rule {
     my $CWD = getcwd();
 	my ($title,$url,$level,$action,$progress) = @_;
+	if(!$action) {
+		if($OPTS{database}) {
+			$action = 'DATABASE';
+		}
+		elsif($OPTS{download}) {
+			$action = 'DOWNLOADER';
+		}
+		elsif($OPTS{action}) {
+			$action = $OPTS{action};
+		}
+	}
+	
 	my $rep = $url . ($level ? "|$level" : "");
 	if($URLIGNORE->check($rep)) {
 		$MSG->message("Ignored: $rep\n");
@@ -138,6 +150,9 @@ sub getcwd {
 	fullname
 	thread
 	force|f
+	action|a=s
+	database|db
+	download|down|dd
 /;
 if(@ARGV) {
 	require Getopt::Long;

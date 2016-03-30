@@ -55,27 +55,42 @@ my $CURL = MyPlace::Curl->new(
 #	"retry"=>4,
 	"max-time"=>120,
 );
-my @CURLOPT = (
-	'--compressed',
-	'-H','Phone-Type: android_VIVO_4.4.2',
-	'-H','Accept-Encoding: gzip',
-	'-H','Weipai-Token: 55fda4ca13ca59.41317149',
-	'-H','Weipai-UserId: 508775398134943b58000051',
-	'-H','Phone-Number: ',
-	'-H','Latitude: 23.542087',
-	'-H','Longitude: 116.403701',
-	'-H','Api-Version: 8',
-	'-H','Client-Version: 0.99.9.8',
-	'-H','App-Name: weipai',
-	'-H','Device-Uuid: 6747b8883e410ab3e29ae93a143563912dc31fbd',
-	'-H','Kernel-Version: 15',
-	'-H','Com-Id: weipai',
-	'-H','Push-Id: com.weipai.weipaipro',
-	'-H','os: android',
-	'-H','Channel: weipai',
-	'-H','Connection: Keep-Alive',
-	'-H','User-Agent: Apache-HttpClient/UNAVAILABLE (java 1.4)',
-);
+
+my $COPIED_HEADER = '
+Content-Length: 85
+Content-Type: application/x-www-form-urlencoded
+Host: w1.weipai.cn
+Connection: Keep-Alive
+User-Agent: android-async-http/1.4.3 (http://loopj.com/android-async-http)
+Accept-Encoding: gzip
+Phone-Type: android_Lenovo A788t_4.3
+os: android
+Channel: 360%E6%89%8B%E6%9C%BA%E5%8A%A9%E6%89%8B
+App-Name: weipai
+Api-Version: 8
+Weipai-Token: ef1d3ac6f047b95dc8efe19a9439210804020274e9c4feddc94c60f9182a23318db7a8715127a3b9
+Phone-Number: 
+Com-Id: weipai
+sign: d18b74787b5683193d8d89f9009407cc
+time: 1459347429
+Client-Version: 1.0.0.0
+Weipai-Userid: 508775398134943b58000051
+Device-Uuid: 53ede2300d89c4cd99b4d92d198affcaf5d63101
+Latitude: 23.548452
+Longitude: 116.409982
+Push-Id: com.weipai.weipaipro
+Kernel-Version: 15
+count=20&relative=&compressd=1&day_count=7&nickname=&user_id=508775398134943b58000051
+';
+my @CURLOPT;# = ('--compressed');
+foreach(split(/\s*\n\s*/,$COPIED_HEADER)) {
+	next unless($_);
+	next unless(m/:/);
+	s/^([^:]+):\s+/$1:/;
+	next if(m/(?:Content-Length|Host|Connection|Accept-Encoding|sign|time):/);
+#	print STDERR $_,"\n";
+	push @CURLOPT,'-H',$_;
+}
 #LAST HEADER UPDATED 2015/09/20
 
 
@@ -142,7 +157,12 @@ sub extract_title {
 
 sub get_url {
 	my $url = shift;
+	my $method = 'get';
 	my $verbose = shift(@_) || '-v';
+	if($verbose eq '--get') {
+		$method = 'get';
+		$verbose = shift(@_) || '-v';
+	}
 	my $json = shift;
 	my $silent;
 
@@ -167,9 +187,22 @@ sub get_url {
 
 	my $data;
 	my $status = 1;
-	print STDERR "[Retriving] $url ..." if($verbose);
+	print STDERR uc("[$method]") . " $url ..." if($verbose);
 	while($retry) {
-		($status,$data) = $CURL->get($url,@CURLOPT);
+		if($method eq 'get') {
+			#		print STDERR join("\n",@CURLOPT,"\n");
+			($status,$data) = $CURL->get($url,@CURLOPT,'-H','time:' . time);
+		}
+		else {
+			my $posturl = $url;
+			my $content = '';
+			if($posturl =~ m/^(.+)\?(.+)$/) {
+				$posturl = $1;
+				$content = $2;
+			}
+			($status,$data) = $CURL->postd($posturl,$content,@CURLOPT,'-H','time:' . time);
+
+		}
 		if($status != 0) {
 		}
 		elsif(!$data) {
@@ -298,6 +331,9 @@ sub safe_decode_json {
 		return {};
 	}
 	else {
+		if($json->{reason}) {
+			print STDERR "Error: " . $json->{reason},"\n";
+		}
 		return $json;
 	}
 }
@@ -524,10 +560,11 @@ sub get_user_videos {
 	my $info = get_videos($uid,undef,$cursor);
 	$r{uid} = $uid;
 	$r{next_cursor} = $info->{next_cursor};
+	my @video_list;
+	$r{videos} = [];
+	$r{count} = 0;
+	my @data;
 	if($info->{"diary_list"}) {
-		$r{videos} = [];
-		$r{count} = 0;
-		my @data;
 		foreach(@{$info->{"diary_list"}}) {
 #"day": "2014-08-23",
 #"city": "\u5e7f\u5dde\u5e02",
@@ -538,20 +575,26 @@ sub get_user_videos {
 #"city": "\u5e7f\u5dde\u5e02"
 #}]
 			if($_->{video_list}) {
-				foreach my $videoinfo (@{$_->{video_list}}) {
-					my $video = {};
-					$video->{cover} = $videoinfo->{video_screenshot};
-					$video->{video} = $video->{cover};
-					$video->{video} =~ s/\.([^\/]+)$//;
-#					$video->{title} = $utf8->encode($videoinfo->{video_intro});
-					$video->{id} = $videoinfo->{blog_id};
-					if($video->{cover} =~ m/\/(\d\d\d\d)(\d\d)\/(\d\d)\/(\d+)\//) {
-						@{$video}{qw/year month day hour minute/} = ($1,$2,$3,$4,'');
-					}
-					push @{$r{videos}},$video;
-					$r{count}++;
-				}
+				push @video_list,$_->{video_list};
 			}
+		}
+	}
+	if($info->{user_video_list}) {
+		push @video_list,$info->{user_video_list};
+	}
+	foreach(@video_list) {
+		foreach my $videoinfo (@$_) {
+			my $video = {};
+			$video->{cover} = $videoinfo->{video_screenshot};
+			$video->{video} = $video->{cover};
+			$video->{video} =~ s/\.([^\/]+)$//;
+#					$video->{title} = $utf8->encode($videoinfo->{video_intro});
+			$video->{id} = $videoinfo->{blog_id};
+			if($video->{cover} =~ m/\/(\d\d\d\d)(\d\d)\/(\d\d)\/(\d+)\//) {
+				@{$video}{qw/year month day hour minute/} = ($1,$2,$3,$4,'');
+			}
+			push @{$r{videos}},$video;
+			$r{count}++;
 		}
 	}
 	return \%r;
@@ -597,6 +640,7 @@ sub clean_up_data {
 				is_vip is_delete s_receive
 				like_state video_play_num
 				video_play_num video_like_num
+				fans_user_list
 		/,@_) {
 			delete $data->{$kw};
 		}
@@ -643,6 +687,8 @@ sub get_profile {
 					diary_list next_cursor
 					prev_cursor level_des
 					state 
+					fans_user_list
+					user_video_list
 				/) {
 				delete $r->{$k};
 			}

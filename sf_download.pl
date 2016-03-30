@@ -56,7 +56,7 @@ my %MIRRORS  = (
 	heanet=>'heanet',
 );
 my @WGET = (
-	qw{-e robots=off --progress=bar -U Mozilla/5.0 --restrict-file-names=windows},
+	qw{-e robots=off --progress=dot:mega -U Mozilla/5.0 --restrict-file-names=windows},
 	qw{-nc -nH -x --cut-dirs=2 -np  -r},
 	qw{-o /dev/stdout --regex pcre}
 );

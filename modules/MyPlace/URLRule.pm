@@ -146,6 +146,7 @@ sub parse_rule {
     if($r{level}) {
 		if($r{level} =~ m/^:(.+)$/) {
 			$r{directory} = "$1";
+			$r{level_desc} = "$1";
 			$r{level} = 0;
 		}
        elsif($r{level} !~ /^[+\-\d]+$/) {
@@ -335,6 +336,7 @@ sub get_rule_handler {
 			my $level = shift(@_);
 			my $info = MyPlace::URLRule::parse_rule($url,$level,@_);
 			$info->{options} = $self->{options};
+			$info = {%{$self->{rule}},%$info};
 			my ($status,@result) = apply_rule($url,$info);
 			my %result;
 			if(!@result) {

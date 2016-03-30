@@ -188,6 +188,13 @@ sub watch {
 	my $name = shift;
 	use MyPlace::Tasks::Pool;
 	my $pool = MyPlace::Tasks::Pool->new($name,@_);
+	if($self->{ignore}) {
+		$pool->{ignore} = $self->{ignore} unless($pool->{ignore});
+	}
+	if($pool->{disabled}) {
+		app_message "Tasks pool of [$name] disabled, IGNORED!\n";
+		return;
+	}
 	if(!$self->{pools}->[$level]) {
 		$self->{pools}->[$level] = [];
 	}

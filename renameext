@@ -262,25 +262,25 @@ foreach my $old(grep !/^\.\.?$/,@files) {
     }
 	$new =~ s/\/+$//;
 	$old =~ s/\/+$//;
-	if($OPTS{force} && -e $new) {
-		print STDERR "[FORCE] backup $new.\n";
-		my $backup = $new . '.backup~';
-		if($OPTS{test}) {
-		    print STDERR ("\"$new\"\n\t->\"$backup\" (Test only) [Sucessed!]\n");
-		}
-		else {
-			if(&my_rename($new,$backup)) {
-		        print STDERR ("\"$new\"\n\t->\"$backup\" [Sucessed!]\n");
-			}
-	        else {
-		        print STDERR ("\"$new\"\n\t->\"$backup\" [Failed:$!]\n");
-			}
-		}
-	}
-	if(-e $new) {
-        $dfile++;
-        print STDERR "[$dfile] \"$old\"\n\t->\"$new\" [Failed:File exists]\n";
-        next;
+#	if($OPTS{force} && -e $new) {
+#		print STDERR "[FORCE] backup $new.\n";
+#		my $backup = $new . '.backup~';
+#		if($OPTS{test}) {
+#		    print STDERR ("\"$new\"\n\t->\"$backup\" (Test only) [Sucessed!]\n");
+#		}
+#		else {
+#			if(&my_rename($new,$backup)) {
+#		        print STDERR ("\"$new\"\n\t->\"$backup\" [Sucessed!]\n");
+#			}
+#	        else {
+#		        print STDERR ("\"$new\"\n\t->\"$backup\" [Failed:$!]\n");
+#			}
+#		}
+#	}
+	if(-e $new and (!$OPTS{force})) {
+	    $dfile++;
+	    print STDERR "[$dfile] \"$old\"\n\t->\"$new\" [Failed:File exists]\n";
+		next;
     }
     if($OPTS{test}) {
         print STDERR ("\"$old\"\n\t->\"$new\" (Test only) [Sucessed!]\n");

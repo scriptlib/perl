@@ -38,8 +38,13 @@ my %EXPS = (
 my %DOWNLOADERS = (
 	'Vlook'=>{
 		'TEST'=>'^(?:http:\/\/|http:\/\/[^\.]+\.)vlook\.cn\/.*\/qs\/',
+	},
+	'Weishi'=>{
+		'TEST'=>'^http:\/\/[^\.]+\.weishi\.com\/.*downloadVideo\.php',
 	}
 );
+
+my $BLOCKED_URLS = qr/vlook\.cn\/video\/high\/[^\/]+\.mp4$/;
 
 sub extname {
 	my $filename = shift;
@@ -392,6 +397,10 @@ sub download {
 	}
 	elsif(!$_) {
 		$exit = 1;
+	}
+	elsif($_ =~ $BLOCKED_URLS) {
+		print STDERR "Error url blocked: $_\n";
+		$exit = $self->EXIT_CODE("ERROR");
 	}
 	elsif(m/^post:\/\/(.+)$/) {
 		$exit = $self->save_http_post($1);

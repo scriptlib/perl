@@ -96,7 +96,7 @@ sub tee {
 my %PROFILE = (
 	'default'=>[qw{
 		-e robots=off
-		--progress=bar
+		--progress=dot:mega
 		--restrict-file-names=windows
 		--show-progress
 		-o /dev/stdout

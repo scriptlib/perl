@@ -321,7 +321,6 @@ sub _get_url {
 	my $options = shift;
 	my $url = shift;
 	my $saveas = shift;
-
 		if(ref $_) {
 			$url = $_->[0];
 			$saveas = $_->[1] if($_->[1]);

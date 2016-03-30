@@ -126,8 +126,8 @@ sub _parse_suffix {
 			$r = [qw/.ts .flv .mov .mp4/];
 		}
 		else {
-			#$r = [qw/\/500k.ts/];
-			$r = [qw/\/500k.ts .flv .mov .mp4/];
+			$r = [qw/\/500k.ts/];
+			#$r = [qw/\/500k.ts .flv .mov .mp4/];
 		}
 	}
 	else {
@@ -284,12 +284,16 @@ sub get_video_url {
 	$vid =~ s/[\?#].*//;
 	$vid =~ s/\/.*//;
 	
-	my $data = get_url(build_url('play',$vid),'-v');
+	#my $data = get_url(build_url('play',$vid),'-v');
+	my $data = get_url("http://share.weipai.cn/video/play/id/$vid/type/theater/source/undefined",'-v');
 	my $playurl;
 	if($data =~ m/"video_url"\s*:\s*"([^"]+)/) {
 		$playurl = $1;
 	}
 	elsif($data =~ m/'video_url'\s*:\s*'([^']+)/) {
+		$playurl = $1;
+	}
+	elsif($data =~ m/videoUrl=([^&]+)/) {
 		$playurl = $1;
 	}
 	else {
@@ -307,13 +311,8 @@ sub _download_video {
 	$vid =~ s/[\?#].*//;
 	$vid =~ s/\/.*//;
 	
-	my $data = get_url(build_url('play',$vid),'-v');
-	my $playurl;
-	if($data =~ m/"video_url"\s*:\s*"([^"]+)/) {
-		$playurl = $1;
-	}
-	elsif($data =~ m/'video_url'\s*:\s*'([^']+)/) {
-		$playurl = $1;
+	my $playurl = get_video_url($url);
+	if($playurl) {
 	}
 	else {
 		print STDERR "Error retriving info: $url\n";

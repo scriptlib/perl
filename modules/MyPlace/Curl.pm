@@ -237,6 +237,19 @@ sub get {
     push @args,'--socks5-hostname',$PROXY    if($url =~ $BLOCKED_EXP);
     return $self->_run_curl(@args);
 }
+
+sub postd {
+	my $self = shift;
+	my $url = shift;
+	my $data = shift;
+    $url =~ s/&amp;/&/g;
+    my @args = (@_,'--data',$data,"--url",$url);
+    push @args,'--socks5-hostname',$PROXY    if($url =~ $BLOCKED_EXP);
+    print STDERR "\nPosting:[$data]\nTo $url\n...";
+
+	return $self->_run_curl(@args);
+}
+
 sub post {
     my $self = shift;
     my $url = shift;
@@ -249,7 +262,7 @@ sub post {
     push @args,'--socks5-hostname',$PROXY    if($url =~ $BLOCKED_EXP);
     push @args,"--referer",$referer if($referer);
     use URI::Escape;    
-
+	
     if(%posts) 
     {
    #     push @args, "--data",join("&", map({"$_=$posts{$_}"} keys %posts));

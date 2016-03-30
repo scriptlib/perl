@@ -37,6 +37,7 @@ our @SITES = (
 	#http://torrage.ws/torrent/:HASH:.torrent
 	#https://torrage.ws/torrent/:HASH:.torrent
 	#https://torrentproject.se/torrent/:HASH:.torrent
+	#
 	qw{
 		post://www.torrent.org.cn/download.php?hash=:HASH:
 		http://torcache.net/torrent/:HASH:.torrent
@@ -164,7 +165,7 @@ sub download {
 	my $output = shift;
 	my $URL = shift;
 	my $REF = shift(@_) || $URL;
-	$DL ||= MyPlace::Program::Download->new('--compressed','--quiet','--maxtry',1);
+	$DL ||= MyPlace::Program::Download->new('--compressed','--maxtry',1);
 	
 	my $postd = shift;
 	if($URL =~ m/^post:\/\/(.+)$/) {

@@ -5,7 +5,7 @@ use base 'MyPlace::Program';
 use strict;
 use warnings;
 use MyPlace::URLRule::Database;
-use MyPlace::URLRule::SimpleQuery;
+use MyPlace::URLRule::SimpleQuery qw/usq_locate_db usq_test_key/;
 use File::Spec::Functions qw/catdir catfile/;
 use Cwd qw/getcwd/;
 my $MSG_PROMPT = 'urlrule';
@@ -30,7 +30,8 @@ sub OPTIONS {qw/
 	retry
 	prompt|p=s
 	url|u
-	overwrite|force|f
+	overwrite
+	force
 	files
 	directory|d=s
 	sed
@@ -39,7 +40,8 @@ sub OPTIONS {qw/
 	input|i=s
 	follow
 	reposter
-	ffollow
+	ffollow|ff
+	grep=s
 /;}
 
 
@@ -71,34 +73,52 @@ sub check_trash {
 	return 1;
 }
 
+sub DB_REINIT {
+	my $self = shift;
+	delete $self->{DB_INIT_DONE};
+	return $self->DB_INIT;
+}
+
 sub DB_INIT {
 	my $self = shift;
-	my %OPTS = %{$self->{OPTS}};
-	return if($OPTS{url});
-
-	if(!($OPTS{hosts} or defined $OPTS{database})) {
-		$OPTS{all} = 1 unless($OPTS{'no-database'});
-	}
-	if($OPTS{all}) {
-		$OPTS{hosts} = $OPTS{hosts} || "*";
-		$OPTS{database} = $OPTS{database} || "";
-	}
-	if($OPTS{'no-database'} and $OPTS{'no-hosts'}) {
+	return $self if($self->{DB_INIT_DONE});
+	$self->{DB_INIT_DONE} = 1;
+	my $OPTS = $self->{OPTS};
+	return if($OPTS->{url});
+	
+	if(defined $OPTS->{'no-hosts'} and defined $OPTS->{'no-database'}) {
 		print STDERR "Error: --no-hosts and --no-database both specified\n";
 		return $self;
 	}
-	if($OPTS{'no-database'}) {
-		delete $OPTS{database};
-		$OPTS{hosts} = $OPTS{hosts} || "*";
+	elsif(defined $OPTS->{'no-hosts'}) {
+		$OPTS->{'database'} = 1;
+		delete $OPTS->{all};
 	}
-	if($OPTS{'no-hosts'}) {
-		delete $OPTS{hosts};
-		$OPTS{database} = $OPTS{database} || "";
+	elsif(defined $OPTS->{'no-database'}) {
+		$OPTS->{hosts} = "*" unless($OPTS->{hosts});
+		delete $OPTS->{all};
 	}
-	if(not($OPTS{hosts} or defined $OPTS{database})) {
-		print STDERR "Error: no --hosts or --database specified\n";
-		return $self;
+	
+	
+	if(!($OPTS->{hosts} or defined $OPTS->{database})) {
+		$OPTS->{all} = 1;
 	}
+	elsif($OPTS->{hosts} and $OPTS->{database}) {
+		$OPTS->{all} = 1;
+	}
+
+	if($OPTS->{all}) {
+		$OPTS->{hosts} = $OPTS->{hosts} || "*";
+		$OPTS->{database} = $OPTS->{database} || "";
+	}
+	return $self;
+}
+
+sub DB_LOAD {
+	my $self = shift;
+	$self->DB_INIT;
+	my %OPTS = %{$self->{OPTS}};
+	return if($OPTS{url});
 	if(defined($OPTS{hosts})) {
 		$self->{USQ} = MyPlace::URLRule::SimpleQuery->new();
 		my @opts  = ('overwrite'=>1) if($OPTS{overwrite});
@@ -112,17 +132,57 @@ sub DB_INIT {
 	return $self;
 }
 
-sub dbfiles {
+sub get_hosts {
 	my $self = shift;
+	$self->DB_INIT();
+	return usq_locate_db($self->{OPTS}->{hosts});
+}
+
+sub get_files_follow {
+	my $self = shift;
+	my $OPTS = $self->{OPTS};
+	my %hosts = $self->get_hosts;
+	my $take_it_easy = shift;
 	my @files;
-	if($self->{USQ}) {
-		push @files,$self->{USQ}->dbfiles;
-	}
-	if($self->{DB}) {
-		foreach(@{$self->{DB}}) {
-			push @files, $_->dbfiles;
+	my @names = qw/follows!.txt follows.txt/;
+	foreach my $dir (keys %hosts,'') {
+		foreach my $basename (@names) {
+			my $partname = $dir ? "$dir/$basename" : "$basename";
+			my $filename = "follows/$partname";
+			foreach($filename,"sites/$partname") {
+				if(-f $_) {
+					$filename = $_;
+					last;
+				}
+			}
+			if(-f $filename) {
+				push @files,$filename;
+			}
+			elsif($take_it_easy) {
+				push @files,$filename;
+			}
 		}
 	}
+	return @files;
+}
+
+sub get_files_database {
+	my $self = shift;
+	$self->DB_INIT;
+	my %hosts = $self->get_hosts;
+	my @files = values %hosts;
+	if($self->{DB}) {
+		push @files,"DATABASE.ud";
+	}
+	return @files;
+}
+
+sub get_files {
+	my $self = shift;
+	my $OPTS = $self->{OPTS};
+	$self->DB_INIT;
+	my @files = $self->get_files_database;
+	push @files,$self->get_files_follow if($OPTS->{follow});
 	return @files;
 }
 
@@ -196,6 +256,21 @@ sub query {
 	return @target;
 }
 
+sub CMD_GREP {
+	my $self = shift;
+	my $OPTS = $self->{OPTS};
+	my @files = $self->get_files;
+	my @grep = ('grep','-a');
+	push @grep,split(/\s+/,$OPTS->{grep}) if($OPTS->{grep});
+	my $exit = 0;
+	foreach(@files) {
+		my $short = $_;
+		$short =~ s/.*\/([^\/]+\/[^\/]+\/[^\/]+)$/$1/;
+		$exit = system(@grep,@_,'--',$_);
+		print STDERR "\t IN <$short>.\n" if(!$exit);
+	}
+	return $exit;
+}
 
 sub CMD_LIST {
 	my $self = shift;
@@ -345,6 +420,24 @@ sub CMD_DOWNLOAD {
 	else {
 		return $EXIT_CODE{DO_NOTHING},\%r;
 	}
+}
+
+sub CMD_EDIT {
+	my $self = shift;
+	my $OPTS = $self->{OPTS};
+	my @files = $self->get_files;
+	my @target;
+	if(@_) {
+		foreach(@files) {
+			if(system("grep",'-l',@_,'--',$_) == 0) {
+				push @target,$_;
+			}
+		}
+	}
+	else {
+		@target = @files;
+	}
+	return system('r-edit',@target);	
 }
 
 sub CMD_SED {
@@ -568,7 +661,7 @@ sub CMD_ADD {
 	if($OPTS->{reposter}) {
 		$name = '#Reposter/' . $name if($name);
 	}
-	$self->DB_INIT();
+	$self->DB_LOAD();
 
 	if($self->{USQ}) {
 		printf STDERR "%12s %s\n",'[HOSTS]', "Add $id -> $name <$OPTS->{hosts}>";
@@ -603,7 +696,8 @@ sub CMD_FOLLOW {
 		$id = $name;
 		$name = '';
 	}
-	my $fn = $OPTS->{'force'} ? "follows!.txt" : "follows.txt";
+	my $fn = ($OPTS->{'force'} || $OPTS->{'ffollow'}) ? "follows!.txt" : "follows.txt";
+
 	my @hosts;
 	foreach my $hostname (split(/\s*,\s*/,$host)) {
 		my $path = ($hostname eq 'ROOT') ? $fn :  "$hostname/$fn";
@@ -617,7 +711,7 @@ sub CMD_FOLLOW {
 	if($OPTS->{reposter}) {
 		$name = '#Reposter/' . $name if($name);
 	}
-	$self->DB_INIT();
+	$self->DB_LOAD();
 
 	if($self->{USQ}) {
 		printf STDERR "%12s %s\n",'[HOSTS]', "Add $id -> $name <$OPTS->{hosts}>";
@@ -739,9 +833,18 @@ sub MAIN {
 		push @args,$dst if($dst);
 	}
 	elsif($CMD eq 'SED') {
-		my @files = $self->dbfiles;
+		my @files = $self->get_files_database;
 		return $self->CMD_SED(\@_,@files);
 	}
+	elsif($CMD eq 'GREP') {
+		return $self->CMD_GREP(@_);
+	}
+	elsif($CMD eq 'EDIT') {
+		return $self->CMD_EDIT(@_);
+	}
+
+	$self->DB_LOAD();
+
 #	print STDERR join(", ",@queries);
 	my @target = $self->query(@queries);
 	if(!@target) {

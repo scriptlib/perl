@@ -128,6 +128,11 @@ my %DICT = qw/
 	波多野结衣	波多YE结衣
 	三级片	三级
 	体宴	Ti宴
+	jiqing	激
+	三級片	三级
+	色情电影	SQ电影
+	玉蒲团	玉PU团
+	3xplanet	３ＸＰＬＡＮＥＴ
 /;
 
 my %HZPY = qw/
@@ -412,6 +417,27 @@ discuss.com.hk
 	内内
 	外射
 	后入
+	hav520.com
+mowa66.com
+www.cao1024.com
+ www.ch5.cc
+ 夢幻圖碼
+ 梦幻图码
+ 找樂子論壇
+ 無限討論區
+ WK綜合論壇
+ Plus28
+ 公仔箱論壇
+ FDZone-Forum
+HD1080.org
+百乐汇娱乐城
+魔王
+魔王在線
+魔王之家
+Porn
+炮友
+痴漢
+赌博
 /;
 =cut
 =qustionable 
@@ -423,6 +449,8 @@ my @indoubt = qw/
 
 /;
 my @dirty = qw/
+	色情电影
+	玉蒲团
 	颜射
 	骚妻
 	嫖妓

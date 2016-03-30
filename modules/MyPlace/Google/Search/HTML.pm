@@ -319,7 +319,7 @@ sub search {
         $status = undef;
         $results = "Error retriving $URL\n";
     }
-	$status = undef unless($results and @$results);
+	$status = undef unless($results and ref $results and @$results);
 
     return $status,$results,$res;
 }

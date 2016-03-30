@@ -63,6 +63,7 @@ my @OPTIONS = qw/
 	norc|nr
 	same-directory
 	mkdir|md
+	fullname|full
 /;
 our %CONF;
 our @DATABASE_DIR = qw{
@@ -203,6 +204,7 @@ sub execute {
 		Close=>'Clean, and move specified directory',
 		Update=>'Update profile',
 		Download=>'Run downloader in directories',
+		Files=>'Run sub command against files in directories',
 	);
 	if(!$CMD) {
 		print STDERR "Commands:\n";
@@ -239,6 +241,14 @@ sub execute {
 	}
 	elsif($CMD eq 'D') {
 		$CMD = 'DOWNLOAD';
+	}
+	elsif($CMD eq 'F') {
+		$CMD = 'FILES';
+	}
+	elsif($CMD eq 'FNAME' or $CMD eq 'FN') {
+		$CMD = 'FILES';
+		unshift @ARGV,'rename';
+		$OPTS{fullname} = 1;
 	}
 	
 	if((!$OPTS{norc}) and -f ".babes.rc" and open FI,'<',".babes.rc") {
@@ -297,6 +307,9 @@ sub execute {
 	}
 	elsif($CMD eq 'PLAY') {
 		exit Babes::Play::process(\%OPTS,@ARGV);
+	}
+	elsif($CMD eq 'FILES') {
+		exit Babes::Files::process(\%OPTS,@ARGV);
 	}
 	else {
 		die("Command not found: $cmd\n");
@@ -595,7 +608,8 @@ sub process {
 	if($OPTS->{move}) {
 		delete $OPTS->{reposter};
 		print STDERR "Moving directory $oldname => $newname\n";
-		$exit2 = run('mv','-v','--',$oldname,$newname) ? 0 : 1;
+		$exit2 = Babes::Move::cmd_mv($oldname,$oldname,$newname);
+		#run('mv','-v','--',$oldname,$newname) ? 0 : 1;
 	}
 	return 1 if($exit1 or $exit2);
 	return 0;
@@ -678,11 +692,23 @@ sub move_to {
 		print STDERR "  Move directories into <$dstd>:\n";
 		foreach(@_) {
 			print STDERR "    <= $_\n";
-			$exit = run('mv','-t',$dstd,'--',$_);
+			$exit = cmd_mv($_,$_,$dstd);
 		};
 	}
 
 	return ($exit == 0);
+}
+
+sub cmd_mv {
+	my $test = shift;
+	my $src = shift;
+	my $dst = shift;
+	if($test =~ m/[\/\\]/) {
+		return run('mv','-T','--',$src,$dst . '/' . $src);
+	}
+	else {
+		return run('mv','-t',$dst,'--',$src);
+	}
 }
 
 
@@ -740,8 +766,8 @@ our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 			my $link = readlink($SRC);
 			print STDERR "  [$SRC] is a symbol link to $link\n";
 			return 2 unless(&Babes::create_dir($DST));
-			if(run('mv','-t',$DST,'--',$link)) {
-				print STDERR "  Move $link to $DST/\n";
+			if(cmd_mv($SRC,$link,$DST)) {
+				print STDERR "  Move [$SRC]$link to $DST\n";
 			}
 			else {
 				print STDERR "  Error move $link to $DST/\n";
@@ -769,7 +795,7 @@ our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 		}
 		else {
 			return 2 unless(&Babes::create_dir($DST));
-			if(run("mv","-t",$DST,"--",$SRC)) {
+			if(cmd_mv($SRC,$SRC,$DST)) {
 				print STDERR "\t [OK]\n";
 				if(!$OPTS->{'no-junction'}) {
 #					print STDERR "[$SRC] LINK=> $DST \n";
@@ -1078,6 +1104,9 @@ sub get {
 		}
 		if($done) {
 		}
+		elsif($OPTS->{medias}) {
+			push @result,Babes::List::get_files($_,'\.(?:mov|mp4|avi|flv|f4v|mpg|mpeg|3gp|ts|jpg|png|gif)$');
+		}
 		elsif($OPTS->{directories}) {
 			push @result,Babes::List::get_dirs($_,$OPTS->{filter});
 		}
@@ -1088,7 +1117,7 @@ sub get {
 			push @result,Babes::List::get_files($_,$OPTS->{filter});
 		}
 		else {
-			push @result,Babes::List::get_videos($_);
+			push @result,Babes::List::get_files($_);
 		}
 	}
 	if($OPTS->{include}) {
@@ -1099,6 +1128,49 @@ sub get {
 	}
 	return @result;
 }
+
+sub files_rename {
+	my $OPTS = shift;
+	if($OPTS->{fullname}) {
+		my $ok = 1;
+		my $rexp = qr/([^\/]+)\/([^\/]+)\/([^\/]+)\/([^\/]+)$/;
+		foreach(@_) {
+			my $oldname = $_;
+			if($OPTS->{revert}) {
+				s/([^\/]+)_([^\/]+)_(\d\d\d\d\d+[^\/]+)$/$3/;
+			}
+			else {
+				s/([^\/]+)\/([^\/]+)\/([^\/]+)\/(\d\d\d\d\d+[^\/]+)$/$1\/$2\/$3\/$1_$3_$4/;
+			}
+			
+			if($oldname ne $_) {
+				if(-f $_) {
+					print STDERR "File exists: $_\n";
+					return 2;
+				}
+				$ok = 0;
+				system(qw/mv -v --/,$oldname,$_);
+			}			
+		}
+		return $ok;
+	}
+}
+
+
+sub process {
+	my $OPTS = shift;
+	my $command = shift;
+	my $CMD = uc($command);
+	if(!$CMD) {
+		print STDERR "No command specified for files\n";
+		return 1;
+	}
+	my @files = get($OPTS,@_);
+	if($CMD eq 'RENAME') {
+		return files_rename($OPTS,@files);
+	}
+}
+
 1;
 
 #######################################################################
@@ -1147,7 +1219,7 @@ sub process_dir {
 	}
 	my $processed;
 	foreach(glob('*')) {
-		if(m/^weipai\.cn$/) {
+		if(m/^(weipai\.cn)$/) {
 			process_weipai($OPTS,$_,$dir);
 			$processed = 1;
 		}
