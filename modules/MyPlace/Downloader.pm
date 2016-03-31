@@ -41,6 +41,9 @@ my %DOWNLOADERS = (
 	},
 	'Weishi'=>{
 		'TEST'=>'^http:\/\/[^\.]+\.weishi\.com\/.*downloadVideo\.php',
+	},
+	'Weibo'=>{
+		'TEST'=>'^http:\/\/video\.weibo\.com\/',
 	}
 );
 
