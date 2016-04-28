@@ -33,11 +33,23 @@ sub color2 {
 	return color('CYAN') . join(" ",@_) . color('RESET');
 }
 
+sub _build_prompt {
+	my $c1 = shift;
+	my $c2 = shift;
+	my $p1 = $c1 ? color($c1) . $NAME . color('RESET') : $NAME if($NAME);
+	my $p2 = $c1 ? color($c1) . $CMD . color('RESET') : $CMD if($CMD);
+	my $p3 = $c1 ? color($c2) . $PROMPT . color('RESET') : $PROMPT if($PROMPT);
+
+	my $p = $NAME ? $p1 . ">" : $CMD ? $p2 . ">" : ">";
+	$p .= $PROMPT ? $p3 . ">" : "";
+	$p .= " ";
+	$p .= join(" ",@_) if(@_);
+	return $p;
+}
+
 sub qcmd_prompt {
-	print STDERR $NAME ? color1($NAME) . ">" : $CMD ? color1($CMD) . ">" : ">";
-	print STDERR $PROMPT ? color2($PROMPT) . ">" : "";
-	print STDERR " ";
-	print STDERR join(" ",@_) if(@_);
+	print "\e]2;" . _build_prompt(undef,undef,@_) . "\7";;
+	print STDERR _build_prompt('GREEN','CYAN',@_);
 }
 
 my %vtable = (

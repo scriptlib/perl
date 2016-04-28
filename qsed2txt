@@ -7,6 +7,7 @@ our $VERSION = 'v0.1';
 my @OPTIONS = qw/
 	help|h|? 
 	manual|man
+	output|o=s
 /;
 my %OPTS;
 if(@ARGV)
@@ -62,7 +63,6 @@ sub parse_filename {
 
 sub read_qsed {
 	my $filename = shift;
-	my $basename = shift;
 	open my $FI,"<",$filename or return error("Opening $filename for reading","$!");
 	my @links;
 	my $text = join("",<$FI>);
@@ -71,10 +71,10 @@ sub read_qsed {
 	}
 	close $FI;
 	if(@links) {
-		return $basename . "\n" . "\t" . join("\n\t",@links);
+		return @links;
 	}
 	else {
-		return $basename . "\n" . "\t" . join("\n\t",split(/[\r\n]+/,$text));
+		return split(/\s*[\r\n]+\s*/,$text);
 	}
 }
 
@@ -88,6 +88,46 @@ sub clean_name {
 }
 
 use File::Glob qw/bsd_glob/;
+sub process_files {
+	my $output = shift;
+	my $fh;
+	my $count_f=0;
+	my $count_l=0;
+	open $fh,'>>',$output or die("Error opening $output for appending: $!\n");
+	foreach my $path(@_) {
+		$path =~ s/[\/\\]+$//;
+		if(-d $path) {
+			print STDERR "  [DIR]$path ...\n";
+			my($cf,$cl) = process_files($output,grep !/\/\./,bsd_glob($path . "/*"));
+			$count_f += $cf;
+			$count_l += $cl;
+		}
+		elsif($path =~ m/\.(?:qsed|ed2k|bdhd|thunder|uri|txt|lst)$/i) {
+			print STDERR "  [FILE]$path ...\n";
+			if(!-r $path) {
+				print STDERR "    Error: reading $path!\n";
+			}
+			else {
+				$count_f++;
+				my @links = read_qsed($path);
+				if(@links) {
+					$count_l = $count_l + scalar(@links);
+					print $fh join("\n",@links),"\n";
+#					print STDERR "  > " . scalar(@links) . " link(s).\n";
+				}
+				else {
+					print STDERR "    Error: nothing read!\n";
+				}
+			}
+
+		}
+		else {
+			print STDERR "  Error: file type $path not supported!\n";
+		}
+	}
+	close $fh;
+	return $count_f,$count_l;
+}
 sub process_dir {
 	my $srcd = shift;
 	my $dstd = shift;
@@ -159,7 +199,7 @@ sub process_dir {
 		if($FO) {
 			if($IS_QSED) {
 				print STDERR  "[Appending] $output\n";
-				print $FO &read_qsed($file,$basename),"\n";
+				print $FO $basename . "\n\t" . join("\n\t",&read_qsed($file)),"\n";
 			}
 			else {
 				my $fout = catfile($odir,$clean_name . "." . lc($extname));
@@ -172,7 +212,7 @@ sub process_dir {
 				my $fout = catfile($wdir,"$clean_name$URI_FILE_EXT");
 				print STDERR "[Writting] $fout\n";
 				open my $FH,">>",$fout or error("Opeing $fout for writting","$!");
-				print $FH &read_qsed($file,$basename),"\n";
+				print $FH $basename . "\n\t" . join("\n\t",&read_qsed($file)),"\n";
 				close $FH;
 			}
 			else {
@@ -193,6 +233,13 @@ sub process {
 		system('mkdir','-p','-v','--',$dstd) == 0 or return error("Creating directory $dstd",$!);
 	}
 	process_dir($srcd,$dstd,"","");
+}
+
+
+if($OPTS{output}) {
+	my($cf,$cl) = process_files($OPTS{output},@ARGV);
+	print STDERR "\n<<\n  $cf files processed\n  $cl links written\n>>$OPTS{output}\n";
+	exit 0;
 }
 
 my $SOURCE = shift;

@@ -44,7 +44,10 @@ my %DOWNLOADERS = (
 	},
 	'Weibo'=>{
 		'TEST'=>'^http:\/\/video\.weibo\.com\/',
-	}
+	},
+	'Xiaoying'=>{
+		'TEST'=>'^http:\/\/xiaoying.tv\/v\/',
+	},
 );
 
 my $BLOCKED_URLS = qr/vlook\.cn\/video\/high\/[^\/]+\.mp4$/;

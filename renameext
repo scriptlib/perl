@@ -221,12 +221,15 @@ sub my_rename {
 my @files;
 if($OPTS{dir}) {
 	die("Directory not accessiable: <$OPTS{dir}>\n") unless(-d $OPTS{dir});
+	my $PREFIX = $OPTS{dir} . "/";
+	$PREFIX =~ s/\/\/+$//;
+	$PREFIX =~ s/^\.\/+//;
 	if(opendir(my $dh,$OPTS{dir})) {
 		while(readdir($dh)) {
 			next if($_ eq '.');
 			next if($_ eq '..');
 			#print STDERR $_,"\n";
-			push @files,"$OPTS{dir}/$_";
+			push @files,"$PREFIX$_";
 		}
 		close $dh;
 	}

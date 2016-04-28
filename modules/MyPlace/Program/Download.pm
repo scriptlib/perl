@@ -342,8 +342,19 @@ sub _get_url {
 		}
 		if(!$saveas) {
 		    my $basename=$url;
+			if($basename =~ m/^(.+?)[\?\#](.+)$/) {
+				my $f1 = $1;
+				my $f2 = $2;
+				if($f2 =~ m/\.[^\.]{2,4}$/) {
+					$basename = $f2;
+				}
+				else {
+					$basename = $f1;
+				}
+			}
+			$basename =~ s/\?.*$//;
+			$basename =~ s/\#.*$//;
 		    $basename =~ s/^.*\///;
-			$basename =~ s/[\?\#].*//;
 		    $basename = "index.html" unless($basename);
 		    $saveas=$basename;
 		}

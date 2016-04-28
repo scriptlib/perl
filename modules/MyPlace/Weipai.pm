@@ -23,8 +23,8 @@ our %URLSTPL = (
 	fans=>'/user_fans_list?count=$2&relative=after&uid=$1&cursor=$3',
 	follows=>'/user_follow_list?count=$2&relative=after&uid=$1&cursor=$3',
 	likes=>'/user/compresseduserlikes?count=$2&cursor=$3&relative=after&user_id=$1',
-	search_user=>'/search_user?count=$2&next_cursor=$3&relative=after&keyword=$1',
-	search_video=>'/search_video?count=$2&next_cursor=$3&relative=after&keyword=$1',
+	search_user=>'/search_user?count=$2&cursor=$3&relative=after&keyword=$1',
+	search_video=>'/search_video?count=$2&cursor=$3&relative=after&keyword=$1',
 	video_defender=>'/top_defender?count=$2&relative=after&vid=$1&next_cursor=$3',
 	defender=>'/top_defender?count=$2&relative=after&uid=$1&next_cursor=$3',
 	play=>'/play_video?user_id=508775398134943b58000051&blog_id=$1',
@@ -54,46 +54,33 @@ my $CURL = MyPlace::Curl->new(
 	"show-error"=>'',
 #	"retry"=>4,
 	"max-time"=>120,
+	'user-agent'=>'android-async-http/1.4.3 (http://loopj.com/android-async-http)',
+#	'verbose'=>'',
 );
 
-my $COPIED_HEADER = '
-Content-Length: 85
-Content-Type: application/x-www-form-urlencoded
-Host: w1.weipai.cn
-Connection: Keep-Alive
-User-Agent: android-async-http/1.4.3 (http://loopj.com/android-async-http)
-Accept-Encoding: gzip
-Phone-Type: android_Lenovo A788t_4.3
-os: android
-Channel: 360%E6%89%8B%E6%9C%BA%E5%8A%A9%E6%89%8B
-App-Name: weipai
-Api-Version: 8
-Weipai-Token: ef1d3ac6f047b95dc8efe19a9439210804020274e9c4feddc94c60f9182a23318db7a8715127a3b9
-Phone-Number: 
-Com-Id: weipai
-sign: d18b74787b5683193d8d89f9009407cc
-time: 1459347429
-Client-Version: 1.0.0.0
-Weipai-Userid: 508775398134943b58000051
-Device-Uuid: 53ede2300d89c4cd99b4d92d198affcaf5d63101
-Latitude: 23.548452
-Longitude: 116.409982
-Push-Id: com.weipai.weipaipro
-Kernel-Version: 15
-count=20&relative=&compressd=1&day_count=7&nickname=&user_id=508775398134943b58000051
-';
-my @CURLOPT;# = ('--compressed');
-foreach(split(/\s*\n\s*/,$COPIED_HEADER)) {
-	next unless($_);
-	next unless(m/:/);
-	s/^([^:]+):\s+/$1:/;
-	next if(m/(?:Content-Length|Host|Connection|Accept-Encoding|sign|time):/);
-#	print STDERR $_,"\n";
-	push @CURLOPT,'-H',$_;
+my %STATIC_WEIPAI_HEADER = (
+	"Phone-Type"=>"android_Lenovo A788t_4.3",
+	"os"=>"android",
+	"Channel"=>"360%E6%89%8B%E6%9C%BA%E5%8A%A9%E6%89%8B",
+	"App-Name"=>"weipai",
+	"Api-Version"=>"8",
+	"Weipai-Token"=>"ef1d3ac6f047b95dc8efe19a9439210804020274e9c4feddc94c60f9182a23318db7a8715127a3b9",
+	"Phone-Number"=>'',
+	"Com-Id"=>"weipai",
+	"Client-Version"=>"1.0.0.0",
+	"Weipai-Userid"=>"508775398134943b58000051",
+	"Device-Uuid"=>"53ede2300d89c4cd99b4d92d198affcaf5d63101",
+	"Latitude"=>"23.548538",
+	"Longitude"=>"116.409899",
+	"Push-Id"=>"com.weipai.weipaipro",
+	"Kernel-Version"=>15,
+);
+our $STATIC_WEIPAI_SIGNATURE = 
+	"Knk9ss{3jMM;KD%;kl;jafo'jaUG9,^43*5KM./a.aNNlf/.sdfgnp==>(mskI^8*NKD::I&^(^(KDH,WND..LK*%KJD8'%73djkssj...;'][sks";
+sub get_sign {
+	my %params = @_;
+	return _md5sum_map(1,\%params,sort keys %params);
 }
-#LAST HEADER UPDATED 2015/09/20
-
-
 
 my $utf8 = find_encoding('utf8');
 
@@ -188,10 +175,34 @@ sub get_url {
 	my $data;
 	my $status = 1;
 	print STDERR uc("[$method]") . " $url ..." if($verbose);
+	
+	my $param_url = $url;
+	$param_url =~ s/.*\/[^\?]+//;
+	$param_url =~ s/^\?//;
+	my %params;
+	foreach(split/(?:&amp;|&)/,$param_url) {
+		if(m/^([^=]+)=(.*)$/) {
+			$params{$1} = $2 || '';
+		}
+	}
+	my %header = (%STATIC_WEIPAI_HEADER,
+		"time"=>time,
+	);
+	$header{sign} = get_sign(%header,%params);
+
+	my @CURLOPT;
+
+	foreach(keys %header) {
+		my $h = $_ . ":" . ($header{$_} || '');
+		push @CURLOPT,'-H',$h;
+		#print STDERR $h,"\n";
+	}
+	
+
 	while($retry) {
 		if($method eq 'get') {
 			#		print STDERR join("\n",@CURLOPT,"\n");
-			($status,$data) = $CURL->get($url,@CURLOPT,'-H','time:' . time);
+			($status,$data) = $CURL->get($url,@CURLOPT);
 		}
 		else {
 			my $posturl = $url;
@@ -200,7 +211,7 @@ sub get_url {
 				$posturl = $1;
 				$content = $2;
 			}
-			($status,$data) = $CURL->postd($posturl,$content,@CURLOPT,'-H','time:' . time);
+			($status,$data) = $CURL->postd($posturl,$content,@CURLOPT);
 
 		}
 		if($status != 0) {
@@ -300,6 +311,8 @@ sub build_url {
 	}
 	$url =~ s/\?&/\?/;
 	$url =~ s/&$//;
+	$url =~ s/=0&/=&/g;
+	$url =~ s/=0$/=/g;
 	return $url;
 }
 
@@ -651,6 +664,58 @@ sub clean_up_data {
 	return $data;
 }
 
+sub cmd_md5sum {
+	my $opts = shift;
+	my $header_file = shift;
+	open FI,'<',$header_file or die("$!\n");
+	my %header;
+	while(<FI>) {
+		chomp;
+		next unless($_);
+		if(m/^([^:]+):\s*(.*?)\s*$/) {
+			if($1 eq 'sign') {
+				print STDERR "-"x40,"sign","-"x40,"\n";
+				print STDERR $2,"\n";
+				print STDERR "-"x40,"sign","-"x40,"\n";
+				next;
+			}
+			elsif($1 eq 'sign2') {
+				next;
+			}
+			$header{$1} = $2 ? $2 : "";
+		}
+	}
+	close FI;
+	
+	_md5sum_map(1,\%header,sort keys %header);
+	_md5sum_map(0,\%header,sort keys %header);
+#	_md5sum_map(1,\%header,sort {lc($a) cmp lc($b)} keys %header);
+#	_md5sum_map(0,\%header,sort {lc($a) cmp lc($b)} keys %header);
+	
+	return 0;
+
+}
+
+sub _md5sum_map {
+	my $escape = shift;
+	my $map = shift;
+	my $text = '';
+	foreach my $key(@_) {
+		$text .= $key . '=' . $map->{$key};
+	}
+	$text .= $STATIC_WEIPAI_SIGNATURE;
+#	$text .= "Knk9ss{3jMM;KD%;kl;jafo'jaUG9,^43*5KM./a.aNNlf/.sdfgnp==>(mskI^8*NKD::I&^(^(KDH,WND..LK*%KJD8'sdjkssj...;'][sks";
+	use Encode;
+	use URI::Escape qw/uri_escape_utf8 uri_escape/;
+	use Digest::MD5 qw/md5_hex md5/;
+	$text =~ s/ /+/g;
+	$text = uri_escape($text) if($escape);
+	$text =~ s/%2A/*/g;
+	$text =~ s/%2B/%20/g;
+#	print STDERR "-"x40,"\n",$text,"\n","-"x30,"\n",md5_hex($text),"\n","-"x40,"\n";
+	return md5_hex($text);
+}
+
 sub cmd_get_videos {
 	my $opts = shift;
 	my $uid = shift;
@@ -962,6 +1027,9 @@ sub MAIN {
 		else {
 			print STDERR "No valid url found!\n";
 		}
+	}
+	elsif($command eq 'MD5SUM') {
+		return cmd_md5sum($opts,@_);
 	}
 }
 

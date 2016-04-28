@@ -123,6 +123,7 @@ sub prompt {
 	my $cwd = getcwd;
 	my $cwdname = $cwd =~ s/.*[\/\\]//r;
 	my $prefix = $DATA ? "[$DATA]" : $PROMPT ? "$PROMPT>" : @_ ? join(" ",@_) . "#" : '';
+	print "\e]2;" . "$cwdname>$prefix " . "\7";
 	print STDERR color('GREEN'),"$cwdname",color('RESET'),'>',color('YELLOW'),$prefix,color('RESET')," ";
 }
 
