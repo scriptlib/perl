@@ -3,8 +3,8 @@ package MyPlace::Tasks::Worker::URLRule;
 use strict;
 use warnings;
 use parent 'MyPlace::Tasks::Worker';
-use MyPlace::Weipai;
 use MyPlace::Tasks::Task qw/$TASK_STATUS/;
+use MyPlace::Weipai;
 use MyPlace::Script::Message;
 use MyPlace::URLRule::SimpleQuery qw/usq_test_key usq_locate_db/;
 use MyPlace::Program::SimpleQuery qw/validate_item/;
@@ -120,15 +120,23 @@ my $USQ;
 #				return undef;
 #			}
 #		}
-		if($url =~ m/weipai\.cn/) {
+		if($url =~ m/yiqi1717.com/) {
+			use MyPlace::URLRule;
+			my ($status,$result) = MyPlace::URLRule::request($url,':info');
+			if($status) {
+				return $result->{uid},$result->{uname},$result->{host};
+			}
+		}
+		elsif($url =~ m/weipai\.cn/) {
 			use MyPlace::URLRule;
 			my ($status,$result) = MyPlace::URLRule::request($url);
+#			use MyPlace::Debug::Dump;die(debug_dump($result));
 			if($status) {
 				my $info = $result->{info};
 				if($info) {
 					return 
 					$info->{uid} || $info->{user_id} || $info->{userid}, 
-					$info->{uname} || $info->{user_name} || $info->{username},
+					$info->{uname} || $info->{user_name} || $info->{username} || $info->{nickname},
 					'weipai.cn'
 					;
 				}
@@ -180,12 +188,20 @@ my $USQ;
 sub _validate_cmd {
 	my $REG_CMD_DOWNLOAD = qr/^(:?SAVE|UPDATE|DOWNLOADER|DOWNLOAD|BATCHGET|SAVER)$/;
 	my $OPTS = shift;
+	my $TASK = shift;
 	my $CMD = shift;
 	return $CMD unless($CMD =~ $REG_CMD_DOWNLOAD);
-	if($OPTS->{'disable-all-download'}) {
+	my $TASK_DEF = join('>',$TASK->content());
+	my $k1 = 'disable-all-download';
+	my $o1 = defined $OPTS->{$k1} ? ($OPTS->{$k1} || '.*') : undef;
+	my $k2 = defined $OPTS->{'disable-download'} ? 'disable-download' : 'no-download';
+	my $o2 = defined $OPTS->{$k2} ? ($OPTS->{$k2} || '.*') : undef;
+	$o1 = '.*' if($o1 and $o1 eq '*');
+	$o2 = '.*' if($o2 and $o2 eq '*');
+	if($o1 and $TASK_DEF =~ $o1) {
 		$CMD = 'DATABASE' unless($OPTS->{REALLYFORCE});
 	}
-	elsif($OPTS->{'disable-download'} || $OPTS->{'no-download'}) {
+	elsif($o2 and $TASK_DEF =~ $o2) {
 		$CMD = 'DATABASE' unless($OPTS->{FORCE});
 	}
 	return $CMD;
@@ -371,7 +387,7 @@ sub work {
 			$prefix = $1;
 			$action = $2;
 		}
-		$action = $prefix .  _validate_cmd({%{$self->{options}},%OPTS},$action);
+		$action = $prefix .  _validate_cmd({%{$self->{options}},%OPTS},$task,$action);
 
 		if(!@urls) {
 			return $self->error($task,"No url specified");
@@ -448,6 +464,7 @@ sub work {
 				}
 
 				my ($key1,$key2,$key3) = extract_info_from_url($ARG1);
+#				use MyPlace::Debug::Dump;die(debug_dump($key1,'',$key2,'',$key3,''));
 				if(!($key1 or $key2)) {
 					return $self->error($task,'Extract information from URL failed');
 				}
@@ -639,7 +656,7 @@ sub work {
 			$OPTS{$1} = 1;
 		}
 
-		$CMD = _validate_cmd({%{$self->{options}},%OPTS},$CMD);
+		$CMD = _validate_cmd({%{$self->{options}},%OPTS},$task,$CMD);
 
 		if($CMD eq 'ADD' || $CMD eq 'FOLLOW' || $CMD eq 'LIKES' || $CMD eq 'FOLLOW_LIKES') {
 			$WD = $task->{source_dir} || $task->{workdir} || $self->{source_dir} || "";
@@ -966,9 +983,16 @@ sub work {
 					}
 					foreach(@{$likes->{video_list}}) {
 						next unless(ref $_);
+						if($record{$_->{video_id}}) {
+							next;# unless($OPTS{FORCE});
+						}
+						if($A->{$_->{video_id}}) {
+							next unless($OPTS{FORCE});
+						}
 						foreach my $key(qw/video_desc nickname video_id video_desc user_id video_play_url date/) {
 							$_->{$key} = '' unless(defined $_->{$key});
 						}
+
 						$_->{video_desc} =~ s/[\r\n]+//g;
 						$_->{video_desc} =~ s/\s{2,}/ /g;
 						if($_->{video_play_url} =~ m/\/(\d+)\/(\d+)\/(\d+)\//) {
@@ -982,23 +1006,17 @@ sub work {
 							$_->{video_play_url} ,
 							$_->{video_desc}
 						);
-
-						if($record{$_->{video_id}}) {
-							next;# unless($OPTS{FORCE});
-						}
-						else {
+						if(not $record{$_->{video_id}}) {
 							$record{$_->{video_id}} = 1;
 							print FO $k,"\n";
 						}
-						$processed = 0;	
-
-						if($A->{$_->{video_id}}) {
-							next unless($OPTS{FORCE});
-						}
-						else {
+						if(not $A->{$_->{video_id}}) {
 							$A->{$_->{video_id}} = 1;
 							print $FO_ALL $k,"\n" if($FO_ALL);
 						}
+
+						$processed = 0;	
+
 						push @result,"http://www.weipai.cn/video/$_->{video_id}";
 						print STDERR "LIKES: $_->{date} $_->{video_id}\t$_->{nickname}\t$_->{video_desc}\n";
 						$count++;
@@ -1027,7 +1045,7 @@ sub work {
 				}
 			}
 			$self->{URLRULE_LIKES_ALL} = $A;
-			my $URL_CMD = ($FOLLOW_ID ? 'AFD' : 'AD') . ',' . ($OPTS{FORCE} ? '!!SAVEURL' : 'SAVEURL');
+			my $URL_CMD = ($FOLLOW_ID ? 'AFD' : 'AD') . ',' . ($OPTS{FORCE} ? '!!SAVEURL' : '!SAVEURL');
 			if(@result) {
 				my @dt;
 				foreach(@result) {
@@ -1152,7 +1170,7 @@ sub work {
 			$prefix = $1;
 			$action = $2;
 		}
-		$action = $prefix .  _validate_cmd({%{$self->{options}},%OPTS},$action);
+		$action = $prefix .  _validate_cmd({%{$self->{options}},%OPTS},$task,$action);
 		$task->{title} = "[urlrule action] $url $level $action";
 		use MyPlace::URLRule::OO;
 		my $URLRULE = new MyPlace::URLRule::OO('action'=>$action,'thread'=>1);
@@ -1253,8 +1271,8 @@ sub OPTIONS {qw/
 	no-createdir|nc
 	no-recursive|nr
 	no-download|nd
-	disable-download|dd
-	disable-all-download|dad
+	disable-download|dd=s
+	disable-all-download|dad=s
 	fullname
 	include|I:s
 	exclude|X:s

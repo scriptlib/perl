@@ -109,7 +109,7 @@ sub validate_item {
 
 	my @teststr;
 	foreach(@_) {
-		push @teststr,$_ if(defined $_);
+		push @teststr,$_ if($_);
 	}
 	my $testname = join(" ",@teststr);
 	my $result = 1;
@@ -421,7 +421,7 @@ sub do_saveurl {
 		my $action = $OPTS->{'force'} ? 'DOWNLOAD' : $OPTS->{'no-download'} ? 'DATABASE' : 'DOWNLOAD';
 		$action = '!' . $action  if($OPTS->{'force-action'});
 		my $URLRULE = new MyPlace::URLRule::OO(
-				'action'=>$action,
+				'action'=>'SAVE',#$action,
 				'thread'=>$OPTS->{thread},
 				'createdir'=>$OPTS->{createdir},
 				'include'=>$OPTS->{include},

@@ -43,21 +43,21 @@ my %ENGINES = (
 		'https://btdigg.org/?###QUERY###',
 		2,
 	],
-	'sobt5.com'=>[
+	'#sobt5.com'=>[
 		'http://www.sobt5.com/q/###QUERY###',
 		1,
 	],
 	'torrentkitty'=>[
 		#'http://www.torrentkitty.org/search/###QUERY###/',
-		'http://www.torrentkitty.net/search/###QUERY###/',
+		'https://www.torrentkitty.tv/search/###QUERY###/',
 		2,
 	],
 	#'torrentkittyzw.com'=>[
 	#	'http://www.torrentkittyzw.com/###QUERY###',
 	#	3,
 	#],
-	'btdigg.ws'=>[
-		'http://btdigg.ws/?###QUERY###',
+	'#btdigg.ws'=>[
+		'https://btdigg.ws/?###QUERY###',
 		3,
 	],
 #	'ganluzhe.com'=>[
@@ -77,13 +77,14 @@ my %ENGINES = (
 		2,
 	],
 	'kat.cr'=>[
-		'http://kat.cr/?###QUERY###',
+		#'https://kat.cr/?###QUERY###',
+		'http://kickasstorrentsan.com/?###QUERY###',
 		2,
 	],
-#	'bitsnoop'=>[
-#		'http://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
-#		2,
-#	],
+	'bitsnoop'=>[
+		'https://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
+		2,
+	],
 );
 
 my %ENGINES2  = (
@@ -225,6 +226,7 @@ foreach my $QUERY(@ARGV) {
 	my $k = $QUERY;
 	$k =~ s/\s+/+/g;
 	foreach(keys %engine) {
+		next if(m/^#/);
 		app_message2 "Search \<$QUERY\> using engine \[$_\]\n";
 		my $url = $engine{$_}[0];
 		my $level = $engine{$_}[1];

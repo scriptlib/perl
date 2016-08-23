@@ -154,15 +154,18 @@ TMPLINLINE
     $DEF{EMAIL} = "$USER\@" . (defined $HOSTNAME ? $HOSTNAME : "myplace.hell");
 	$DEF{TARGET} = join(" ",@ARGV);
 	$DEF{NAME} = $rule{domain} || $DEF{TARGET};
+	$DEF{LEVEL} = $rule{level_desc} || $rule{level};
+	$DEF{DIRECTORY} = $rule{directory} if($rule{directory});
+	if($rule{source}) {
+		$DEF{ID} = $rule{source};
+		$DEF{ID} =~ s/^.*\/([^\/]+)\/([^\/]+)$/$1_$2/; 
+		$DEF{ID} =~ s/\./_/g;
+	}
 foreach(@TEXT) {
 	foreach my $D(keys %DEF) {
+		next unless($DEF{$D});
 		s/___${D}___/$DEF{$D}/g;
 	}
-	#s/___EMAIL___/$EMAIL/g;
-	#s/___AUTHOR___/$USER/g;
-	#s/___NAME___/$NAME/g;
-	#s/___DATE___/$DATE/g;
-	#s/___TARGET___/$TARGET/g;
 }
 
 if($OPTS{stdout}) {

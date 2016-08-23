@@ -12,7 +12,7 @@ BEGIN {
 }
 use base 'MyPlace::Program';
 use MyPlace::Program::Download;
-use MyPlace::Weipai qw/get_url build_url/;
+use MyPlace::Weipai qw/get_url build_url get_blog_id/;
 
 my $DOWNLOADER;
 my %VIDEO_TYPE = (
@@ -184,7 +184,25 @@ sub _preprocess {
 	my $hist = shift(@_) || $OPTS->{history};
 	my $overwrite = shift(@_) || $OPTS->{overwrite};
 	my $mtm = $OPTS->{mtm};
+	
+	my $uuid_url;
+	my $blog_id;
+	if($url =~ m/.*\/\d+\/\d+\/\d+\/([^\/]+)\.(mov|mp4|flv)/) {
+		$blog_id = MyPlace::Weipai::get_blog_id($url);
+	}
+	elsif($url =~ m/\/video\/uuid\/([^?#&]+)/) {
+		$blog_id = MyPlace::Weipai::get_blog_id($1);
+	}
+	if($blog_id) {
+		$uuid_url = $url;
+		$url = 'http://www.weipai.cn/video/' . $blog_id;
+		print STDERR "Video Page => $url\n";
+	}
 
+	if($url =~ m/\.(?:mp4|mov|flv)/) {
+		print STDERR "  Ignored: url type not supported\n";
+		return MyPlace::Program::EXIT_CODE("FAILED");
+	}
 
 	$suffix = _parse_suffix($url,$suffix);
 
@@ -203,6 +221,9 @@ sub _preprocess {
 	$basename =~ s/^.*\///;
 	$basename =~ s/\.m3u8$//;
 	if($hist) {
+		if($uuid_url) {
+			return undef if(hist_check_url($uuid_url,$basename,$suffix));
+		}
 		return undef if(hist_check_url($url,$basename,$suffix));
 	}
 	else {
@@ -387,14 +408,18 @@ sub download {
 	my ($exit,$input,$output);
 	
 
-
-	if(@args && $args[0]) {
-		if($OPTS->{"no-download"}) {
-			$exit = MyPlace::Program::EXIT_CODE("UNKNOWN");
-		}
-	}
-	else {
+	if(!@args) {
 		$exit = 12;
+	}
+	elsif(!defined $args[0]) {
+		$exit = MyPlace::Program::EXIT_CODE("UNKNOWN");
+
+	}
+	elsif($OPTS->{"no-download"}) {
+		$exit = MyPlace::Program::EXIT_CODE("UNKNOWN");
+	}
+	elsif($args[0] =~ /^\d+$/) {
+		$exit = $args[0];
 	}
 	return $exit if(defined $exit);
 
@@ -406,8 +431,8 @@ sub download {
 	if($args[0] =~ m/weipai\.cn\/video\/[^\/]+$/) {
 		print STDERR "\n";
 		my $n_url = get_video_url($args[0]);
-		print STDERR " => $n_url\n";
 		return 11 unless($n_url);
+		print STDERR " => $n_url\n";
 		my $n_basename = $args[1] || undef;
 		$exit = download($OPTS,$n_url,$n_basename);
 		if($exit == 0) {

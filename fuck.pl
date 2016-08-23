@@ -8,7 +8,7 @@ my @OPTIONS = qw/
 	help|h|? 
 	manual|man
 	source|directory|d=s
-	update|renew|u
+	update|renew|rebuild|u
 	group|g=s
 	videos|c=s
 	video-only
@@ -32,6 +32,7 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 my @DEF_DIR = (qw{
 	/z/datapool
 	/z/datapool2
+	/myplace/appdata/dp
 	/u/datapool
 	/service/Temp/
 });
@@ -114,6 +115,10 @@ sub find_videos {
 	my @result;
 	foreach my $dir (@DEF_DIR) {
 		foreach my $name(@_) {
+			if(-d $name) {
+				push @result,$name;
+				last;
+			}
 			foreach($name,ucfirst($name)) {
 				my $fd = join("/",$dir,$name);
 					next if(-l $fd);
@@ -437,7 +442,10 @@ foreach(@videos) {
 	next if($REALPATH{lc($path)});
 	print STDERR "Found videos to play: $_\n";
 	$REALPATH{lc($path)} = 1;
-	play_dir($_,$targets{play},$path);
+#	if(!($targets{play}->{with} and $targets{play}->{with}->{images})) {
+#		$targets{play}->{without}->{images} = 1;
+#	}
+	play_dir($_,$targets{play},$path,'without-images'=>1);
 }
 
 

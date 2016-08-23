@@ -317,13 +317,54 @@ sub get_rule_handler {
 		return {error=>'Rule not defined'};#,undef;
 	}
 	my $source = $info->{source};
-	if(!-f $source) {
-		return {error=>"Rule not defined:$source"};#,undef;
+	$info->{version} = 1;
+	if(open FI,'<',$source) {
+		my $count = 0;
+		while(<FI>) {
+			last if($count > 20);
+			if(index($_,'MyPlace::URLRule::Rule')>0) {
+				$info->{version} = 2;
+				last;
+			}
+			$count++;
+		}
+		close FI;
+	}
+	else {
+		return {error=>"Rule not defined: file not accessiable:$source"};#,undef;
 	}
 	my $id = $source;
 	if($CACHED_RULE{$id}) {
 		return $CACHED_RULE{$id};
 	}
+	
+	if($info->{version} >= 2) {
+		my $r;
+		if(!($r = do $source)) {
+			if($@) {
+				return {error=>"Compiling '$source' failed.\n$@"};
+			}
+			elsif(!defined $r) {
+				return {error=>"File '$source' compiled, but return nothing.\n$!"};
+			}
+			elsif(!$r) {
+				return {error=>"File '$source' compiled, but return false."};
+			}
+			else {
+				return {error=>"File '$source' compiled, but return no MyPlace::URLRule::Rule"};
+			}
+		}
+		elsif(!ref $r) {
+			return {error=>"File '$source' compiled, but return no MyPlace::URLRule::Rule"};
+		}
+		else {
+			$r->{source} = $source;
+			$r->{rule} = $info;
+			$CACHED_RULE{$id} = $r;
+			return $r;
+		}
+	}
+
 	my $package = "MyPlace::URLRule::Rule::$id";
 	$package =~ s/[\/\\\.-]/_/g;
 	#app_message "Importing rule $source\n";

@@ -24,6 +24,8 @@ sub OPTIONS {qw/
 	markdone
 	no-download
 	output|saveas|o=s
+	max-time|mt=i
+	connect-timeout|ct=i
 /;}
 
 my %EXPS = (
@@ -48,6 +50,13 @@ my %DOWNLOADERS = (
 	'Xiaoying'=>{
 		'TEST'=>'^http:\/\/xiaoying.tv\/v\/',
 	},
+	'HLS'=>{
+		'TEST'=>'^hls:\/\/',
+	},
+	'Yiqi'=>{
+		'TEST'=>'^http:\/\/yiqihdl.*\.flv$',
+	}
+
 );
 
 my $BLOCKED_URLS = qr/vlook\.cn\/video\/high\/[^\/]+\.mp4$/;
@@ -135,6 +144,11 @@ sub save_http {
 	my $filename = shift;
 	my @opts = @_;
 	push @opts,'--url',$url;
+	foreach(qw/max-time connect-timeout/) {
+		if($self->{OPTS}->{$_}) {
+			push @opts,'--' . $_,$self->{OPTS}->{$_};
+		}
+	}
 	if($filename) {
 		return $self->{LAST_EXIT} if($self->file_exists($url,$filename));
 		push @opts,'--saveas',$filename if($filename);
@@ -337,6 +351,12 @@ sub download {
 	#$self->print_msg("DOWNLOAD: $line\n");
 	if(!$_) {
 		return $self->EXIT_CODE('IGNORED');
+	}
+	if(index($_,"\t")<1) {
+		my $sidx = index($_,"    ");
+		if($sidx > 1) {
+			$_ = substr($_,0,$sidx) . "\t" . substr($_,$sidx+4);
+		}
 	}
 #	elsif(m/meitudata\.com|meipai\.com/) {
 #		print STDERR "Skipped, Code update need\n";

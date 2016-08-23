@@ -49,7 +49,7 @@ my @OPTIONS = qw/
 	weibo
 	moko
 	mplayer=s
-	start=i
+	start=s
 	find=s
 	replace=s
 	vlook

@@ -8,7 +8,7 @@ BEGIN {
     $VERSION        = 1.00;
     @ISA            = qw(Exporter);
 	#@EXPORT		    = qw(profile user videos home square get_likes fans follows video);
-    @EXPORT_OK      = qw(extract_title build_url profile user videos home square get_likes fans follows video get_url safe_decode_json);
+    @EXPORT_OK      = qw(extract_title build_url profile user videos home square get_likes fans follows video get_url safe_decode_json get_blog_id);
 }
 
 our $HOST = 'http://w1.weipai.cn';
@@ -31,6 +31,11 @@ our %URLSTPL = (
 	comment=>'/blog_comment_list?count=$2&relative=after&blog_id=$1',
 	share=>'/get_template?template_type=third_share_qq&blog_id=$1',
 );
+###TODO NEWAPI 20160524
+#http://share.weipai.cn/userinfo.do?uid=55491494a8640bde738b4569
+#http://www.weipai.cn/getuservideo.do?uid=55491494a8640bde738b4569
+#http://www.weipai.cn/share.do?vid=573efee562e2b0e4edd52b42
+#http://aliv.weipai.cn/resource/player/sewise/flash/SewisePlayer.swf?autoStart=true&lang=zh_CN&buffer=0&type=m3u8&skin=http://aliv.weipai.cn/resource/player/sewise/flash/skins/vodWhite.swf&draggable=true&startTime=0&poster=&clarityButton=disable&timeDisplay=enable&controlBarDisplay=enable&topBarDisplay=disable&customStrings=&volume=0.6&videoUrl=http://enc.weipai.cn/aliv/201605250144/f5e8ee4b0dac5adc08b87c2a41ff9283/201605/20/20/F22454DA-7761-429C-97D2-ACAC7E5D0959.m3u8&key=&copyright=www.weipai.cn
 our %PRINT_FORMAT = (
 	'defender' => {
 		result=>'defender_list',
@@ -59,22 +64,24 @@ my $CURL = MyPlace::Curl->new(
 );
 
 my %STATIC_WEIPAI_HEADER = (
-	"Phone-Type"=>"android_Lenovo A788t_4.3",
-	"os"=>"android",
-	"Channel"=>"360%E6%89%8B%E6%9C%BA%E5%8A%A9%E6%89%8B",
-	"App-Name"=>"weipai",
-	"Api-Version"=>"8",
-	"Weipai-Token"=>"ef1d3ac6f047b95dc8efe19a9439210804020274e9c4feddc94c60f9182a23318db7a8715127a3b9",
-	"Phone-Number"=>'',
-	"Com-Id"=>"weipai",
-	"Client-Version"=>"1.0.0.0",
-	"Weipai-Userid"=>"508775398134943b58000051",
-	"Device-Uuid"=>"53ede2300d89c4cd99b4d92d198affcaf5d63101",
-	"Latitude"=>"23.548538",
-	"Longitude"=>"116.409899",
-	"Push-Id"=>"com.weipai.weipaipro",
-	"Kernel-Version"=>15,
+	"Phone-Type" => "android_LG-F300K_4.4.2",
+	"os" => "android",
+	"Channel" => "channel",
+	"App-Name" => "weipai",
+	"Api-Version" => "8",
+	"Weipai-Token" => "ef1d3ac6f047b95dc8efe19a9439210804020274e9c4feddc94c60f9182a23318db7a8715127a3b9",
+	"Phone-Number" => "",
+	"Com-Id" => "weipai",
+	"Client-Version" => "1.4.1",
+	"Weipai-Userid" => "508775398134943b58000051",
+	"Device-Uuid" => "ccddbd68acd05ea7972495bbb1d0debfa9f3ba0a",
+	"Latitude" => "23.548307",
+	"Longitude" => "116.410032",
+	"Push-Id" => "com.weipai.weipaipro",
+	"Kernel-Version" => "15",
 );
+
+
 our $STATIC_WEIPAI_SIGNATURE = 
 	"Knk9ss{3jMM;KD%;kl;jafo'jaUG9,^43*5KM./a.aNNlf/.sdfgnp==>(mskI^8*NKD::I&^(^(KDH,WND..LK*%KJD8'%73djkssj...;'][sks";
 sub get_sign {
@@ -611,6 +618,52 @@ sub get_user_videos {
 		}
 	}
 	return \%r;
+}
+sub get_blog_id {
+	my $url = shift;
+	my $uuid;
+
+	if($url !~ m/^http/i) {
+		$uuid = $url;
+	}
+	elsif($url =~ m/\/([^\/]+)\.(?:mov|ts|mp4|flv)$/) {
+		$uuid = $1;
+	}
+	my $uuid_url = 'http://share.weipai.cn/video/uuid/' . $uuid . '?type=third_share_sina';
+	print STDERR " Retriving information from $uuid_url ...\n";
+	my $html = get_url($uuid_url);
+#	print STDERR $html,"\n";
+	if($html =~ m/url\s*:\s*"(http:\/\/www\.weipai\.cn\/video\/([^\/]+)")/) {
+		return $1;
+	}
+	elsif($html =~ m[video/download/id/([^/]+)/]) {
+		return $1;
+	}
+
+=method incorrect
+
+	if($url =~ m/http:\/\//) {
+		my $jpg = $url;
+		$jpg =~ s/\.([^\.]+)$/\.jpg/;
+		my $blogid;
+		print STDERR " Retriving information from $jpg ...\n";
+		if(open FI,'-|','curl','--silent','-I',$jpg) {
+			foreach(<FI>) {
+				chomp;
+				if(m/x-oss-request-id:\s*(.+?)[\r\n\s]*$/) {
+					$blogid = lc($1);
+					last;
+				}
+			}
+			close FI;
+		}
+		return $blogid if($blogid);
+	}
+
+=cut
+
+	print STDERR "  Error: Extract blog_id from url failed.\n";
+	return undef;
 }
 
 #####################################################################

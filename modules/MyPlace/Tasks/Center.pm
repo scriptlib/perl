@@ -188,6 +188,7 @@ sub watch {
 	my $name = shift;
 	use MyPlace::Tasks::Pool;
 	my $pool = MyPlace::Tasks::Pool->new($name,@_);
+	$self->{TASKS_POOL_COUNT} += 1;
 	if($self->{ignore}) {
 		$pool->{ignore} = $self->{ignore} unless($pool->{ignore});
 	}
@@ -213,7 +214,7 @@ sub more {
 		last if($TASKS->[$level] and @{$TASKS->[$level]});
 		next unless($POOLS->[$level] and @{$POOLS->[$level]});
 		foreach my $builder(@{$POOLS->[$level]}) {
-			my @t = $builder->more();
+			my @t = $builder->more($self->{TASKS_POOL_EMPTY});
 			if(@t) {
 				my $nextlevel = $builder->{level} || ($level);
 				my @queue;
@@ -232,6 +233,7 @@ sub more {
 		next unless($self->{tasks}->[$level]);
 		$count += scalar(@{$self->{tasks}->[$level]});
 	}
+	$self->{TASKS_POOL_EMPTY} = 0;
 	if($count>0) {
 		return $count;
 	}
@@ -245,6 +247,7 @@ sub more {
 	elsif($self->{called_sub_more} > 1) {
 		sleep $self->{options}->{sleep} if($self->{options}->{sleep});
 	}
+	$self->{TASKS_POOL_EMPTY} = 1;
 	return 0;
 }
 

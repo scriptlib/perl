@@ -15,6 +15,7 @@ sub new {
 
 sub more {
 	my $self = shift;
+	my $nofreq = shift;
 	my $confkey = 'Tasks::Pool::Position::' . $self->{name};
 	$confkey =~ s/\s+/_/g;
 
@@ -36,7 +37,7 @@ sub more {
 			return @queue;
 		}
 	}
-	if(defined $self->{MORE}) {
+	if((!$nofreq) and defined $self->{MORE}) {
 		$self->{MORE} += 1;
 		if($self->{freq} and ($self->{MORE} <= $self->{freq})) {
 			return;

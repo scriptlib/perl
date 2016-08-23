@@ -30,7 +30,6 @@ my @OPTIONS = qw/
 		refurl|r=s
 		autoname|a
 		program|p=s
-		maxtime|m=i
 		force|f
 		connect-timeout=i
 		maxtry|mt=i
@@ -39,6 +38,7 @@ my @OPTIONS = qw/
 		compressed
 		mirror|or=s@
 		post=s
+		max-time|maxtime|m=i
 	/;
 my $proxy = '127.0.0.1:9050';
 my $blocked_host = '\n';#wretch\.cc|facebook\.com|fbcdn\.net';
@@ -123,7 +123,7 @@ sub build_cmdline {
 			push @result,"--save-cookie",$OPTS{cookie};
 			push @result,"--load-cookie",$OPTS{cookie} if(-f $OPTS{cookie});
 		}	
-        push @result,'--read-timeout',$OPTS{maxtime} if($OPTS{maxtime});
+        push @result,'--read-timeout',$OPTS{'max-time'} if($OPTS{'max-time'});
         push @result,$url;
     }
     else {
@@ -136,7 +136,8 @@ sub build_cmdline {
 	        push @result,"--cookie",$OPTS{cookie} if(-f $OPTS{cookie});
 		    push @result,"--cookie-jar",$OPTS{cookie};
 		}
-        push @result,"--max-time",$OPTS{maxtime} if($OPTS{maxtime});
+        push @result,"--max-time",$OPTS{'max-time'} if($OPTS{'max-time'});
+        push @result,"--connect-timeout",$OPTS{'connect-timeout'} if($OPTS{'connect-timeout'});
 		push @result,"--silent" if($OPTS{quiet});
 		push @result,"--compressed" unless($OPTS{'no-compressed'});
         if($url =~ $BLOCKED_EXP) {
@@ -153,17 +154,27 @@ sub _process {
     my $retry = shift(@_) || 0;
     my $r=0;
 #	print STDERR join(" ",@{$cmdline}),"\n";
+	my $output = "$taskname.downloading";
+	$output =~ s/[\/\\*?:"'\[\]\{\}\s,#!\>\<^&~\|+_\-]+//g;
+	unlink $output if(-f $output);
     while($retry) {
         $retry--;
 		my @data;
-		if(open FI,'-|:raw',@{$cmdline}) {
-		#	return undef,"$!";
+#		if(open FI,'-|:raw',@{$cmdline}) {
+#			@data = <FI>;
+#			close FI;
+#		}
+#		$r = $?;
+#		print STDERR "Execute: ",join(" ",@{$cmdline},'-o',$output),"\n";
+        $r=system(@{$cmdline},'-o',$output);
+		if($r == 0) {
+			open FI,'<:raw',$output;
 			@data = <FI>;
 			close FI;
+			unlink $output;
+			return 0,@data;
 		}
-		$r = $?;
-#        $r=system(@{$cmdline});
-        return (0,@data) if($r==0);
+		unlink $output if(-f $output);
         return 2,$! if($r==2); #/KILL,TERM,USERINT;
         $r = $r>>8;
         #2 =>
@@ -460,7 +471,8 @@ sub _download {
 				referer=>$refer,
 				cookie=>$cookie,
 				quiet=>$options->{quiet},
-				maxtime=>$options->{maxtime},
+				'max-time'=>$options->{'max-time'},
+				'connect-timeout'=>$options->{'connect-timeout'},
 				compressed=>$options->{compressed},
 			)
 		);

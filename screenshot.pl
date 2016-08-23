@@ -17,7 +17,7 @@ my @OPTIONS = qw/
 	help|h|? 
 	manual|man
 	mplayer|player=s
-	start|ss=i
+	start|ss=s
 /;
 my %OPTS;
 
@@ -44,8 +44,10 @@ sub process_file {
 	my @dirs = split(/\//,$file);
 	my $basename = pop(@dirs);
 	$basename =~ s/\.[^\.]+$//;
+	my $dst = join("/",@dirs,$basename) . ".jpg";
 	system(@$prog,'--',$_);
-	system('mv','-v','--','00000001.jpg', join("/",@dirs,$basename) . ".jpg");
+	system("rm","-v",$dst) if(-f $dst);
+	system('mv','-v','--','00000001.jpg', $dst);
 }
 
 sub process {

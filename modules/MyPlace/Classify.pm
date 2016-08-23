@@ -66,7 +66,16 @@ sub read_rules {
 		my %r;
 		$r{name} = $_;
 		$r{dest} = $dest;
-		$r{keyword} = [@value];
+		$r{keyword} = [];
+		foreach(@value) {
+			if(index($_,'<SN>') eq 0) {
+				push @{$r{keyword}},substr($_,4);
+				$_ = "\\b$_\[-~_\\.\\s]*\\d+";
+			}
+			else {
+				push @{$r{keyword}},$_;
+			}
+		}
 		@value = map {s/\\-|\\_/[-~_\.\\s]*/g;$_} @value;
 		@value = map {s/\s+/[-~_\.\\s]+/g;$_} @value;
 		if(m/^<SN>(.+)$/) {

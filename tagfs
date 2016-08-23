@@ -190,7 +190,6 @@ sub tag_files {
     }
 }
 use utf8;
-
 use File::Glob qw/bsd_glob/;
 foreach (@files) {
     if(-e $_) {

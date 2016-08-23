@@ -19,10 +19,17 @@ exit 0 if(help_even_empty($0,@ARGV));
 
 
 my $input=shift;
+my($start,$length,$clip_name,$profile);
 my $start=shift;
 my $length=shift;
-my $clip_name=shift;
-my $profile=shift;
+if(!@ARGV) {
+	$clip_name = 'sized';
+	$profile = 'mp4';
+}
+else {
+	$clip_name=shift;
+	$profile=shift;
+}
 
 die("File not exists:$input\n") unless(-f $input);
 $profile="" unless($profile);
@@ -76,6 +83,7 @@ $encoder = 'mencoder' if($profile =~ m/^avi$/i);
 if($enctype eq 'ffmpeg') {
     push @enarg,'-t',fix_time_arg($length) if($length);
     push @enarg,'-i',$input;
+	push @enarg,'-acodec','mp3';
 #	push @enarg,'-q','1';
     if($profile =~ m/^(?:3gp|mp4)$/i) {
         push @enarg,'-s','320x240','-vf','scale=-1:-1';

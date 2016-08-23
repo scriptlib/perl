@@ -133,6 +133,11 @@ my %DICT = qw/
 	色情电影	SQ电影
 	玉蒲团	玉PU团
 	3xplanet	３ＸＰＬＡＮＥＴ
+	sprd	ＳＰＲＤ
+	群魔色舞	ＱＭＳＷ
+	字幕组	字幕
+	无修正	UNCENSORED
+	素人	素REN
 /;
 
 my %HZPY = qw/
@@ -446,8 +451,21 @@ Porn
 =ok
 =cut
 my @indoubt = qw{
+	福利岛
+	fulidao
 };
-my @dirty = qw{
+my @dirty = (
+	'Mofuku Tsuma',
+);
+push @dirty,(qw{
+	-AV
+	jav
+	akb99
+	vip视频
+	BTOP
+	MimiP2P
+	hentai
+	18禁
 	RARBG.com
 	rarbg.to
 	色情电影
@@ -540,7 +558,7 @@ my @dirty = qw{
 	无码
 	高島恭子
 	麻生希
-};
+});
 
 my @keys;
 my %filter;
@@ -632,8 +650,9 @@ sub clean {
 		return ($tor,$dirty);
 	}
 	#if($all or $key =~ m/publisher|path|publisher|created by|name|comment|files/i) {
-	
-	if($type eq 'ARRAY') {
+	if(!defined $tor) {
+	}
+	elsif($type eq 'ARRAY') {
 		my @values;
 		my $idx = 0;
 		foreach(@{$tor}) {
@@ -703,6 +722,14 @@ sub process {
 			}
 			$dirty = 1;
 			print STDERR "Set torrent->{info}->{name} = $torrent->{info}->{name}\n";
+		}
+		foreach my $key(qw/private/) {
+			if(defined $torrent->{info}->{$key}) {
+				print STDERR "Delete torrent->{info}->{" . $key . "} = " . $torrent->{info}->{$key} . "\n";
+				$torrent->{info}->{$key} = undef;
+				delete $torrent->{info}->{$key};
+				$dirty = 1;
+			}
 		}
 #		if($torrent->{info}->{name} && !($torrent->{info}->{name} eq $basename)) {
 #			$torrent->{info}->{name} = $basename;

@@ -82,6 +82,7 @@ my %Actions;
 			my $CWD = getcwd;
 			chdir $target;
 			foreach my $key (@keywords) {
+				$key =~ s/\\.[\+\*]?//g;
 				print STDERR "    Processing [" . $rule->{name} . "/$key] ...\n";
 				system(@prog,$key,@suf);
 			}

@@ -10,6 +10,20 @@
 use strict;
 $ARGV[0]="--help" unless(@ARGV);
 exit 0 unless(system("plhelp",$0,(@ARGV)));
+my $os = 'linux';
+my $OSTYPE = $^O;
+if(!$OSTYPE) {
+	$os = 'windows';
+}
+elsif($OSTYPE eq 'cygwin') {
+	$os = 'cygwin';
+}
+elsif($OSTYPE =~ m/Windows/i) {
+	$os = 'windows';
+}
+else {
+	$os = 'linux';
+}
 
 my @args;
 my @exps;
@@ -26,12 +40,20 @@ while(@ARGV) {
 }
 
 my %procs;
-open FI,"-|","ps -Ao pid,command h";
+my $exp;
+if($os eq 'cygwin') {
+	open FI,'-|','ps -a -W';
+	$exp = qr/^\s*(\d+).*\d+:\d+:\d+\s+(.+)\s*$/;
+}
+else {
+	open FI,"-|","ps -Ao pid,command h";
+    $exp = qr/^\s*(\d+)\s+(.*)\s*$/;
+}
 while(<FI>) {
-    chomp;
-    if(/^\s*(\d+)\s+(.*)\s*$/) {
-        next if($2 =~ /pskill/);
-        $procs{$1} = $2;
+	chomp;
+	if($_ =~ $exp) {
+	 next if($2 =~ /pskill/);
+		$procs{$1} = $2;
     }
 }
 close FI;

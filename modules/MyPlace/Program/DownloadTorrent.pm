@@ -13,6 +13,7 @@ BEGIN {
 use File::Spec;
 use MyPlace::Script::Message;
 use MyPlace::Escape qw/js_escape js_unescape/;
+use MyPlace::URLRule::Utils qw/get_url/;
 use MyPlace::Program::Download;
 use base 'MyPlace::Program';
 
@@ -36,33 +37,41 @@ our @SITES = (
 	#http://torcache.net/torrent/:HASH:.torrent	
 	#http://torrage.ws/torrent/:HASH:.torrent
 	#https://torrage.ws/torrent/:HASH:.torrent
-	#https://torrentproject.se/torrent/:HASH:.torrent
-	#
+	#http://www.sobt5.com/Tool/downbt?info=:HASH:
+	#http://www.torrenthound.com/torrent/:HASH:
+	#http://torrage.com/torrent/:HASH:.torrent
+	#http://zoink.it/torrent/:HASH:.torrent
 	qw{
-		post://www.torrent.org.cn/download.php?hash=:HASH:
-		http://torcache.net/torrent/:HASH:.torrent
-		http://torrage.top/torrent/:HASH:.torrent
-		http://www.sobt5.com/Tool/downbt?info=:HASH:
+		https://itorrents.org/torrent/:HASH:.torrent
+		https://torrentproject.se/torrent/:HASH:.torrent
+		http://torrage.biz/torrent/:HASH:.torrent
 		http://www.mp4ba.com/down.php?date=1422367802&hash=:HASH:
-		http://www.torrenthound.com/torrent/:HASH:
-		http://torrage.com/torrent/:HASH:.torrent
-		http://zoink.it/torrent/:HASH:.torrent
+		https://torcache.net/torrent/:HASH:.torrent
+		post://www.torrent.org.cn/download.php?hash=:HASH:
 	}
 );
 #@SITES = ( 'post://www.torrent.org.cn/download.php?hash=:HASH:',);
 our %SITES2 = (
-	'sobt5.com/m2t'=>sub {
-		my $_ = shift;
-		if(m/^(\w\w).*(\w\w)$/) {
-			return "http://bt.box.n0808.com/$1/$2/$_.torrent";
+	'#seedpeer.eu'=>sub {
+		my $hash = shift;
+		my $url = 'http://www.seedpeer.eu/hash.php?hash=' . $hash;
+		my $html = get_url($url,'-v');
+		if($html =~ m/href="\/details\/[^\/]+\/([^\/]+)\.html/) {
+			my $name = lc($1);
+			$name =~ s/\(([^\)]+)\)/$1/g;
+			$name =~ s/\[([^\]]+)\]/$1/g;
+			$name =~ s/[^a-zA-Z0-9]/_/g;
+			$name =~ s/__+/_/g;
+			$name =~ s/^_+//;
+			$name =~ s/_+$//;
+			return 'http://www.seedpeer.eu/download/' . $name . '/' . $hash;
 		}
-		else {
-			return undef;
-		}
-	},
+		print STDERR "NO torrent found on seedpeer.eu\n";
+		return undef;
+	}
 );
 
-%SITES2 = ();
+#%SITES2 = ();
 
 sub error_no {
 	return MyPlace::Program::EXIT_CODE(@_);
@@ -165,7 +174,7 @@ sub download {
 	my $output = shift;
 	my $URL = shift;
 	my $REF = shift(@_) || $URL;
-	$DL ||= MyPlace::Program::Download->new('--compressed','--maxtry',1);
+	$DL ||= MyPlace::Program::Download->new();
 	
 	my $postd = shift;
 	if($URL =~ m/^post:\/\/(.+)$/) {
@@ -184,7 +193,16 @@ sub download {
 		push @OPTS,'--post',$postd;
 	}
 
-	if($DL->execute("-r",$REF,"-u",$URL,"-s",$output,@OPTS) == 0) {
+	if($DL->execute(
+		'--max-time',300,
+		'--connect-timeout',20,
+		'--compressed',
+		'--maxtry',1,
+		"-r",$REF,
+		"-u",$URL,
+		"-s",$output,
+		@OPTS) == 0
+	) {
 		my ($ok,$type) = check_type($output);
 		if($ok) {
 			return 1;
@@ -279,6 +297,7 @@ sub download_torrent {
 	}
 	if(!defined $exit) {
 		foreach my $site (@SITES) {
+			next if($site =~ m/^#/);
 			my $sitename = $site;
 			if($site =~ m/:\/\/([^\/]+)/) {
 				$sitename = $1;
@@ -300,6 +319,7 @@ sub download_torrent {
 	}
 	if(!defined $exit) {
 		foreach my $sitename(keys %SITES2) {
+			next if($sitename =~ m/^#/);
 			my $url = $SITES2{$sitename}($hash);
 			next unless($url);
 			print STDERR "  Try [$sitename]$url ... ";

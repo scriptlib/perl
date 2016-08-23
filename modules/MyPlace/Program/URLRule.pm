@@ -859,6 +859,9 @@ sub MAIN {
 	elsif($CMD eq 'DOWNLOAD') {
 		return $self->CMD_DOWNLOAD(@target);
 	}
+	elsif($CMD eq 'DATABASE') {
+		return $self->CMD_ACTION('DATABASE',@target);
+	}
 	elsif($CMD eq 'DUMP') {
 		return $self->CMD_DUMP(@target);
 	}

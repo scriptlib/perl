@@ -124,21 +124,49 @@ sub _write_lines {
 }
 
 
+sub get_key {
+	my $str = shift;
+	return unless($str);
+	if(index($str,'sinaimg.cn')) {
+		$str =~ s/:\/\/ww\d+\./:\/\/ww1./;
+		#print STDERR $str,"\n";
+	}
+	my $t = index($str,"\t");
+	if($t >0) {
+		return substr($str,0,$t);
+	}
+	else {
+		return $str;
+	}
+}
+
 sub unique {
 	my $source = shift;
 
 	return unless($source and @{$source});
 	return @{$source} unless(@_);
+	
+	my $ignore = shift(@_) || [];
 
 	my @r;
 	
-	my %holder = map {$_=>1} @_;
-	
+	my %holder;
+	foreach(@_) {
+		$holder{get_key($_)} = 1;
+	}
 	foreach(@{$source}) {
-		if(!defined($holder{$_})) {
+		my $k = get_key($_);
+		if(defined($holder{$k})) {
+			push @$ignore,$_;
+#			print STDERR $k,"\n";
+#			print STDERR $_,"[IGNORED]\n";
+		}
+		else {
+			$holder{$k} = 1;
 			push @r,$_;
 		}
 	}
+	print STDERR "\t",scalar(@$ignore) . " urls duplicated\n";
 	return @r;
 }
 
@@ -168,6 +196,7 @@ sub run {
 	$MSG_PROMPT = defined($opt{title}) ? $opt{title} :
 			defined($opt{directory}) ? $opt{directory} : 
 			'MyPlace Tasks Manager';
+	$MSG_PROMPT .= "/";
 
 	&p_prompt();
 
@@ -199,8 +228,8 @@ sub run {
 		}
 		foreach(@subdir) {
 			$self->{options}->{directory} = $_;
-			$self->{options}->{title} = $MSG_PROMPT . "/$_";
-			$MSG_PROMPT .=  "/$_";
+			$self->{options}->{title} = $MSG_PROMPT . $_;
+			$MSG_PROMPT .=  $_;
 			my ($count,$val,$msg) = $self->run();
 			$COUNTER += $count if($count);
 			$opt{title} = $kt;
@@ -215,6 +244,7 @@ sub run {
 
 
 	my (@queue,@done,@failed,@ignore,@input);
+	my %duplicated;
 
 	@input = &_read_lines($opt{input}) if($opt{input});
 	push @input,@arguments;
@@ -226,13 +256,19 @@ sub run {
 		@done = &_read_lines($DB_DONE,$CONFIG_DIR);
 		@failed = &_read_lines($DB_FAILED,$CONFIG_DIR);
 		@ignore = &_read_lines($DB_IGNORE,$CONFIG_DIR);
+		my @dup;
 		push @queue, &_read_lines($DB_QUEUE,$CONFIG_DIR) unless($opt{'no-queue'});
-		if($opt{force}) {
+		if($opt{'no-unique'}) {
 			unshift @queue,@input;
 		}
-		else {
-			unshift @queue, unique(\@input,@queue,@failed,@done,@ignore);
+		elsif($opt{'no-strict-url'}) {
+			unshift @queue, unique(\@input,\@dup,@queue,@failed,@done,@ignore) if(@input);
 		}
+		else {
+			@queue = unique([@queue,@input],\@dup,@failed,@done,@ignore) if(@queue or @input);
+		}
+		#&_write_lines(\@queue,$DB_QUEUE,$CONFIG_DIR);
+		#	die(@queue);
 
 		if($opt{retry}) {
 			my @newfailed;
@@ -254,9 +290,16 @@ sub run {
 	elsif(!(@queue or @input)) {
 		return $self->exit($CWD_KEPT,$COUNTER);
 	}
-	else {
-		push @queue,@input;
+	elsif($opt{'no-unique'}) {
+		unshift @queue,@input;
 	}
+	elsif($opt{'no-strict-url'}) {
+		unshift @queue, unique(\@input,undef,@queue) if(@input);
+	}
+	else {
+		@queue = unique([@queue,@input],undef) if(@queue or @input);
+	}
+	&_write_lines(\@queue,$DB_QUEUE,$CONFIG_DIR);
 	if($opt{include}) {
 		@queue = grep(/$opt{include}/,@queue);
 	}
@@ -269,7 +312,6 @@ sub run {
 		  ", IGNORED: " . scalar(@ignore) . 
 		  ", FAILED: " . scalar(@failed) .
 	      "\n";
-
 	if(!$count) {
 		&p_warn("Tasks queue was empty\n") unless($opt{quiet});
 		return $self->exit($CWD_KEPT,$COUNTER,$self->EXIT_CODE('IGNORED'),"Empty tasks queue");

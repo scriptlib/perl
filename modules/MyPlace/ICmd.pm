@@ -50,6 +50,7 @@ sub icmd_execute {
 	}
 #	print STDERR "SYSTEM: " . join("\n",@cmds),"\n";
 	system(@cmds);
+#	exec(@cmds);
 }
 
 sub icmd_parse {
@@ -153,6 +154,7 @@ sub process_line {
 		feed_top(split(/\s*\t\s*/,$line));
 		return;
 	}
+	$line =~ s/\e\[[A-Za-z]//g;
 	return process($line);
 }
 

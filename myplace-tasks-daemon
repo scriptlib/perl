@@ -15,12 +15,12 @@ my @OPTIONS = qw/
 	debug|D
 	no-push
 	runonce|run
-	no-download|nd
+	no-download|nd:s
 	include|I:s
 	exclude|X:s
 	no-saveurl|ns
-	disable-download|dd
-	disable-all-download|dad
+	disable-download|dd:s
+	disable-all-download|dad:s
 /;
 my %OPTS;
 my $USE_LAST_CONFIG = 1;
@@ -169,11 +169,11 @@ sub CONTROL_INPUT {
 my $START_DIR = getcwd;
 my @TasksBuilders;
 push @TasksBuilders,
-	MyPlace::Tasks::Builder->new(level=>20);
+	MyPlace::Tasks::Builder->new(level=>20,name=>'level_20');
 push @TasksBuilders,
-	MyPlace::Tasks::Builder->new(level=>10);
+	MyPlace::Tasks::Builder->new(level=>10,name=>'level_10');
 push @TasksBuilders,
-	MyPlace::Tasks::Builder->new(level=>0);
+	MyPlace::Tasks::Builder->new(level=>0,name=>'level_0');
 my @DEFAULT_LISTENERS = (
 		MyPlace::Tasks::Listener->new('dump', 
 			MyPlace::Tasks::Worker->new(
@@ -294,7 +294,7 @@ foreach(reverse 0 .. $TBCOUNT) {
 		delete $TasksBuilders[$_];
 	}
 	else {
-		app_warning('Tasks Builder activated: #$_ ' . $TasksBuilders[$_]);
+		app_warning("Tasks Builder activated: #$_ " . $TasksBuilders[$_]->{name});
 	}
 }
 

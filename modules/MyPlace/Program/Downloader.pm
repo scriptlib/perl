@@ -47,6 +47,11 @@ sub download {
 			push @args,'--' . $_;
 		}
 	}
+	foreach(qw/max-time connect-timeout/) {
+		if($self->{OPTS}->{$_}) {
+			push @args,'--' . $_,$self->{OPTS}->{$_};
+		}
+	}
 	my $r = system('downloader',@args,'--',@_);
 	$r = $r>>8 if(($r != 0) and $r != 2);
 	return $r;
@@ -55,6 +60,8 @@ sub download {
 sub MAIN {
 	my $self = shift;
 	my $OPTS = shift;
+	$OPTS->{'max-time'} = 1200 unless($OPTS->{'max-time'});
+	$OPTS->{'connect-timeout'} = 60 unless($OPTS->{'connect-timeout'});
 	$self->{OPTS} = $OPTS;
 	if($OPTS->{directory}) {
 		system("ls","-ld","--",$OPTS->{directory});
@@ -94,7 +101,7 @@ sub MAIN {
 		title=>
 			defined($OPTS->{title}) ? $OPTS->{title} : 
 			defined($OPTS->{directory}) ? $OPTS->{directory} :
-			'MyPlace Downloader',
+			'<mdown>',
 		force=>$OPTS->{force},
 		overwrite=>$OPTS->{overwrite},
 		retry=>$OPTS->{retry},
