@@ -65,7 +65,10 @@ sub _parse_from_text {
 		chomp;
 		s/^\s+//;
 		s/\s+$//;
-		next unless($_);
+		if(!$_) {
+			push @sortedId,'';
+			next;
+		}
 		#print STDERR "TEXT:[$_]\n";
 		if(m/^\s*\#OUTPUT\s*:\s*(.+?)\s*$/) {
 			push @{$self->{OUTPUT}},$1;
@@ -168,6 +171,7 @@ sub output_item {
 	#use MyPlace::Debug::Dump;print STDERR debug_dump(\@translater),"\n";
 	my @result;
 	foreach my $key (@$ids) {
+		next unless($key);
 		my @values = @{$info->{$key}};
 		my $value = $values[0];
 		my $values = join(",",@values);
@@ -322,7 +326,10 @@ sub saveTo {
 		#if($value eq 'TRUE') {
 		#	print FO $id,"\n";
 		#}
-		if($self->{info}->{$id} && @{$self->{info}->{$id}}) {
+		if(!$id) {
+			print FO "\n";
+		}
+		elsif($self->{info}->{$id} && @{$self->{info}->{$id}}) {
 			print FO $id,"\t",join("\t",@{$self->{info}->{$id}}),"\n";
 		}
 		else {
