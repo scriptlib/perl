@@ -296,11 +296,11 @@ sub _add {
 			$count++;
 			$info{$id} = $incoming{$id};
 			push @sorted,$id;
-			print STDERR "Add $id => @{$incoming{$id}}\n";
+			print STDERR "\tAdd $id => @{$incoming{$id}}\n";
 		}
 		else {
 			$count++;
-			print STDERR "Add $id\n";
+			print STDERR "\tAdd $id\n";
 			push @sorted,$id;
 		}
 	}

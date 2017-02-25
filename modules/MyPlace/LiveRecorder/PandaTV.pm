@@ -19,6 +19,9 @@ sub get_room {
 			if(m/"room_key"\s*:\s*"([^"]+)"/) {
 				$r{key} = $1;
 			}
+			if(m/"plflag"\s*:\s*"([\d\_]+)"/) {
+				$r{plflag} = [split(/_/,$1)];
+			}
 		}
 		close FI;
 	}
@@ -34,21 +37,52 @@ sub check {
 	return undef unless($room->{status});
 	$self->{just_checked} = 1;
 	$self->{live_key} = $room->{key};
+	$self->{plflag} = $room->{plflag} || [qw/10 3 11 4/];
 	return 1;
 }
 
 sub def_live {
 	my $self = shift;
 	my $id = shift;
-	unless($self->{live_key} or $self->{just_checked}) {
-		return {} unless($self->{check_show});
+	if(!($self->{live_key} and $self->{just_checked})) {
+		if(!$self->check($id)) {
+			return {};
+		}
 	}
 	$self->{just_checked} = undef;
+	#'http://223.111.17.74/pl3.live.panda.tv/live_panda/' .$self->{live_key} . '.flv?wshc_tag=0&wsts_tag=57ded6b4&wsid_tag=df4a3553&wsiphost=ipdbm',
+	my $durl;
+	foreach(@{$self->{plflag}},qw/10 3 11 4/) {
+		next if($_ == 11);
+		my $url = 'http://pl' . $_ . '.live.panda.tv/live_panda/' . $self->{live_key} . ".flv";
+		print STDERR "Checking $url ...\n";
+		if(open FI,'-|','curl','--silent','-I',$url) {
+			foreach(<FI>) {
+				print STDERR $_;
+				if(m/^\s*location\s*:\s*/i) {
+					$durl = $url;
+					last;
+				}
+				elsif(m/Content-Type:\s*application\/octet-stream/) {
+					$durl = $url;
+					last;
+				}
+				elsif(m/Content-Type:\s*video\/x-flv/) {
+					$durl = $url;
+					last;
+				}
+
+			}
+			close FI;
+		}
+		last if($durl);
+	}
+	$durl = 'http://pl4.live.panda.tv/live_panda/' . $self->{live_key} . ".flv" unless($durl);
 	return {
 		CURL=>[
+			'--location',
 			'--url',
-			'http://223.111.17.74/pl3.live.panda.tv/live_panda/' .
-				$self->{live_key} . '.flv?wshc_tag=0&wsts_tag=57ded6b4&wsid_tag=df4a3553&wsiphost=ipdbm',
+			$durl,
 			'--referer',
 			'http://www.panda.tv/' . $id,
 		],

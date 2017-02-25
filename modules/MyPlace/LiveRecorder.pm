@@ -215,7 +215,12 @@ sub start {
 		print STDERR "\tBEGIN: " . localtime() . "\n";
 		print STDERR "\t$output\n";
 		print STDERR "-"x80,"\n";
-		system("curl","-m",$seconds,"-o",$output,@{$r->{CURL}});
+		if($r->{SYSTEM}) {
+			system(@{$r->{CURL}},"-m",$seconds,"-o",$output);
+		}
+		else {
+			system("curl","-m",$seconds,"-o",$output,@{$r->{CURL}});
+		}
 		print STDERR "\n","-"x80,"\n";
 		print STDERR "\tEND: " . localtime() . "\n";
 		print STDERR "$name\t$id\n";

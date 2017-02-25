@@ -7,6 +7,12 @@
 ###APPUSAGE:	(url)
 ###APPEXAMPLE:	netcat www.google.com
 use strict;
+use MyPlace::URLRule::Utils qw/get_url/;
+print STDOUT scalar(get_url(@ARGV));
+
+
+__END__
+
 die("Usage:$0 URL\n") unless(@ARGV);
 
 my $verbose = 0; 

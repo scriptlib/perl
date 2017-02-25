@@ -63,6 +63,7 @@ my $CURL = MyPlace::Curl->new(
 #	'verbose'=>'',
 );
 
+
 my %STATIC_WEIPAI_HEADER = (
 	"Phone-Type" => "android_LG-F300K_4.4.2",
 	"os" => "android",
@@ -72,7 +73,7 @@ my %STATIC_WEIPAI_HEADER = (
 	"Weipai-Token" => "ef1d3ac6f047b95dc8efe19a9439210804020274e9c4feddc94c60f9182a23318db7a8715127a3b9",
 	"Phone-Number" => "",
 	"Com-Id" => "weipai",
-	"Client-Version" => "1.4.1",
+	"Client-Version" => "1.5",
 	"Weipai-Userid" => "508775398134943b58000051",
 	"Device-Uuid" => "ccddbd68acd05ea7972495bbb1d0debfa9f3ba0a",
 	"Latitude" => "23.548307",

@@ -54,6 +54,62 @@ sub escape {
 	return $_;
 }
 
+my %HZPY = qw/
+	なお$ Nao
+	聊	Liao
+	欲	Yv
+	性	Xing
+	做	Zuo
+	交$	Jiao
+	肛	Gang
+	屄$	Bi
+	乳	Rv
+	榴$	Liu
+	色	Se
+	奇 	Qi
+	狼	Lang
+	爱$	Ai
+	訊	Xun
+	优$	You
+	訊	Xun
+	淫	Yin
+	乱	Luan
+	网$	Wang
+	察$	Cha
+	城$	Chen
+	里沙 りさ
+	春香 はるか
+	咲	さき
+	美穂 みほ
+	百合 ゆり
+	小夏 こなつ
+	優乃	ゆうの
+	愛 	あい
+	奈津美	なつみ
+	里子 りこ
+	梓ユイ	梓えい
+	翔 しょう
+	瞳	ひとみ
+	麻妃	まき
+	沙英	さえ
+	心美	ここみ
+	恋		こい
+	恭子 きょうこ
+	レイ Rei
+	奸 Jian
+	大	Da
+	涩	Se
+	女	Nv
+	嫖	Piao
+	妓	Ji
+	射	She
+	骚	Sao
+	妻	Qi
+	丝	Si
+	露	Lu
+	姦	Jian
+/;
+
 my %DICT = qw/
 	成人		成Ren
 	榊なち		榊ナチ
@@ -80,10 +136,10 @@ my %DICT = qw/
 	親親社區	ＱＱＳＱ
 	香港廣場	ＸＧＧＣ
 	情\s+色\s+六\s+月\s+天	QS6YT
-	有码	骑兵
-	无码 步兵
-	有碼	骑兵
-	無碼  步兵
+	有码	有马
+	无码 无马
+	有碼	有马
+	無碼  无马
 	爆操	操
 	大奶	丰满
 	麻生希	麻生XI
@@ -138,64 +194,331 @@ my %DICT = qw/
 	字幕组	字幕
 	无修正	UNCENSORED
 	素人	素REN
+	射精	射
+	論壇	LUN壇
+	论坛	LUN坛
+	讨论区	讨LUN区
+	風間ゆみ	風間YUMI
+	麻生早苗	麻生ZAO苗
+	春日由衣	春日由YI
+	上原結衣	上原結YI
+	綾乃梓	綾NAI梓
+	花和尚北美	花HE尚北美
+	情色	Qing色
+	情趣	Qing趣
+	吉沢明歩	吉沢Ming歩
+	北川杏樹	北川杏KI
+	小川あさ美	小川ASA美
+	長谷川みく	長谷川MIKU
+	白鳥ゆな	白鳥UNA
+	宇都宮しをん	宇都宮SION
+	冬月かえで	冬月KAEDE
+	青木花恋	青木HANAKOI
+	合集	合辑
+	北条麻妃	北TIAO麻KI
+	大桥未久	大桥Miku
+	早川濑里奈	早川濑RINA
+	原紗央莉	原紗央LI
+	翻墙	FANGQIAN
+	步兵	无马
+	骑兵	有马
+	西洋兵 欧片
+	乃亜	NAI亜
+	乃亚	NAI亚
+	遥惠	YAO惠
+	穗花	穗HUA
+	
 /;
 
-my %HZPY = qw/
-	なお$ Nao
-	聊	Liao
-	欲	Yv
-	性	Xing
-	做	Zuo
-	交$	Jiao
-	肛	Gang
-	屄$	Bi
-	乳	Rv
-	榴$	Liu
-	色	Se
-	奇 	Qi
-	狼	Lang
-	爱$	Ai
-	訊	Xun
-	优$	You
-	訊	Xun
-	淫	Yin
-	乱	Luan
-	网$	Wang
-	察$	Cha
-	城$	Chen
-	里沙 りさ
-	春香 はるか
-	咲	さき
-	美穂 みほ
-	百合 ゆり
-	小夏 こなつ
-	優乃	ゆうの
-	愛 	あい
-	奈津美	なつみ
-	里子 りこ
-	梓ユイ	梓えい
-	翔 しょう
-	瞳	ひとみ
-	麻妃	まき
-	沙英	さえ
-	心美	ここみ
-	恋		こい
-	恭子 きょうこ
-	レイ Rei
-	奸 Jian
-	大	Da
-	涩	Se
-	女	Nv
-	嫖	Piao
-	妓	Ji
-	射	She
-	骚	Sao
-	妻	Qi
+
+my @AVSTARS  = qw/
+	苍井空
+	麻美花
+	小川さ亚纱美
+	吉泽明步
+	伊泽千夏
+	美优千奈
+	片濑亚纪
+	遥井奈
+	西條麗
+	池田純子
+	結衣美沙
+	朹京音光
+	西条丽
+	進藤美雪
+	立花瞳
+	翔田千里
+	水澤まお
+	姬野爱
+	北原多香子
+	秋月杏奈
+	神谷姬
+	妃乃ひかり
+	浅野唯
+	大桥未久
+	早川濑里奈
+	原紗央莉
+	藤浦めぐ
+	希志あいの
+	早乙女ルイ
+	伊东遥
+	卯月麻衣
+	亜希菜
+	麻美ゆま
+	佳山三花
+	星乃優
+	里美ゆりあ
+	小田有紗
+	夏目奈奈
+	小西那奈
+	早乙女ルイ 
+	白石さゆり
+	水城奈绪
+	川上ゆう
+		宮間葵
+	板垣あずさ
+	相沢恋
+	辻さき
+	成瀬心美
+	高城沙英
+		香坂百合
+	村上里沙
+		大塚咲
+	妃悠爱
+	妃悠愛
+	真田春香
+	青空小夏
+	橘美穂
+	星優乃
+	河本愛
+	黒沢愛
+	榊なち
+	高島恭子
+	麻生希
+	堀口奈津美
+	立花里子
+	梓ユイ
+	西野翔
+	北川瞳
+	菅野亞梨沙
+	小泉彩
+	田中梨子
+	花野真衣
+	大浦安娜
+	泽井芽衣
+	友田真希
+	中野千夏
+	西崎里央
+	三上翔子
+	伊原詩織
+	七瀬美香
+	大石真理子
+	西野エリカ
+	原小雪
+	鮎川なお
+	篠原リョウ
+	水嶋友穂
+	瀬織さら
+	冬月枫
+	星野あかり
+	並木優
+	藤川結子
+	青山葵
+	加藤リナ
+	篠原杏
+	椿ゆい
+	源みいな
+	西条麗
+	吉崎直绪
+	香山圣
+	西野セイナ
+	小坂めぐる
+	片瀬まこ
+	大橋未久
+	つぼみ
+	水城奈緒
+	月野りさ
+	愛菜りな
+	真白希実
+	紅音ほたる
+	菅野亜梨沙
+	唯川纯
+	菅野亚梨沙
+	水元ゆうな
+	小泽マリア
+	辻さき
+	水玉レモン
+	大沢佑香
+	星优乃
+	小泽玛丽亚
+	麻美由真
+	青木凛
+	爱田由
+	紅音ほたる
+	相川瞬
+	北川繪美
+	瀧澤優奈
+	あいだゆあ
+	みひろ
+	松島かえで
+	涼果りん
+	小澤マリア
+	初音みのり
+	夏川亜咲
+	月見栞
+	桜ここみ
+	桐原エリカ
+	南ともか
+	藤本リーナ
+	白瀬エリナ
+	西條るり
+	恩田ほのか
+	真咲南朋
+	楓モモ
+	安藤なつ妃
+	田嶋めぐみ
+	望月ちはや
+	千堂ゆりあ
+	雨音しおん
+	唯川純
+	水希遥
+	沢田麗奈
+	甲斐正明
+	宫泽ケイト
 /;
+
+
+my @indoubt = qw{
+};
+
+my @dirty = (
+	'Mofuku Tsuma',
+);
+push @dirty,(qw{
+	乱交
+	潮吹
+	手淫
+	輪姦
+	轮奸
+	被奸
+	翻墙
+	性伴侣
+	露出
+	性器
+	黑丝
+	touch99
+	-AV
+	jav
+	akb99
+	vip视频
+	BTOP
+	MimiP2P
+	hentai
+	18禁
+	RARBG.com
+	rarbg.to
+	色情电影
+	玉蒲团
+	颜射
+	骚妻
+	嫖妓
+	女主播
+	18p2p
+	你懂的 
+	招妓
+	乳交
+	大尺度
+	涩工厂
+	橘なお
+	迷奸
+	裸聊
+	视频聊天
+	大奶
+	爆操
+	南レイ
+	情色论坛
+	潮吹
+	丁字裤
+	苏小美
+	波波妹
+	夫妻交换
+	换妻
+	上门服务
+	99bt
+	JPAVGOD
+	色狼
+	selang
+	女教师
+	熟女
+	援交
+	六月天
+	品色堂
+	肉欲
+	性交
+	性爱
+	肛交
+	美屄
+	美乳
+	草榴
+	fuck
+	sexinsex
+	sex
+	一夜情
+	色中色
+	成人
+	都市奇爱网
+	狼友
+	爱唯侦察
+	dioguitar
+	D.C.資訊交流網
+	女优
+	sis001
+	淫乱
+	乱交
+	乱~交
+	乱x交
+	性吧
+	娱乐城
+	有码
+	无码
+});
 
 
 
 =safekey
+	失禁
+	れのん
+	第一会所
+	小姐威客
+	色网
+	骑兵
+	凌辱
+	澳门
+	真人
+	同城
+	BK373
+	红音
+	连裤
+	芸能人
+	美人秘書
+	初裸
+	捜査官
+	熟オナニー
+	ザーメン
+	Nadeshiko
+	Max-A
+	MUTEKI
+	Moodyz
+	大桥Miku
+	希志
+	Sasuke\s+Premium
+	隐退作
+	死夜恶
+	zoink.it
+	恥辱
+	妻
+	感謝祭
+	滚滚红尘
 	發情
 	性开放
 	禁断
@@ -443,6 +766,30 @@ Porn
 炮友
 痴漢
 赌博
+	乃亜
+	小阪めぐる
+	情色黄金屋
+	新亲密爱人
+		黑暗圣殿
+	ourmonk
+	救国P2P
+	公仔箱
+		
+	city9x.com
+	资讯交流网
+		灌肠
+	丝袜
+	屁股
+	virgin
+	nude
+	av名人
+	c1523.uk
+	草榴社区
+	草Liu社区
+	麻薬
+	姐妹花
+	淫荡
+	自慰
 /;
 =cut
 =qustionable 
@@ -450,123 +797,29 @@ Porn
 =cut
 =ok
 =cut
-my @indoubt = qw{
-	福利岛
-	fulidao
-};
-my @dirty = (
-	'Mofuku Tsuma',
-);
-push @dirty,(qw{
-	-AV
-	jav
-	akb99
-	vip视频
-	BTOP
-	MimiP2P
-	hentai
-	18禁
-	RARBG.com
-	rarbg.to
-	色情电影
-	玉蒲团
-	颜射
-	骚妻
-	嫖妓
-	女主播
-	18p2p
-	你懂的 
-	招妓
-	乳交
-	大尺度
-	涩工厂
-	橘なお
-	迷奸
-	裸聊
-	视频聊天
-	大奶
-	爆操
-	南レイ
-	情色论坛
-	潮吹
-	丁字裤
-	苏小美
-	波波妹
-	夫妻交换
-	换妻
-	上门服务
-	99bt
-	JPAVGOD
-	色狼
-	selang
-	女教师
-	宮間葵
-	板垣あずさ
-	相沢恋
-	熟女
-	辻さき
-	成瀬心美
-	高城沙英
-	援交
-	六月天
-	品色堂
-	北条麻妃
-	北川瞳
-	肉欲
-	性交
-	性爱
-	肛交
-	美屄
-	美乳
-	草榴
-	fuck
-	sexinsex
-	sex
-	一夜情
-	色中色
-	成人
-	都市奇爱网
-	狼友
-	爱唯侦察
-	dioguitar
-	D.C.資訊交流網
-	女优
-	香坂百合
-	村上里沙
-	sis001
-	淫乱
-	乱交
-	乱~交
-	乱x交
-	大塚咲
-	妃悠爱
-	妃悠愛
-	真田春香
-	青空小夏
-	橘美穂
-	星優乃
-	河本愛
-	黒沢愛
-	榊なち
-	堀口奈津美
-	立花里子
-	梓ユイ
-	西野翔
-	性吧
-	娱乐城
-	有码
-	无码
-	高島恭子
-	麻生希
-});
 
 my @keys;
 my %filter;
 push @keys,keys %DICT;
+
+foreach my $name (@AVSTARS) {
+	#$filter{$name} = (join('一',split(//,$name)));
+	my $clean = join("\\s*",split(//,$name));
+	my $replace = ($name =~ s/^(.{2})/$1丶/gr);
+	#my $replace = ($name =~ s/^(.{2})/$1＾/gr);
+	#$filter{$clean} = $name;
+	#push @keys,$clean;
+	#$filter{$clean} = "$replace";
+	$clean = "[-_\\s\\[(]*" . ${clean} . "[-_\\s)\\]]*";
+	#print $clean,"\n";
+	$filter{$clean} = "[$replace]";
+	push @keys,$clean;
+}
+
 foreach(@dirty) {
 	my $value = $_;
 	if(defined $DICT{$_}) {
-		$value = $DICT{$_} || "";
+		$value = ($DICT{$_} eq "\'\'" ? "" : $DICT{$_});
 	}
 	
 	if($value eq $_) {
@@ -592,7 +845,7 @@ foreach(@indoubt) {
 }
 
 foreach(keys %DICT) {
-	$filter{$_} = $DICT{$_};
+	$filter{$_} = ($DICT{$_} eq "\'\'" ? "" : $DICT{$_});
 }
 
 
@@ -683,6 +936,13 @@ sub clean {
 sub process {
 	my $filename = shift;
 	my $chunks = '';
+	
+	print STDERR "PROCESS\n\t$filename\n";
+	
+	if($filename =~ m/\.MASKED.torrent$/) {
+		print STDERR "Error ignored $filename: MASKED\n";
+		return undef,'E_IGNORED';
+	}
 	if(!open FI,'<:raw',$filename) {
 		print STDERR "Error opening $filename: $!\n";
 		return undef,'E_OPENING';

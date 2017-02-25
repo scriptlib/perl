@@ -243,8 +243,24 @@ sub _preprocess {
 			$dstr =~ s/\d\d$//;
 			$o_basename = $dstr . '_' . $o_name;
 		}
+		my %filelist;
+		if(-f "files.lst" and open FI,'<',"files.lst") {
+				foreach(<FI>) {
+					chomp;
+					$filelist{$_} = 1;
+				}
+				close FI;
+		}
 		foreach(keys %$exts,values %$exts) {
-			if(-f $basename . $_) {
+			if($filelist{$basename . $_}) {
+				print STDERR "  Ignored, File \"$basename" . $_ . "\" in FILES.LST\n";
+				return undef;
+			}
+			elsif($filelist{$o_basename . $_}) {
+				print STDERR "  Ignored, Old file \"$o_basename" . $_ . "\" in FILES.LST\n";
+				return undef;
+			}
+			elsif(-f $basename . $_) {
 				print STDERR "  Ignored, File \"$basename" . $_ . "\" exists\n";
 				return undef;
 			}
@@ -307,6 +323,7 @@ sub get_video_url {
 	
 	#my $data = get_url(build_url('play',$vid),'-v');
 	my $data = get_url("http://share.weipai.cn/video/play/id/$vid/type/theater/source/undefined",'-v');
+	die($data);
 	my $playurl;
 	if($data =~ m/"video_url"\s*:\s*"([^"]+)/) {
 		$playurl = $1;

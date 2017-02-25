@@ -28,6 +28,20 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
     exit $v;
 }
+my $OS = 'linux';
+my $OSTYPE = $^O;
+if(!$OSTYPE) {
+	$OS = 'windows';
+}
+elsif($OSTYPE eq 'cygwin') {
+	$OS = 'cygwin';
+}
+elsif($OS =~ m/Windows/i) {
+	$OS = 'windows';
+}
+else {
+	$OS = 'linux';
+}
 
 my @DEF_DIR = (qw{
 	/z/datapool
@@ -180,8 +194,13 @@ sub build_playlist {
 	open $fh,">",$playlist;
 	my $count=0;
 	foreach(@$items) {
-		$_ =~ s/\//\\/g;
-		$_ = "$prefix\\$_";
+		if($OS eq 'linux') {
+			$_ = "$prefix/$_" if($prefix);
+		}
+		else {
+			$_ =~ s/\//\\/g;
+			$_ = "$prefix\\$_" if($prefix);
+		}
 		$count++;
 		print $fh $_,"\n";
 	}
@@ -194,13 +213,19 @@ sub build_playlist {
 sub open_player {
 	my $playlist = shift;
 	my $player = shift(@_) || 'irfanview';
-
-	if($player eq 'irfanview') {
+	
+	if($player eq 'feh') {
+		return system('feh','-f',$playlist);
+	}
+	elsif($player eq 'mplayer') {
+		return system('mplayer','-playlist',$playlist);
+	}
+	elsif($player eq 'irfanview') {
 		my $wpath = `cygpath -w "$playlist"`;
 		chomp $wpath;
 		return system('irfanview.bat','/filelist=' . $wpath)==0;
 	}
-	elsif($player eq 'kmplayer') {
+	elsif($player eq 'kmplayer.bat') {
 		my $wpath = `cygpath -w "$playlist"`;
 		chomp $wpath;
 		return system('kmplayer.bat',$wpath)==0;
@@ -234,15 +259,16 @@ sub open_player {
 
 
 sub play_images {
+	my $player = $OS eq 'linux' ? 'feh' : 'picshow';
 	foreach my $file(@_) {
-		open_player($file,'picshow');
+		open_player($file,$player);
 	}
 }
 
 sub play_videos {
-	my @player = ('kmplayer.bat');
+	my @player = $OS eq 'linux' ? ('mplayer') :  ('kmplayer.bat');
 	foreach my $file(@_) {
-		open_player($file,'kmplayer');
+		open_player($file,@player);
 	}
 }
 
@@ -265,6 +291,7 @@ sub play_dir {
 	my $options = shift(@_);
 	my $wdir = shift;
 
+	$dir =~ s/\/+$//;
 	$options = {without=>{}} unless($options and ref $options);
 
 	my $playname = $dir;
@@ -295,7 +322,6 @@ sub play_dir {
 			return play_playlist(%playlist);
 		}
 	}
-
 	print STDERR "Reading directory: $dir\n";
 	my $CWD_KEPT = getcwd;
 	chdir $dir;
@@ -310,7 +336,7 @@ sub play_dir {
 	$data{images} = $images;
 	$data{videos} = $videos;
 	
-	if($wdir) {
+	if($wdir and $OS eq 'cygwin') {
 		$wdir = `cygpath -w "$dir"`;
 		chomp($wdir);
 	}
@@ -430,7 +456,11 @@ if($verbs{play}) {foreach(@{$verbs{play}}) {
 
 my %REALPATH;
 foreach(@babes) {
-	my $path = `cygpath -w "$_"`;chomp($path);
+	my $path = $_;
+	if($OS eq 'cygwin') {
+		$path = `cygpath -w "$_"`;
+		chomp($path);
+	}
 	next if($REALPATH{lc($path)});
 	print STDERR "Found babes to fuck: $_\n";
 	$REALPATH{lc($path)} = 1;
@@ -438,7 +468,11 @@ foreach(@babes) {
 }
 
 foreach(@videos) {
-	my $path = `cygpath -w "$_"`;chomp($path);
+	my $path = $_;
+	if($OS eq 'cygwin') {
+		$path = `cygpath -w "$_"`;
+		chomp($path);
+	}
 	next if($REALPATH{lc($path)});
 	print STDERR "Found videos to play: $_\n";
 	$REALPATH{lc($path)} = 1;

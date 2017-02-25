@@ -358,10 +358,6 @@ sub download {
 			$_ = substr($_,0,$sidx) . "\t" . substr($_,$sidx+4);
 		}
 	}
-#	elsif(m/meitudata\.com|meipai\.com/) {
-#		print STDERR "Skipped, Code update need\n";
-#		return $self->EXIT_CODE("DEBUG");
-#	}
 	elsif(m/^(.+?\s*\t\s*([^\t]+))\s*\t\s*([^\t]+)$/) {
 		$_ = $1;
 		$filename = $2;
@@ -385,6 +381,17 @@ sub download {
 				$self->{mtm}->set_prompt($self->{saved_prompt} . ":" . $wd);
 			}
 		}
+	}
+	if(-f "files.lst" and open FI,'<',"files.lst") {
+		foreach(<FI>) {
+			chomp;
+			if($_ eq $filename) {
+				close FI;
+				print STDERR "Ignored: \"$filename\" in FILES.LST\n"; 
+				return $self->EXIT_CODE("IGNORED");
+			}
+		}
+		close FI;
 	}
 	if($self->{OPTS}->{touch}) {
 		$self->print_msg("[Touch] $filename\n");
