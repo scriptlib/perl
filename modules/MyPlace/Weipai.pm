@@ -15,8 +15,10 @@ our $HOST = 'http://w1.weipai.cn';
 our %URLSTPL = (
 	profile=>'/get_profile?&weipai_userid=$1',
 	user=>'/home_user?relative=after&user_id=$1&day_count=$2&cursor=$3',
-	videos=>'/home_user?relative=after&user_id=$1&day_count=$2&cursor=$3',
+#	videos=>'/home_user?relative=after&user_id=$1&day_count=$2&cursor=$3',
+	videos=>'/user/compresseduservideos?relative=after&count=$2&sort=time&user_id=$1&cursor=$3',
 	video=>'/user_video_list?blog_id=$1',
+	video2=>'/user/compresseduservideo?blog_id=$1',
 	my_home=>'/my_follow_user_video_list?relative=after&user_id=$1&count=$2&cursor=$3',
 	square=>'/top_video?relative=after&type=$1&count=$2&cursor=$3',
 	my_likes=>'/my_favorite_video_list?count=$2&relative=after&user_id=$1&cursor=$3',

@@ -61,7 +61,7 @@ sub check_data {
 	my $get_nothing = 1;
 	my @CURL_OBJECT = @{$r->{CURL}};
 	print STDERR "[Checking] CURL " . join(" ",@CURL_OBJECT);
-	if(open FI,'-|','curl','--silent',@CURL_OBJECT) {
+	if(open FI,'-|','curl','-m','20','--connect-timeout',30,'--silent',@CURL_OBJECT) {
 		foreach(<FI>) {
 			chomp;
 			next unless($_);
@@ -77,7 +77,12 @@ sub check_data {
 	}
 	if($get_nothing) {
 		print STDERR "\n\t[NO] (Get NOTHING)\n";
-		return undef,1 unless($r->{stop});
+		if($r->{stop}) {
+			return undef,undef;
+		}
+		else {
+			return undef,1;
+		}
 	}
 	else {
 		print STDERR "\n\t[NO]\n";
@@ -91,7 +96,7 @@ sub check_info {
 	return undef unless($r->{CURL});
 	my @CURL_OBJECT = @{$r->{CURL}};
 	print STDERR "[Checking] CURL " . join(" ",@CURL_OBJECT); 
-	if(open FI,'-|','curl','--silent',@CURL_OBJECT) {
+	if(open FI,'-|','curl','-m','20','--connect-timeout',30,'--silent',@CURL_OBJECT) {
 		foreach(<FI>) {
 			chomp;
 			next unless($_);
@@ -204,7 +209,9 @@ sub start {
 			last;
 		}
 		print STDERR join(" ",@{$r->{CURL}}),"\n";
-		my $output = ($self->{hostname} ? "$self->{hostname}_" : ""). $title . "_" . $start . ".flv";
+		my $ext = ".flv";
+		$ext = $r->{EXT} if($r->{EXT});
+		my $output = ($self->{hostname} ? "$self->{hostname}_" : ""). $title . "_" . $start . $ext;
 		system("touch","..","../..","../../..","../../../../");
 		if($preview) {
 			print STDERR "Preview will start in $wait seconds ...\n";

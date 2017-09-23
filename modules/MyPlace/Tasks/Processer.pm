@@ -128,7 +128,7 @@ sub read_tasks {
 	my @lists;
 	my $status = shift;
 	my %opts = @_;
-	open FI,'<',$FEED or return;
+	open FI,'<',$FEED or return @lists;
 	if($status) {
 		$self->output("Reading from $FEED... ");
 	}

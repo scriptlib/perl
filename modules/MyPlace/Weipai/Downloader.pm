@@ -117,9 +117,10 @@ sub _parse_suffix {
 	my $r;
 	if(!$suffix) {
 		if($url =~ m/\.jpg$/) {
-			$r = [qw/.mov.3in1.jpg .jpg .1.jpg .2.jpg .p.1.jpg .p.2.jpg/];
+			$r = [qw/.jpg .mov.3in1.jpg/],
+			#.jpg .1.jpg .2.jpg .p.1.jpg .p.2.jpg/];
 		}
-		elsif($url =~ m/\.m3u8$/) {
+		elsif($url =~ m/\.m3u8/) {
 			$r = [qw/.ts .flv .mov .mp4/];
 		}
 		elsif($url =~ m/\/video\/[^\/]+$/) {
@@ -176,6 +177,124 @@ sub download_urls {
 }
 
 
+#sub _preprocess {
+#	my $OPTS = shift;
+#	my $url = shift;
+#	my $basename = shift;
+#	my $suffix = shift(@_) || $OPTS->{exts};
+#	my $hist = shift(@_) || $OPTS->{history};
+#	my $overwrite = shift(@_) || $OPTS->{overwrite};
+#	my $mtm = $OPTS->{mtm};
+#	
+#	my $uuid_url;
+#	my $blog_id;
+#	if($url =~ m/.*\/\d+\/\d+\/\d+\/([^\/]+)\.(mov|mp4|flv)/) {
+#		$blog_id = MyPlace::Weipai::get_blog_id($url);
+#	}
+#	elsif($url =~ m/\/video\/uuid\/([^?#&]+)/) {
+#		$blog_id = MyPlace::Weipai::get_blog_id($1);
+#	}
+#	if($blog_id) {
+#		$uuid_url = $url;
+#		$url = 'http://www.weipai.cn/video/' . $blog_id;
+#		print STDERR "Video Page => $url\n";
+#	}
+#
+#	if($url =~ m/\.(?:mp4|mov|flv)/) {
+#		print STDERR "  Ignored: url type not supported\n";
+#		return MyPlace::Program::EXIT_CODE("FAILED");
+#	}
+#
+#	$suffix = _parse_suffix($url,$suffix);
+#
+#	my $noext = qr/(?:\/500k\.ts|\/500k\.mp4|\.mov\.l\.jpg|\.mov\.3in1\.jpg|\.jpg|\.\d\.jpg|\.mov|\.mp4|\.flv|\.f4v|\.ts)$/o;
+#
+#	$url =~ s/$noext//;
+#	$url =~ s/\/thumbnail\/.*\/video\//\/video\//;
+#	if(!$basename) {
+#		$basename = $url;
+#		$basename =~ s/^.+\/(\d+)\/(\d+)\/(\d+)\/([^\/]+)$/$1$2$3_$4/;
+#		$basename =~ s/[\?#].*//;
+#	}
+#	else {
+#		$basename =~ s/$noext//;
+#	}
+#	$basename =~ s/^.*\///;
+#	$basename =~ s/\.m3u8$//;
+#	if($hist) {
+#		if($uuid_url) {
+#			return undef if(hist_check_url($uuid_url,$basename,$suffix));
+#		}
+#		return undef if(hist_check_url($url,$basename,$suffix));
+#	}
+#	else {
+#		hist_check_url();
+#	}
+#	my $exts = {};
+#	foreach(@$suffix) {
+#		if(m/(\.[^\.]+)$/) {
+#			$exts->{$_} = $1;
+#		}
+#	}
+#	if(!$overwrite) {
+#		my $o_basename = $basename;
+#		if($basename =~ m/^(\d+)_(.+)$/) {
+#			my $dstr = $1;
+#			my $o_name = $2;
+#			$dstr =~ s/\d\d$//;
+#			$o_basename = $dstr . '_' . $o_name;
+#		}
+#		my %filelist;
+#		if(-f "files.lst" and open FI,'<',"files.lst") {
+#				foreach(<FI>) {
+#					chomp;
+#					$filelist{$_} = 1;
+#				}
+#				close FI;
+#		}
+#		foreach(keys %$exts,values %$exts) {
+#			if($filelist{$basename . $_}) {
+#				print STDERR "  Ignored, File \"$basename" . $_ . "\" in FILES.LST\n";
+#				return undef;
+#			}
+#			elsif($filelist{$o_basename . $_}) {
+#				print STDERR "  Ignored, Old file \"$o_basename" . $_ . "\" in FILES.LST\n";
+#				return undef;
+#			}
+#			elsif(-f $basename . $_) {
+#				print STDERR "  Ignored, File \"$basename" . $_ . "\" exists\n";
+#				return undef;
+#			}
+#			elsif( -f $o_basename . $_) {
+#				print STDERR "  Ignored, Old file \"$o_basename" . $_ . "\" exists\n";
+#				return undef;
+#			}
+#		}
+#	}
+#	if($mtm and -f '.mtm/done.txt' and open FI,'<','.mtm/done.txt') {
+#		print STDERR "  Checking MTM database <done.txt> ... ";
+#		my %DONE;
+#		foreach (<FI>) {
+#			chomp;
+#			$DONE{get_url_id($_)} = 1;
+#		}
+#		close FI;
+#		if(%DONE) {
+#			foreach my $suf(@$suffix) {
+#				my $ext = $exts->{$suf};
+#				my $input = $url . $suf;
+#				if($DONE{get_url_id($input,$ext)}) {
+#					print STDERR "[EXIST]\n  Ignored, url recored in <.mtm/done.txt>\n   $input\n";
+#					return undef;
+#				}
+#			}
+#		}
+#		print STDERR "[OK]\n";
+#	}
+#	$url =~ s/aliv3\.weipai\.cn/aliv\.weipai\.cn/;
+#	$url =~ s/oldvideo\.qiniudn\.com/v.weipai.cn/;
+#	return $url,$basename,$suffix,$exts;
+#}
 sub _preprocess {
 	my $OPTS = shift;
 	my $url = shift;
@@ -184,29 +303,30 @@ sub _preprocess {
 	my $hist = shift(@_) || $OPTS->{history};
 	my $overwrite = shift(@_) || $OPTS->{overwrite};
 	my $mtm = $OPTS->{mtm};
-	
-	my $uuid_url;
-	my $blog_id;
-	if($url =~ m/.*\/\d+\/\d+\/\d+\/([^\/]+)\.(mov|mp4|flv)/) {
-		$blog_id = MyPlace::Weipai::get_blog_id($url);
+
+	my $nurl = $url;
+	if($url =~ m/(.*\/\d+\/\d+\/\d+\/)([^\/]+)\/500k\.ts$/) {
+		$nurl = $1 . $2 . ".m3u8";
+	}
+	elsif($url =~ m/(.*\/\d+\/\d+\/\d+\/)([^\/]+)\.(mov|mp4|flv)/) {
+		$nurl = $1 . $2 . ".m3u8";
 	}
 	elsif($url =~ m/\/video\/uuid\/([^?#&]+)/) {
-		$blog_id = MyPlace::Weipai::get_blog_id($1);
+		$nurl = undef;
 	}
-	if($blog_id) {
-		$uuid_url = $url;
-		$url = 'http://www.weipai.cn/video/' . $blog_id;
-		print STDERR "Video Page => $url\n";
+	elsif($url =~ m/\/video\/[^\/]+$/) {
+		$nurl = undef;
 	}
 
-	if($url =~ m/\.(?:mp4|mov|flv)/) {
+	if(!$nurl) {
 		print STDERR "  Ignored: url type not supported\n";
 		return MyPlace::Program::EXIT_CODE("FAILED");
 	}
-
+	
+	$url = $nurl;
 	$suffix = _parse_suffix($url,$suffix);
 
-	my $noext = qr/(?:\/500k\.ts|\/500k\.mp4|\.mov\.l\.jpg|\.mov\.3in1\.jpg|\.jpg|\.\d\.jpg|\.mov|\.mp4|\.flv|\.f4v|\.ts)$/o;
+	my $noext = qr/(?:\/500k\.ts|\/500k\.mp4|\.mov\.l\.jpg|\.mov\.3in1\.jpg|\.jpg|\.\d\.jpg|\.mov|\.mp4|\.flv|\.f4v|\.ts\.png)$/o;
 
 	$url =~ s/$noext//;
 	$url =~ s/\/thumbnail\/.*\/video\//\/video\//;
@@ -215,15 +335,11 @@ sub _preprocess {
 		$basename =~ s/^.+\/(\d+)\/(\d+)\/(\d+)\/([^\/]+)$/$1$2$3_$4/;
 		$basename =~ s/[\?#].*//;
 	}
-	else {
-		$basename =~ s/$noext//;
-	}
 	$basename =~ s/^.*\///;
+	$basename =~ s/\?.+$//;
 	$basename =~ s/\.m3u8$//;
+		$basename =~ s/$noext//;
 	if($hist) {
-		if($uuid_url) {
-			return undef if(hist_check_url($uuid_url,$basename,$suffix));
-		}
 		return undef if(hist_check_url($url,$basename,$suffix));
 	}
 	else {
@@ -235,6 +351,7 @@ sub _preprocess {
 			$exts->{$_} = $1;
 		}
 	}
+	#$exts->{".jpg"} = ".png";
 	if(!$overwrite) {
 		my $o_basename = $basename;
 		if($basename =~ m/^(\d+)_(.+)$/) {
@@ -284,7 +401,7 @@ sub _preprocess {
 				my $input = $url . $suf;
 				if($DONE{get_url_id($input,$ext)}) {
 					print STDERR "[EXIST]\n  Ignored, url recored in <.mtm/done.txt>\n   $input\n";
-					return undef;
+					return MyPlace::Program::EXIT_CODE("OK");
 				}
 			}
 		}
@@ -305,7 +422,7 @@ sub _download {
 		my $ext = $exts->{$suf};
 		my $input = $url . $suf;
 		my $output = $basename . $ext;
-		$DOWNLOADER->execute("--url",$input,"--saveas",$output,"--maxtry",4);
+		$DOWNLOADER->execute("--url",$input,"--saveas",$output,"--maxtry",2);
 		if(-f $output) {
 			system('touch','-c','-h','../');
 			system('touch','-c','-h','../../');
@@ -373,12 +490,12 @@ sub _download_m3u8 {
 	my $f_m3u = $basename . ".m3u8";
 	
 	if(!-f $f_m3u) {
-		$DOWNLOADER->execute("--url",$url,"--saveas",$f_m3u,"--maxtry",4);
-		return undef,$f_m3u unless(-f $f_m3u);
+		$DOWNLOADER->execute("--url",$url,"--saveas",$f_m3u,"--maxtry",2);
+		return undef,undef unless(-f $f_m3u);
 	}
 	if(!open FI,"<:utf8",$f_m3u) {
 		print STDERR "Error opening file $f_m3u: $!\n";
-		return undef,$f_m3u;
+		return undef,undef;
 	}
 	my @urls;
 	while(<FI>) {
@@ -391,6 +508,9 @@ sub _download_m3u8 {
 	my $count = @urls;
 	my @data;
 	my @files;
+	if($count < 1) {
+		 return undef,undef;
+	}
 	foreach(@urls) {
 		$idx++;
 		my $output = $basename . '_' .  $idx . '.ts';
@@ -457,7 +577,7 @@ sub download {
 			$output = $args[1];
 		}
 	}
-	elsif($args[0] =~ m/\.m3u8$/) {
+	elsif($args[0] =~ m/\.m3u8/) {
 		print STDERR "\n";
 		($input,$output) = _download_m3u8(@args);
 	}

@@ -270,7 +270,7 @@ sub _add {
 	};
 	my %incoming = %{$r->{info}};
 	my @id = @{$r->{sortedId}};
-	my $count;
+	my $count = 0;
 	foreach my $id(@id) {
 		if($id =~ m/^\s*$/) {
 			next;
@@ -440,6 +440,7 @@ sub query {
 			foreach my $key (@keys) {
 				next if($target{$key});
 				my $exp = join("|",$key,@{$info{$key}});
+				$exp =~ s/([\(\)\{\}\|]+)/\\$1/g;
 				if($r =~ m/^(?:$exp)\s+/ or $r =~ m/\s+(?:$exp)$/) {
 					push @Id,$key;
 					$target{$key} = $info{$key};

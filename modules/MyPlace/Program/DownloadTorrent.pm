@@ -41,11 +41,11 @@ our @SITES = (
 	#http://www.torrenthound.com/torrent/:HASH:
 	#http://torrage.com/torrent/:HASH:.torrent
 	#http://zoink.it/torrent/:HASH:.torrent
+	#http://www.mp4ba.com/down.php?date=1422367802&hash=:HASH:
 	qw{
 		https://itorrents.org/torrent/:HASH:.torrent
 		https://torrentproject.se/torrent/:HASH:.torrent
 		http://torrage.biz/torrent/:HASH:.torrent
-		http://www.mp4ba.com/down.php?date=1422367802&hash=:HASH:
 		https://torcache.net/torrent/:HASH:.torrent
 		post://www.torrent.org.cn/download.php?hash=:HASH:
 	}

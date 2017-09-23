@@ -42,6 +42,7 @@ sub OPTIONS {qw/
 	reposter
 	ffollow|ff
 	grep=s
+	host=s
 /;}
 
 
@@ -638,10 +639,16 @@ sub CMD_ADD {
 			die($result . "\n");
 		}
 	}
-
-	if(defined $OPTS->{hosts}	or defined $OPTS->{all}) {
+	if(!$name) {
+		die("No name defnied\n");
+	}
+	if(defined $OPTS->{hosts} or defined $OPTS->{all}) {
 		$OPTS->{hosts} = $host if($host);
 	}
+	if($OPTS->{host}) {
+		$OPTS->{hosts} = $OPTS->{hosts} ? $OPTS->{hosts} . "," . $OPTS->{host} : $OPTS->{host};
+	}
+
 	if(!defined $OPTS->{hosts}) {
 		die("Error <HOSTS> not defined\n");
 	}

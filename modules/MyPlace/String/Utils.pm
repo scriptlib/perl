@@ -8,7 +8,7 @@ BEGIN {
     $VERSION        = 1.00;
     @ISA            = qw(Exporter);
     @EXPORT         = qw();
-    @EXPORT_OK      = qw(dequote no_empty strtime);
+    @EXPORT_OK      = qw(dequote no_empty strtime strtime2);
 }
 use utf8;
 my $DEBUG=0;
@@ -71,8 +71,9 @@ sub no_empty {
 	}
 }
 
-sub strtime {
-	my $time =  shift(@_) || time();
+sub format_time {
+	my $r = shift;
+	my @r = (@$r);
 	my $style = shift;
 	my $sep1 = shift(@_); 
 	my $sep2 = shift(@_);
@@ -80,8 +81,7 @@ sub strtime {
 	$sep1 = "/" unless(defined $sep1); #seperator for date (year/month/day)
 	$sep2 = ":" unless(defined $sep2); #seperator for time (hour::minute::second)
 	$sep3 = " " unless(defined $sep3); #seperator seperated date and time
-	my @r = localtime($time);
-	my $year   = $r[5] + 1900;
+	my $year   = $r[5] < 1000 ? $r[5] + 1900 : $r[5];
 	my $month  = $r[4]  > 8  ? ($r[4] + 1) : '0' . ($r[4]+1);
 	my $day    = $r[3] > 9 ? $r[3] : '0' . $r[3];
 	my $hour   = $r[2] > 9 ? $r[2] : '0' . $r[2];
@@ -106,9 +106,75 @@ sub strtime {
 	elsif($style == -2) {
 		return "$month$sep1$day";
 	}
+	elsif($style == 5) {
+		return "$year$month$day";
+	}
+	elsif($style == -5) {
+		return "$year$month$day$hour$minute$second";
+	}
 	else {
 		return "$year$sep1$month$sep1$day$sep3$clock";
 	}
+}
+
+sub strtime {
+	my $time =  shift(@_) || time();
+	my @r = localtime($time);
+	return format_time([@r]);
+}
+
+sub strtime2 {
+	my %MONTHMAP = (
+	"Jan"=>0,
+	"Feb"=>1,
+	"Mar"=>2,
+	"Apr"=>3,
+	"May"=>4,
+	"Jun"=>5,
+	"Jul"=>6,
+	"Aug"=>7,
+	"Sep"=>8,
+	"Oct"=>9,
+	"Nov"=>10,
+	"Dec"=>11,
+	);
+	my $str = shift;
+	my @r;
+	my @c = localtime();
+	my $r = $str;
+	if(!$r) {
+		return undef;
+	}
+	elsif($r =~ m/(\w\w\w) (\d+) (\d+):(\d+):(\d+) \+(\d+) (\d+)$/) {
+		$r[5] = $7;
+		my $m = $MONTHMAP{ucfirst($1)};
+		$r[4] = $m ? $m : $c[1];
+		$r[3] = +$2 - 0;
+		$r[2] = +$3 - 0;
+		$r[1] = +$4 - 0;
+		$r[0] = +$5 - 0;
+	}
+	elsif($r =~ m/(\d\d\d\d)[_-](\d+)[_-](\d+)$/) {
+		$r[5] = $1;
+		$r[4] = +$2 - 1;
+		$r[3] = +$3 - 0;
+		$r[2] = 0;
+		$r[1] = 0;
+		$r[0] = 0;
+	}
+	elsif($r =~ m/(\d+)[_-](\d+)$/) {
+		$r[5] = $c[5];
+		$r[4] = +$1 - 1;
+		$r[3] = +$2 - 0;
+		$r[2] = 0;
+		$r[1] = 0;
+		$r[0] = 0;
+	}
+	else {
+		return $str;
+	}
+	my $style = shift;
+	return format_time(\@r,(defined $style ? $style : -5),@_);
 }
 
 1;

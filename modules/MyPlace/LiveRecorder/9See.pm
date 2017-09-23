@@ -13,7 +13,7 @@ sub def_check1 {
 		CURL=>[
 			'http://www.9see.com/MiaoBo/live/live_room_userinfo.aspx?useridx=' . $id,
 		],
-		stop=>0,
+		stop=>1,
 	};
 }
 

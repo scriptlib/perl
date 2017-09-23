@@ -15,6 +15,7 @@ my $CMD = 'echo';
 my $NAME = '';
 my @ARGS = ();
 my $PROMPT = '';
+my $PREFIX = '';
 
 sub qcmd_set {
 	if(@_) {
@@ -44,6 +45,7 @@ sub _build_prompt {
 	$p .= $PROMPT ? $p3 . ">" : "";
 	$p .= " ";
 	$p .= join(" ",@_) if(@_);
+	$p = $p . "$PREFIX>";
 	return $p;
 }
 
@@ -61,6 +63,8 @@ my %vtable = (
 	'PROMPT'=>'PROMPT',
 	'SYS'=>'SYSTEM',
 	'SYSTEM'=>'SYSTEM',
+	'PRE'=>'PREFIX',
+	'PREFIX'=>'PREFIX',
 );
 
 my %ctable = (
@@ -92,7 +96,7 @@ sub qcmd_run {
 			my($verb,@words) = split(/\s+/,$_);
 			my $VERB = $vtable{uc($verb)};
 			if(!$VERB) {
-				@words = split(/\s+>\s+/,$_);
+				@words = split(/\s+>\s+/,$PREFIX . $_);
 				$ok = qcmd_execute($CMD,@ARGS,@words);
 			}
 			elsif($VERB eq 'QUIT') {
@@ -106,11 +110,14 @@ sub qcmd_run {
 			elsif($VERB eq 'SYSTEM') {
 				$ok = qcmd_execute(@words);
 			}
+			elsif($VERB eq 'PREFIX') {
+				$PREFIX = "@words";
+			}
 			elsif($ctable{$VERB}) {
 				$ok = qcmd_execute(@{$ctable{$VERB}},@words);
 			}
 			else {
-				@words = split(/\s+>\s+/,$_);
+				@words = split(/\s+>\s+/,$PREFIX . $_);
 				$ok = qcmd_execute($CMD,@ARGS,@words);
 			}
 		}
