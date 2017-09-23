@@ -693,6 +693,15 @@ sub move_to {
 		foreach(@_) {
 			print STDERR "    <= $_\n";
 			$exit = cmd_mv($_,$_,$dstd);
+
+		};
+		print STDERR "  Delete catalog links in <#Catalogs>:\n";
+		foreach(@_) {
+			my $catalog_dir = '#Catalogs/' . uc(substr($_,0,1)) . '/' . $_;
+			if(-l $catalog_dir) {
+				print STDERR "    XX $catalog_dir\n";
+				unlink $catalog_dir;
+			}
 		};
 	}
 
@@ -757,9 +766,16 @@ our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 
 	
 	my $dpre = $OPTS->{'move-prefix'} || Babes::get_pref("move-prefix");
-	$DST = catdir($dpre,$DST) if($dpre);
+	if($DST =~ m/^[\/\.]+/) {
+	}
+	elsif(!$dpre) {
+	}
+	else {
+		$DST = catdir($dpre,$DST);
+	}
 #	print STDERR "DST: $DST\n";return;
-
+	
+	$exit = 0;
 	foreach my $SRC (@_) {
 		print STDERR "  [$SRC] Moving to $DST/\n";
 		if(-l $SRC) {
@@ -800,6 +816,11 @@ our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 				if(!$OPTS->{'no-junction'}) {
 #					print STDERR "[$SRC] LINK=> $DST \n";
 					$exit = Babes::junction($SRC,$DST);
+				}
+				my $catalog_dir = '#Catalogs/' . uc(substr($SRC,0,1)) . '/' . $SRC;
+				if(-l $catalog_dir) {
+					print STDERR "    XX $catalog_dir\n";
+					unlink $catalog_dir;
 				}
 			}
 			else {
@@ -1509,7 +1530,7 @@ sub process {
 			if($OPTS->{'unfollow'}) {
 				Babes::Follow::unfollow($OPTS,$SRC);
 			}
-			Babes::Update::process($OPTS,$SRC);
+			#Babes::Update::process($OPTS,$SRC);
 		}
 		
 

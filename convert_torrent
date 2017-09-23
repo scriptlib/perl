@@ -12,6 +12,7 @@ my @OPTIONS = qw/
 	find=s
 	replace=s
 	move
+	filename
 /;
 my %OPTS;
 if(@ARGV)
@@ -108,6 +109,15 @@ my %HZPY = qw/
 	丝	Si
 	露	Lu
 	姦	Jian
+	妇	fu
+	兰	LAN
+	蘭	LAN
+	花	HUA
+	川	CHUAN
+	子	ZI
+	春	CHUN
+	赌	DU
+	爱	AI
 /;
 
 my %DICT = qw/
@@ -227,174 +237,84 @@ my %DICT = qw/
 	乃亚	NAI亚
 	遥惠	YAO惠
 	穗花	穗HUA
-	
+	第一会所	ＳＩＳ００１
+	若妻	妻子
+	carib	ＣＡＲＩＢ
+	解禁	禁忌解开
+	羽月希	羽YUE希
+	登录器	录器登
+	永久地址 久永址地
+	\.Xvid\. .
+	防屏蔽	蔽屏防
+	Boob	B00b
+	NHDTA  NHDta
+	痴漢俱樂部	痴Han俱樂部
+	限制级	18+
+	大乳	Big奶
+	蜜桃成熟时	蜜TAO成SHOU时
+	色欲	色之欲望
+	生殖器官  下体
+	生殖器  下体
+	淫母 淫の母
 /;
 
 
 my @AVSTARS  = qw/
-	苍井空
-	麻美花
-	小川さ亚纱美
-	吉泽明步
-	伊泽千夏
-	美优千奈
-	片濑亚纪
-	遥井奈
-	西條麗
-	池田純子
-	結衣美沙
-	朹京音光
-	西条丽
-	進藤美雪
-	立花瞳
-	翔田千里
-	水澤まお
-	姬野爱
-	北原多香子
-	秋月杏奈
-	神谷姬
-	妃乃ひかり
-	浅野唯
-	大桥未久
-	早川濑里奈
-	原紗央莉
-	藤浦めぐ
-	希志あいの
-	早乙女ルイ
-	伊东遥
-	卯月麻衣
-	亜希菜
-	麻美ゆま
-	佳山三花
-	星乃優
-	里美ゆりあ
-	小田有紗
-	夏目奈奈
-	小西那奈
-	早乙女ルイ 
-	白石さゆり
-	水城奈绪
-	川上ゆう
-		宮間葵
-	板垣あずさ
-	相沢恋
-	辻さき
-	成瀬心美
-	高城沙英
-		香坂百合
-	村上里沙
-		大塚咲
-	妃悠爱
-	妃悠愛
-	真田春香
-	青空小夏
-	橘美穂
-	星優乃
-	河本愛
-	黒沢愛
-	榊なち
-	高島恭子
-	麻生希
-	堀口奈津美
-	立花里子
-	梓ユイ
-	西野翔
-	北川瞳
-	菅野亞梨沙
-	小泉彩
-	田中梨子
-	花野真衣
-	大浦安娜
-	泽井芽衣
-	友田真希
-	中野千夏
-	西崎里央
-	三上翔子
-	伊原詩織
-	七瀬美香
-	大石真理子
-	西野エリカ
-	原小雪
-	鮎川なお
-	篠原リョウ
-	水嶋友穂
-	瀬織さら
-	冬月枫
-	星野あかり
-	並木優
-	藤川結子
-	青山葵
-	加藤リナ
-	篠原杏
-	椿ゆい
-	源みいな
-	西条麗
-	吉崎直绪
-	香山圣
-	西野セイナ
-	小坂めぐる
-	片瀬まこ
-	大橋未久
-	つぼみ
-	水城奈緒
-	月野りさ
-	愛菜りな
-	真白希実
-	紅音ほたる
-	菅野亜梨沙
-	唯川纯
-	菅野亚梨沙
-	水元ゆうな
-	小泽マリア
-	辻さき
-	水玉レモン
-	大沢佑香
-	星优乃
-	小泽玛丽亚
-	麻美由真
-	青木凛
-	爱田由
-	紅音ほたる
-	相川瞬
-	北川繪美
-	瀧澤優奈
-	あいだゆあ
-	みひろ
-	松島かえで
-	涼果りん
-	小澤マリア
-	初音みのり
-	夏川亜咲
-	月見栞
-	桜ここみ
-	桐原エリカ
-	南ともか
-	藤本リーナ
-	白瀬エリナ
-	西條るり
-	恩田ほのか
-	真咲南朋
-	楓モモ
-	安藤なつ妃
-	田嶋めぐみ
-	望月ちはや
-	千堂ゆりあ
-	雨音しおん
-	唯川純
-	水希遥
-	沢田麗奈
-	甲斐正明
-	宫泽ケイト
+ 苍井空 麻美花 小川さ亚纱美 吉泽明步 伊泽千夏 美优千奈 片濑亚纪 遥井奈 西條麗 池田純子 結衣美沙 朹京音光 西条丽 進藤美雪 立花瞳 翔田千里 水澤まお 姬野爱 北原多香子 秋月杏奈 神谷姬 妃乃ひかり 浅野唯 大桥未久 早川濑里奈 原紗央莉 藤浦めぐ 希志あいの 早乙女ルイ 伊东遥 卯月麻衣 亜希菜 麻美ゆま 佳山三花 星乃優 里美ゆりあ 小田有紗 夏目奈奈 小西那奈 早乙女ルイ 白石さゆり 水城奈绪 川上ゆう 宮間葵 板垣あずさ 相沢恋 辻さき 成瀬心美 高城沙英 香坂百合 村上里沙 大塚咲 妃悠爱 妃悠愛 真田春香 青空小夏 橘美穂 星優乃 河本愛 黒沢愛 榊なち 高島恭子 麻生希 堀口奈津美 立花里子 梓ユイ 西野翔 北川瞳 菅野亞梨沙 小泉彩 田中梨子 花野真衣 大浦安娜 泽井芽衣 友田真希 中野千夏 西崎里央 三上翔子 伊原詩織 七瀬美香 大石真理子 西野エリカ 原小雪 鮎川なお 篠原リョウ 水嶋友穂 瀬織さら 冬月枫 星野あかり 並木優 藤川結子 青山葵 加藤リナ 篠原杏 椿ゆい 源みいな 西条麗 吉崎直绪 香山圣 西野セイナ 小坂めぐる 片瀬まこ 大橋未久 つぼみ 水城奈緒 月野りさ 愛菜りな 真白希実 紅音ほたる 菅野亜梨沙 唯川纯 菅野亚梨沙 水元ゆうな 小泽マリア 辻さき 水玉レモン 大沢佑香 星优乃 小泽玛丽亚 麻美由真 青木凛 爱田由 紅音ほたる 相川瞬 北川繪美 瀧澤優奈 あいだゆあ みひろ 松島かえで 涼果りん 小澤マリア 初音みのり 夏川亜咲 月見栞 桜ここみ 桐原エリカ 南ともか 藤本リーナ 白瀬エリナ 西條るり 恩田ほのか 真咲南朋 楓モモ 安藤なつ妃 田嶋めぐみ 望月ちはや 千堂ゆりあ 雨音しおん 唯川純 水希遥 沢田麗奈 甲斐正明 宫泽ケイト 吉川萌 鏡桜子 风骚 淫荡 泉麻那 鏡麗子 今井優 真木今日子 草凪純 南波杏 梨々花 小峰由衣 
 /;
 
-
 my @indoubt = qw{
+ 
 };
 
+=safe
+	六月联盟	瀬咲るな	飯島夏希 爱唯侦查	宣传文本　美妇　东方后宫
+	77自由爱　赤裸宮殿　烽火连城　奇幻之国　无双国土　新巴黎中文社区
+	新天下华人娱乐	欲望天涯	開放註冊 淫亂	开放注册
+	友情天地　小小淫	香艳三级 深田梨菜 	あずみ恋 	希咲あや 	爱城
+	 騙姦 愛川香織
+	 広田さくら   羽田夕夏
+	石川優季奈 浅井舞香 澤田なつみ 滝沢優奈  長澤リオン 白石ひより   椎名りく
+	貞操 
+=cut
+
+my @TONOTHING = (
+	'ai搭伴电影【www\.aidaban\.net】',
+	'\[BT狗 www\.btdog\.com\]',
+	'【最新电影下载，尽在2kandy\.com】',
+	'【BT天堂】','【BtBt.info】',
+	'梦幻天堂・龙网\(LWgod\.com\)',
+	'^\.?720p\.',
+);
+
 my @dirty = (
+	'SUN16',
 	'Mofuku Tsuma',
+	'Sky Angel',
+	'MAS-',
+	'ARM-',
+	'SKY-',
+	'CRPD',
+	'GAR-',
+	'Erotic',
+	'HBAD-',
+	'Kamikaze Premium',
+	'九 九 情 色 论 坛',
 );
 push @dirty,(qw{
+    Agemix
+    爱唯侦查
+    赌博
+	Amateur
+	性愛
+	pornolab.net
+	porn
+	色界
+	丽春苑
+	巨乳
+	淫色
+	1pondo
+	Uncensored
 	乱交
 	潮吹
 	手淫
@@ -481,6 +401,15 @@ push @dirty,(qw{
 	娱乐城
 	有码
 	无码
+	少妇	
+	Cover
+	荡妇	  
+	内射	  
+    武藤兰
+	朝河蘭
+	骚妇
+	東方花園
+	
 });
 
 
@@ -488,7 +417,6 @@ push @dirty,(qw{
 =safekey
 	失禁
 	れのん
-	第一会所
 	小姐威客
 	色网
 	骑兵
@@ -800,12 +728,23 @@ Porn
 
 my @keys;
 my %filter;
+
+
+foreach(@TONOTHING) {
+	my $k = '\s*' . $_ . '\s*';
+	$filter{$k} = '';
+	push @keys,$k;
+}
+
 push @keys,keys %DICT;
 
 foreach my $name (@AVSTARS) {
 	#$filter{$name} = (join('一',split(//,$name)));
 	my $clean = join("\\s*",split(//,$name));
 	my $replace = ($name =~ s/^(.{2})/$1丶/gr);
+	if(length($name)<3) {
+		$replace = ($name =~ s/^(.{1})/$1丶/gr);
+	}
 	#my $replace = ($name =~ s/^(.{2})/$1＾/gr);
 	#$filter{$clean} = $name;
 	#push @keys,$clean;
@@ -922,6 +861,10 @@ sub clean {
 	elsif($type eq 'HASH') {
 		foreach my $key (keys %$tor) {
 			my $d;
+			if($tor->{$key} and $tor->{$key . ".utf-8"}) {
+				$tor->{$key} = $tor->{$key . ".utf-8"};
+				$dirty = 1;
+			}
 			($tor->{$key},$d) = clean($tor->{$key},$position . "->\{$key\}");
 			$dirty = $d if($d);
 		}
@@ -983,12 +926,33 @@ sub process {
 			$dirty = 1;
 			print STDERR "Set torrent->{info}->{name} = $torrent->{info}->{name}\n";
 		}
-		foreach my $key(qw/private/) {
+		elsif($OPTS{filename}) {
+			foreach(qw/name name.utf-8/) {
+				$torrent->{info}->{$_} = $name;
+			}
+			$dirty = 1;
+			print STDERR "Set torrent->{info}->{name} = $torrent->{info}->{name}\n";
+		}
+		foreach my $key("private","comment","publisher","created by") {
+			foreach($torrent,$torrent->{info}) {
+				if(defined $_->{$key}) {
+					print STDERR "Delete {" . $key . "} = " . $_->{$key} . "\n";
+					$_->{$key} = undef;
+					delete $_->{$key};
+					$dirty = 1;
+				}
+			}
+		}
+		foreach my $key("ed2k","filehash") {
+			my $v = $torrent->{info}->{$key};
+			if(defined $v) {
+				if($v !~ /^[a-zA-Z0-9]+$/) {
+					print STDERR "Delete torrent->{info}->{" . $key . "} = " . $torrent->{info}->{$key} . "\n";
+					delete $torrent->{info}->{$key};
+					$dirty = 1;
+				}
+			}
 			if(defined $torrent->{info}->{$key}) {
-				print STDERR "Delete torrent->{info}->{" . $key . "} = " . $torrent->{info}->{$key} . "\n";
-				$torrent->{info}->{$key} = undef;
-				delete $torrent->{info}->{$key};
-				$dirty = 1;
 			}
 		}
 #		if($torrent->{info}->{name} && !($torrent->{info}->{name} eq $basename)) {
@@ -1012,6 +976,9 @@ sub process {
 			$output =~ s/\.([^\.]+)$/.MASKED.$1/;
 		}
 		print STDERR "Writting $output ...\n";
+		if($torrent->{info}->{"name.utf-8"}) {
+			$torrent->{encoding}="UTF-8";
+		}
 		if(open FO,">:raw",$output) {
 			print FO bencode($torrent);
 			close FO;

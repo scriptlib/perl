@@ -35,10 +35,10 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 
 my %ENGINES = (
 	#Mirror btkitty.org
-	#'btkitty'=>[
-	#	'http://btkitty.so/?###QUERY###',
-	#	3,
-	#],
+	'btkitty'=>[
+		'http://btkitty.pet/?###QUERY###',
+		3,
+	],
 	'btdigg.org'=>[
 		'https://btdigg.org/?###QUERY###',
 		2,
@@ -72,10 +72,10 @@ my %ENGINES = (
 		'https://torrentproject.se/?safe=off&t=###QUERY###',
 		2,
 	],
-	'mp4ba.com'=>[
-		'http://www.mp4ba.com/search.php?keyword=###QUERY###',
-		2,
-	],
+#	'mp4ba.com'=>[
+#		'http://www.mp4ba.com/search.php?keyword=###QUERY###',
+#		2,
+#	],
 	'kat.cr'=>[
 		#'https://kat.cr/?###QUERY###',
 		'http://kickasstorrentsan.com/?###QUERY###',

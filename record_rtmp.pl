@@ -21,8 +21,11 @@ my @OPTIONS = qw/
 	flv
 	mp4
 	copy
+	x264
 	endpos|ep=s
 	startpos|sp=s
+	dump
+	test
 /;
 my %OPTS;
 if(@ARGV)
@@ -41,7 +44,9 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
     exit $v;
 }
 
-my $app = "/myplace/system/app/multimedia/MPlayer/mencoder.exe";
+my $mencoder = "/myplace/system/app/multimedia/MPlayer/mencoder.exe";
+my $mplayer = "/myplace/system/app/multimedia/MPlayer/mplayer.exe";
+my $app = $mencoder;
 my @opts = qw/
 	-quiet
 /;
@@ -50,34 +55,95 @@ my @flv = qw/
 	-srate 22050 -ovc lavc
 	-lavcopts vcodec=flv:vbitrate=500:mbd=2:mv0:trell:v4mv:last_pred=3
 /;
+my @flv2 = qw/
+	-of lavf -oac mp3lame -ovc lavc
+	-lavcopts vcodec=flv -ni
+/;
 my @copy = qw/
 	-of lavf -oac mp3lame -ovc copy
 /;
-my @mp4 = qw/
-	-of lavf -oac mp3lame -ovc lavc -lavcopts vcodec=mpeg4
+my @x264 = qw/
+	-of lavf -oac faac
+	-ovc x264
 /;
+my @mp4 = qw/
+	 -of lavf
+	 -lavfopts format=mpeg4
+	 -oac lavc
+	 -lavcopts acodec=ac3
+	 -ovc lavc
+	 -lavcopts vcodec=mpeg4:mbd=2:trell:v4mv:last_pred=2:dia=-1:vmax_b_frames=2:vb_strategy=1:cmp=3:subcmp=3:precmp=0:vqcomp=0.6:turbo
+	 -ni
+/;
+#-of lavf
+#	 -lavfopts format=mpeg4
+my @x264 = qw/
+	 -oac faac
+	 -ovc x264
+/;
+my @test = qw/
+	-oac faac
+	-ovc copy
+/;
+#:mbd=2:mv0:trell:v4mv:last_pred=3
+#lavc -lavcopts vcodec=mpeg4
+#-lavcopts vcodec=h264
 
-if($OPTS{flv}) {
-	push @opts,@flv;
-}
-elsif($OPTS{copy}) {
-	push @opts,@copy;
-}
-elsif($OPTS{mp4}) {
-	push @opts,@mp4;
+use File::Temp qw/ tempfile /;
+my (undef, $tmpname) = tempfile("record_rtmp_XXXX", OPEN => 0,DIR=>'',EXT=>".dat");
+
+if($OPTS{output}) {
+	$OPTS{write} = $OPTS{output};
+	$OPTS{output} = $tmpname . ".downloading";
 }
 else {
-	push @opts,@mp4;
+	$OPTS{write} = $tmpname;
+	$OPTS{output} = $tmpname . ".downloading";
+}
+
+if($OPTS{dump}) {	
+	$app = $mplayer;
+	push @opts,(qw/
+		-noar -noconsolecontrols -nojoystick -nolirc -nomouseinput -nofontconfig
+		-nosub
+	/);
+	push @opts,"-dumpstream","-dumpfile",$OPTS{output};
+	if($OPTS{maxtime}) {
+		$OPTS{maxtime} = ((0+$OPTS{maxtime})/60)*(5*1024) . "kb";
+	}
+}
+else {
+	push @opts,'-o',$OPTS{output};
+	if($OPTS{flv}) {
+		push @opts,@flv;
+	}
+	elsif($OPTS{copy}) {
+		push @opts,@copy;
+	}
+	elsif($OPTS{mp4}) {
+		push @opts,@mp4;
+	}
+	elsif($OPTS{x264}) {
+		push @opts,@x264;
+	}
+	elsif($OPTS{test}) {
+		push @opts,@test;
+	}
+	else {
+		push @opts,@x264;
+	}
 }
 if($OPTS{maxtime}) {
 	push @opts,"-endpos",$OPTS{maxtime};
 }
-if($OPTS{output}) {
-	push @opts,"-o",$OPTS{output};
-}
 push @opts,"-endpos",$OPTS{endpos} if($OPTS{endpos});
 push @opts,"-startpos",$OPTS{startpos} if($OPTS{startpos});
-exec($app,@ARGV,@opts);
+print STDERR join(" ",$app,@ARGV,@opts),"\n";
+system($app,@ARGV,@opts);
+if(-f $OPTS{output}) {
+	rename($OPTS{output},$OPTS{write});
+	print STDERR "->save to $OPTS{write}\n";
+}
 
 __END__
 
