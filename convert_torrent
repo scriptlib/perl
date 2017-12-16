@@ -13,6 +13,7 @@ my @OPTIONS = qw/
 	replace=s
 	move
 	filename
+	log
 /;
 my %OPTS;
 if(@ARGV)
@@ -37,687 +38,56 @@ use utf8;
 
 
 sub big_word {
-	my $_ = shift;
+	local $_ = shift;
 	#tr/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ/nopqrstuvwxyzabcdefghijklmNOPQRSTUVWXYZABCDEFGHIJKLM/;
 	tr/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ０１２３４５６７８９/;
 	return $_;
 }
 
 sub atoi {
-	my $_ = shift;
+	local $_ = shift;
 	tr/oOlLbBzZgG/0011662299/;
 	return $_;
 }
 
 sub escape {
-	my $_ = shift;
+	local $_ = shift;
 	s/([~[:ascii:]])/sprintf("%X",ord($1))/ge;
 	return $_;
 }
 
 my %HZPY = qw/
-	なお$ Nao
-	聊	Liao
-	欲	Yv
-	性	Xing
-	做	Zuo
-	交$	Jiao
-	肛	Gang
-	屄$	Bi
-	乳	Rv
-	榴$	Liu
-	色	Se
-	奇 	Qi
-	狼	Lang
-	爱$	Ai
-	訊	Xun
-	优$	You
-	訊	Xun
-	淫	Yin
-	乱	Luan
-	网$	Wang
-	察$	Cha
-	城$	Chen
-	里沙 りさ
-	春香 はるか
-	咲	さき
-	美穂 みほ
-	百合 ゆり
-	小夏 こなつ
-	優乃	ゆうの
-	愛 	あい
-	奈津美	なつみ
-	里子 りこ
-	梓ユイ	梓えい
-	翔 しょう
-	瞳	ひとみ
-	麻妃	まき
-	沙英	さえ
-	心美	ここみ
-	恋		こい
-	恭子 きょうこ
-	レイ Rei
-	奸 Jian
-	大	Da
-	涩	Se
-	女	Nv
-	嫖	Piao
-	妓	Ji
-	射	She
-	骚	Sao
-	妻	Qi
-	丝	Si
-	露	Lu
-	姦	Jian
-	妇	fu
-	兰	LAN
-	蘭	LAN
-	花	HUA
-	川	CHUAN
-	子	ZI
-	春	CHUN
-	赌	DU
-	爱	AI
+なお$ Nao 聊 Liao 欲 Yv 性 Xing 做 Zuo 交$ Jiao 肛 Gang 屄$ Bi 乳 Rv 榴$ Liu 色 Se 奇 Qi 狼 Lang 爱$ Ai 訊 Xun 优$ You 訊 Xun 淫 Yin 乱 Luan 网$ Wang 察$ Cha 城$ Chen 里沙 りさ 春香 はるか 咲 さき 美穂 みほ 百合 ゆり 小夏 こなつ 優乃 ゆうの 愛 あい 奈津美 なつみ 里子 りこ 梓ユイ 梓えい 翔 しょう 瞳 ひとみ 麻妃 まき 沙英 さえ 心美 ここみ 恋 こい 恭子 きょうこ レイ Rei 奸 Jian 大 Da 涩 Se 女 Nv 嫖 Piao 妓 Ji 射 She 骚 Sao 妻 Qi 丝 Si 露 Lu 姦 Jian 妇 fu 兰 LAN 蘭 LAN 花 HUA 川 CHUAN 子 ZI 春 CHUN 赌 DU 爱 AI
 /;
 
 my %DICT = qw/
-	成人		成Ren
-	榊なち		榊ナチ
-	品色堂		品Se堂
-	六月天		6月天
-	板垣あずさ	板垣アズサ
-	宮間葵		宮間あおい
-	女教师		女老师
-	一夜情		一Ye情
-	上门服务	上Meng服务
-	熟女		熟Nv
-	辻さき		辻サキ
-	夫妻交换	夫Qi交换
-	换妻	换Qi
-	苏小美		苏小Mei
-	波波妹		波波Mei
-	丁字裤		Ding字裤
-	beautyleg	BE
-	潮吹		潮Chui
-	淫汁		Yin汁
-	黑木麻衣	黑MU麻衣
-	肉棒		Rou棒
-	城市風情	ＣＳＦＱ
-	親親社區	ＱＱＳＱ
-	香港廣場	ＸＧＧＣ
-	情\s+色\s+六\s+月\s+天	QS6YT
-	有码	有马
-	无码 无马
-	有碼	有马
-	無碼  无马
-	爆操	操
-	大奶	丰满
-	麻生希	麻生XI
-	裸聊	裸Liao
-	性交	交媾
-	肉蒲团	肉浦团
-	偷拍	偷Pai
-	痴汉	痴Han
-	本色	Ben色
-	艳照	艳zhao
-	摸奶	Mo奶
-	持月真由	持月zhen由
-	石川鈴華	石川ling華
-	淫妇	Yin妇
-	东京热	TokyoHot
-	俱乐部	Club
-	北島玲  北V島V玲
-	北島玲  北·島·玲
-	一本道	1pondo
-	石黒京香 石·黒·京·香 
-	人妻	Ren妻  
-	小出遥 小·出·遥
-	鸡巴	JB	
-	释欲	释Yu
-	聊天室	聊天
-	永久网址 网址
-	裸_聊	裸Liao
-	淫穴	Yin穴
-	激情	Ji情
-	永久域名 域名
-	金瓶梅 金Ping梅  
-	做爱	打洞
-	做愛	打洞	
-	口Jiao	吹喇叭
-	口交	吹喇叭
-	乳交	插奶
-	招妓	叫鸡
-	你懂的	懂的
-	心有花	心_有_花
-	yumi-kazama	Yumi_Kazama
-	Yumi\s+Kazama	Yumi_Kazama
-	波多野结衣	波多YE结衣
-	三级片	三级
-	体宴	Ti宴
-	jiqing	激
-	三級片	三级
-	色情电影	SQ电影
-	玉蒲团	玉PU团
-	3xplanet	３ＸＰＬＡＮＥＴ
-	sprd	ＳＰＲＤ
-	群魔色舞	ＱＭＳＷ
-	字幕组	字幕
-	无修正	UNCENSORED
-	素人	素REN
-	射精	射
-	論壇	LUN壇
-	论坛	LUN坛
-	讨论区	讨LUN区
-	風間ゆみ	風間YUMI
-	麻生早苗	麻生ZAO苗
-	春日由衣	春日由YI
-	上原結衣	上原結YI
-	綾乃梓	綾NAI梓
-	花和尚北美	花HE尚北美
-	情色	Qing色
-	情趣	Qing趣
-	吉沢明歩	吉沢Ming歩
-	北川杏樹	北川杏KI
-	小川あさ美	小川ASA美
-	長谷川みく	長谷川MIKU
-	白鳥ゆな	白鳥UNA
-	宇都宮しをん	宇都宮SION
-	冬月かえで	冬月KAEDE
-	青木花恋	青木HANAKOI
-	合集	合辑
-	北条麻妃	北TIAO麻KI
-	大桥未久	大桥Miku
-	早川濑里奈	早川濑RINA
-	原紗央莉	原紗央LI
-	翻墙	FANGQIAN
-	步兵	无马
-	骑兵	有马
-	西洋兵 欧片
-	乃亜	NAI亜
-	乃亚	NAI亚
-	遥惠	YAO惠
-	穗花	穗HUA
-	第一会所	ＳＩＳ００１
-	若妻	妻子
-	carib	ＣＡＲＩＢ
-	解禁	禁忌解开
-	羽月希	羽YUE希
-	登录器	录器登
-	永久地址 久永址地
-	\.Xvid\. .
-	防屏蔽	蔽屏防
-	Boob	B00b
-	NHDTA  NHDta
-	痴漢俱樂部	痴Han俱樂部
-	限制级	18+
-	大乳	Big奶
-	蜜桃成熟时	蜜TAO成SHOU时
-	色欲	色之欲望
-	生殖器官  下体
-	生殖器  下体
-	淫母 淫の母
+成人 成Ren 榊なち 榊ナチ 品色堂 品Se堂 六月天 6月天 女教师 女老师 一夜情 一Ye情 上门服务 上Meng服务 熟女 熟Nv 辻さき 辻サキ 夫妻交换 夫Qi交换 换妻 换Qi 苏小美 苏小Mei 波波妹 波波Mei 丁字裤 Ding字裤 beautyleg BE 潮吹 潮Chui 淫汁 Yin汁 黑木麻衣 黑MU麻衣 肉棒 Rou棒 城市風情 ＣＳＦＱ 親親社區 ＱＱＳＱ 香港廣場 ＸＧＧＣ 情\s+色\s+六\s+月\s+天 QS6YT 有码 有马 无码 无马 有碼 有马 無碼 无马 爆操 操 大奶 丰满 麻生希 麻生XI 裸聊 裸Liao 性交 交媾 肉蒲团 肉浦团 偷拍 偷Pai 痴汉 痴Han 本色 Ben色 艳照 艳zhao 摸奶 Mo奶 持月真由 持月zhen由 石川鈴華 石川ling華 淫妇 Yin妇 东京热 TokyoHot 俱乐部 Club 北島玲 北V島V玲 北島玲 北·島·玲 一本道 1pondo 石黒京香 石·黒·京·香 人妻 Ren妻 小出遥 小·出·遥 鸡巴 JB 释欲 释Yu 聊天室 聊天 永久网址 网址 裸_聊 裸Liao 淫穴 Yin穴 激情 Ji情 永久域名 域名 金瓶梅 金Ping梅 做爱 打洞 做愛 打洞 口Jiao 吹喇叭 口交 吹喇叭 乳交 插奶 招妓 叫鸡 你懂的 懂的 心有花 心_有_花 yumi-kazama Yumi_Kazama Yumi\s+Kazama Yumi_Kazama 波多野结衣 波多YE结衣 三级片 三级 体宴 Ti宴 jiqing 激 三級片 三级 色情电影 SQ电影 玉蒲团 玉PU团 3xplanet ３ＸＰＬＡＮＥＴ sprd ＳＰＲＤ 群魔色舞 ＱＭＳＷ 字幕组 字幕 无修正 UNCENSORED 素人 素REN 射精 精射 論壇 LUN壇 论坛 LUN坛 讨论区 讨LUN区 風間ゆみ 風間YUMI 麻生早苗 麻生ZAO苗 春日由衣 春日由YI 上原結衣 上原結YI 綾乃梓 綾NAI梓 花和尚北美 花HE尚北美 情色 Qing色 情趣 Qing趣 吉沢明歩 吉沢Ming歩 北川杏樹 北川杏KI 小川あさ美 小川ASA美 長谷川みく 長谷川MIKU 白鳥ゆな 白鳥UNA 宇都宮しをん 宇都宮SION 冬月かえで 冬月KAEDE 青木花恋 青木HANAKOI 合集 合辑 北条麻妃 北TIAO麻KI 大桥未久 大桥Miku 早川濑里奈 早川濑RINA 翻墙 FANGQIAN 步兵 无马 骑兵 有马 西洋兵 欧片 乃亜 NAI亜 乃亚 NAI亚 遥惠 YAO惠 穗花 穗HUA 第一会所 ＳＩＳ００１ 若妻 妻子 carib ＣＡＲＩＢ 解禁 禁忌解开 羽月希 羽YUE希 登录器 录器登 永久地址 久永址地 \.Xvid\. . 防屏蔽 蔽屏防 Boob B00b NHDTA NHDta 痴漢俱樂部 痴Han俱樂部 限制级 18+ 大乳 Big奶 蜜桃成熟时 蜜TAO成SHOU时 色欲 色之欲望 生殖器官 下体 生殖器 下体 淫母 淫の母 肉蒲團 肉PU團 豔女 豔Nv H漫 漫H 無双帝國 WSDG 维多利亚娱乐 WDLYWL 九九帝国 99dg 威強男人網 WQNRW MMHOUSE MMH 美眉公寓 MMGY  地球人討論區 DQRTLQ 黑暗圣殿 HASD 無限討論區 WXTLQ 找福利资源社区 ZFLZYSQ KK俱樂部 KKJLB KK視訊俱樂部 KKSXJLB KK俱樂部視訊 KKJLBXS KK視訊 KKSX 艾噹洛學院 ADLXY 帝國無双 DGWS 祼聊 LUO聊 吉祥坊 JXF 我爱看片 WAKP 手机AV影城 SJAVYC 澳门首家线上 AMSJXS 黑暗聖殿 HASD AV资源站 AVCYZ G奶堂 GND 淘精网 TJW 下載A片 XZAP 超級威猛網 CJWMW  水舞间 水WU间 魯管必備 LGBB 魔王之家 MWZJ 魔王在線 MWZX AV影片 AVYP 魔王の家 MWNJ 炮友 PAOYOU 指挥妹子 指挥MEI子 露波 LU波 露B LUB 美女荷官 美N荷G 自拍被干 自P被G 
 /;
 
 
 my @AVSTARS  = qw/
- 苍井空 麻美花 小川さ亚纱美 吉泽明步 伊泽千夏 美优千奈 片濑亚纪 遥井奈 西條麗 池田純子 結衣美沙 朹京音光 西条丽 進藤美雪 立花瞳 翔田千里 水澤まお 姬野爱 北原多香子 秋月杏奈 神谷姬 妃乃ひかり 浅野唯 大桥未久 早川濑里奈 原紗央莉 藤浦めぐ 希志あいの 早乙女ルイ 伊东遥 卯月麻衣 亜希菜 麻美ゆま 佳山三花 星乃優 里美ゆりあ 小田有紗 夏目奈奈 小西那奈 早乙女ルイ 白石さゆり 水城奈绪 川上ゆう 宮間葵 板垣あずさ 相沢恋 辻さき 成瀬心美 高城沙英 香坂百合 村上里沙 大塚咲 妃悠爱 妃悠愛 真田春香 青空小夏 橘美穂 星優乃 河本愛 黒沢愛 榊なち 高島恭子 麻生希 堀口奈津美 立花里子 梓ユイ 西野翔 北川瞳 菅野亞梨沙 小泉彩 田中梨子 花野真衣 大浦安娜 泽井芽衣 友田真希 中野千夏 西崎里央 三上翔子 伊原詩織 七瀬美香 大石真理子 西野エリカ 原小雪 鮎川なお 篠原リョウ 水嶋友穂 瀬織さら 冬月枫 星野あかり 並木優 藤川結子 青山葵 加藤リナ 篠原杏 椿ゆい 源みいな 西条麗 吉崎直绪 香山圣 西野セイナ 小坂めぐる 片瀬まこ 大橋未久 つぼみ 水城奈緒 月野りさ 愛菜りな 真白希実 紅音ほたる 菅野亜梨沙 唯川纯 菅野亚梨沙 水元ゆうな 小泽マリア 辻さき 水玉レモン 大沢佑香 星优乃 小泽玛丽亚 麻美由真 青木凛 爱田由 紅音ほたる 相川瞬 北川繪美 瀧澤優奈 あいだゆあ みひろ 松島かえで 涼果りん 小澤マリア 初音みのり 夏川亜咲 月見栞 桜ここみ 桐原エリカ 南ともか 藤本リーナ 白瀬エリナ 西條るり 恩田ほのか 真咲南朋 楓モモ 安藤なつ妃 田嶋めぐみ 望月ちはや 千堂ゆりあ 雨音しおん 唯川純 水希遥 沢田麗奈 甲斐正明 宫泽ケイト 吉川萌 鏡桜子 风骚 淫荡 泉麻那 鏡麗子 今井優 真木今日子 草凪純 南波杏 梨々花 小峰由衣 
+ 苍井空 麻美花 小川さ亚纱美 吉泽明步 伊泽千夏 美优千奈 片濑亚纪 遥井奈 西條麗 池田純子 結衣美沙 朹京音光 西条丽 進藤美雪 立花瞳 翔田千里 水澤まお 姬野爱 北原多香子 秋月杏奈 神谷姬 妃乃ひかり 浅野唯 大桥未久 早川濑里奈 原纱央莉 原紗央莉 藤浦めぐ 希志あいの 早乙女ルイ 伊东遥 卯月麻衣 亜希菜 麻美ゆま 佳山三花 星乃優 里美ゆりあ 小田有紗 夏目奈奈 小西那奈 早乙女ルイ 白石さゆり 水城奈绪 川上ゆう 宮間葵 板垣あずさ 相沢恋 辻さき 成瀬心美 高城沙英 香坂百合 村上里沙 大塚咲 妃悠爱 妃悠愛 真田春香 青空小夏 橘美穂 星優乃 河本愛 黒沢愛 榊なち 高島恭子 麻生希 堀口奈津美 立花里子 梓ユイ 西野翔 北川瞳 菅野亞梨沙 小泉彩 田中梨子 花野真衣 大浦安娜 泽井芽衣 友田真希 中野千夏 西崎里央 三上翔子 伊原詩織 七瀬美香 大石真理子 西野エリカ 原小雪 鮎川なお 篠原リョウ 水嶋友穂 瀬織さら 冬月枫 星野あかり 並木優 藤川結子 青山葵 加藤リナ 篠原杏 椿ゆい 源みいな 西条麗 吉崎直绪 香山圣 西野セイナ 小坂めぐる 片瀬まこ 大橋未久 つぼみ 水城奈緒 月野りさ 愛菜りな 真白希実 紅音ほたる 菅野亜梨沙 唯川纯 菅野亚梨沙 水元ゆうな 小泽マリア 辻さき 水玉レモン 大沢佑香 星优乃 小泽玛丽亚 麻美由真 青木凛 爱田由 紅音ほたる 相川瞬 北川繪美 瀧澤優奈 あいだゆあ みひろ 松島かえで 涼果りん 小澤マリア 初音みのり 夏川亜咲 月見栞 桜ここみ 桐原エリカ 南ともか 藤本リーナ 白瀬エリナ 西條るり 恩田ほのか 真咲南朋 楓モモ 安藤なつ妃 田嶋めぐみ 望月ちはや 千堂ゆりあ 雨音しおん 唯川純 水希遥 沢田麗奈 甲斐正明 宫泽ケイト 吉川萌 鏡桜子 风骚 淫荡 泉麻那 鏡麗子 今井優 真木今日子 草凪純 南波杏 梨々花 小峰由衣 早坂麻衣 久保希 柚里奈 雨宮琴音 黖木麻衣 早川瀬里奈 鈴木杏里 青木玲 千野さくら 吹石絵梨子 宮間葵  
 /;
 
 my @indoubt = qw{
- 
 };
 
-=safe
-	六月联盟	瀬咲るな	飯島夏希 爱唯侦查	宣传文本　美妇　东方后宫
-	77自由爱　赤裸宮殿　烽火连城　奇幻之国　无双国土　新巴黎中文社区
-	新天下华人娱乐	欲望天涯	開放註冊 淫亂	开放注册
-	友情天地　小小淫	香艳三级 深田梨菜 	あずみ恋 	希咲あや 	爱城
-	 騙姦 愛川香織
-	 広田さくら   羽田夕夏
-	石川優季奈 浅井舞香 澤田なつみ 滝沢優奈  長澤リオン 白石ひより   椎名りく
-	貞操 
-=cut
-
 my @TONOTHING = (
-	'ai搭伴电影【www\.aidaban\.net】',
-	'\[BT狗 www\.btdog\.com\]',
-	'【最新电影下载，尽在2kandy\.com】',
-	'【BT天堂】','【BtBt.info】',
-	'梦幻天堂・龙网\(LWgod\.com\)',
-	'^\.?720p\.',
+	'ai搭伴电影【www\.aidaban\.net】',	'\[BT狗 www\.btdog\.com\]',	'【最新电影下载，尽在2kandy\.com】',	'【BT天堂】','【BtBt.info】',	'梦幻天堂・龙网\(LWgod\.com\)',	'^\.?720p\.', '灣搭拉咩拉','金沙城中心赌场','金沙城中心','性感荷官发牌','台湾色B免费视讯','真愛旅舍', 'vip474', '奇摩女孩','YY2048','澳门丽景湾赌场','408VIP','Y23U','澳门神话大赌场','玩棋牌美女全程陪玩','F6559.COM','m6688.net','AV 天空','HD1080.org','FDZone-Forum','Plus28 討論區','夢幻圖碼','梦幻图码','台湾辣妹聊天','XC25.COM','挑选火爆妹妹','ime688.net','tohav.com','22366.com','在线真人真钱','线上博彩','线上娱乐','免費播放','AV快感','AV Day','电影直播','免费在线观看','电影下载','mmbo.me','mo888.net','dio66.net','javcc.net','注册成为会员','同城交友','KKM56.COM','嫑嫑聯盟','99爱唯工厂','99AVGC.com','寻找同城','澳门巴黎人','439123.com','澳门皇冠赌场','vip848','澳门金沙城','3686.com','环球国际','80866.com','sav888.net','ty997.com','F6559.COM','线上赌场','t66y.com','Free Adult Movie','X8B9.COM','AVDVD','AY456.COM','WE74.COM','YYAA2.COM',
 );
 
 my @dirty = (
-	'SUN16',
-	'Mofuku Tsuma',
-	'Sky Angel',
-	'MAS-',
-	'ARM-',
-	'SKY-',
-	'CRPD',
-	'GAR-',
-	'Erotic',
-	'HBAD-',
-	'Kamikaze Premium',
-	'九 九 情 色 论 坛',
+	'SUN16',	'Mofuku Tsuma',	'Sky Angel',	'MAS-',	'ARM-',	'SKY-',	'CRPD',	'GAR-',	'Erotic',	'HBAD-',	'Kamikaze Premium',	'九 九 情 色 论 坛',
 );
 push @dirty,(qw{
-    Agemix
-    爱唯侦查
-    赌博
-	Amateur
-	性愛
-	pornolab.net
-	porn
-	色界
-	丽春苑
-	巨乳
-	淫色
-	1pondo
-	Uncensored
-	乱交
-	潮吹
-	手淫
-	輪姦
-	轮奸
-	被奸
-	翻墙
-	性伴侣
-	露出
-	性器
-	黑丝
-	touch99
-	-AV
-	jav
-	akb99
-	vip视频
-	BTOP
-	MimiP2P
-	hentai
-	18禁
-	RARBG.com
-	rarbg.to
-	色情电影
-	玉蒲团
-	颜射
-	骚妻
-	嫖妓
-	女主播
-	18p2p
-	你懂的 
-	招妓
-	乳交
-	大尺度
-	涩工厂
-	橘なお
-	迷奸
-	裸聊
-	视频聊天
-	大奶
-	爆操
-	南レイ
-	情色论坛
-	潮吹
-	丁字裤
-	苏小美
-	波波妹
-	夫妻交换
-	换妻
-	上门服务
-	99bt
-	JPAVGOD
-	色狼
-	selang
-	女教师
-	熟女
-	援交
-	六月天
-	品色堂
-	肉欲
-	性交
-	性爱
-	肛交
-	美屄
-	美乳
-	草榴
-	fuck
-	sexinsex
-	sex
-	一夜情
-	色中色
-	成人
-	都市奇爱网
-	狼友
-	爱唯侦察
-	dioguitar
-	D.C.資訊交流網
-	女优
-	sis001
-	淫乱
-	乱交
-	乱~交
-	乱x交
-	性吧
-	娱乐城
-	有码
-	无码
-	少妇	
-	Cover
-	荡妇	  
-	内射	  
-    武藤兰
-	朝河蘭
-	骚妇
-	東方花園
-	
+Agemix 爱唯侦查 赌博 Amateur 性愛 pornolab.net porn 色界 丽春苑 巨乳 淫色 1pondo Uncensored 乱交 潮吹 手淫 輪姦 轮奸 被奸 翻墙 性伴侣 露出 性器 黑丝 touch99 -AV jav akb99 vip视频 BTOP MimiP2P hentai 18禁 RARBG.com rarbg.to 色情电影 玉蒲团 颜射 骚妻 嫖妓 女主播 18p2p 你懂的 招妓 乳交 大尺度 涩工厂 橘なお 迷奸 裸聊 视频聊天 大奶 爆操 南レイ 情色论坛 潮吹 丁字裤 苏小美 波波妹 夫妻交换 换妻 上门服务 99bt JPAVGOD 色狼 selang 女教师 熟女 援交 六月天 品色堂 肉欲 性交 性爱 肛交 美屄 美乳 草榴 fuck sexinsex sex 一夜情 色中色 成人 都市奇爱网 狼友 爱唯侦察 dioguitar D.C.資訊交流網 女优 sis001 淫乱 乱交 乱~交 乱x交 性吧 娱乐城 有码 无码 少妇 Cover 荡妇 内射 武藤兰 朝河蘭 骚妇 東方花園 淫娃 18BT动力工厂 1024核工厂 6china.info 9453社區 Chenvip905 996t工厂 waikeung.org FastZone.ORG zhaofuli KK69 P2P101 vip709  905zy kk.51688 xvdada 爱城地址 淫民 sav88 m6688 FB559 ime688 tohav 愛液 性奴隷 
 });
 
 
 
 =safekey
-	失禁
-	れのん
-	小姐威客
-	色网
-	骑兵
-	凌辱
-	澳门
-	真人
-	同城
-	BK373
-	红音
-	连裤
-	芸能人
-	美人秘書
-	初裸
-	捜査官
-	熟オナニー
-	ザーメン
-	Nadeshiko
-	Max-A
-	MUTEKI
-	Moodyz
-	大桥Miku
-	希志
-	Sasuke\s+Premium
-	隐退作
-	死夜恶
-	zoink.it
-	恥辱
-	妻
-	感謝祭
-	滚滚红尘
-	發情
-	性开放
-	禁断
-	荡妇
-	第一会所
-	(XXX-AV)(20989)超美爆乳！極上悩殺エロボディー連続ファック 星野あかり.wmv
-	SYK-187 Beauty Venus - Risa Murakami, Yuri Kousaka, Akari Hoshino, Ai Kurosawa, Yui Komiya  星野あかり, 黖沢愛, 小宮ゆい
-	お義姉さん
-	静候轮回@www.5exin5ex.net@接吻和同性間亂交 黒木麻衣 星野あかり!!BWB-002
-	性吧
-	http://www.18p2p.com
-	痴女
-	誘惑
-	義姉凌辱調教 
-	 淫亂
-	 青姦
-	 輪姦
-	 巨乳ギャル痴漢バス
-	 人妻
-	 淫
-	 有码
-	 強X
-	義姉
-	仁科百華
-	雨宮琴音
-	黒木麻衣
-	原千尋
-	春咲あずみ
-	ましろ杏
-	鈴音りおな
-	三浦芽依
-	水城奈緒
-		勃起
-		風間ゆみ
-		長澤リカ 真中かおり
-		川上ゆう 雪野ひかる
-		三浦亜沙妃
-		村上涼子 
-			かすみ果穂
-	鮎川なお
-	鷹宮りょう
-	森ななこ
-	松すみれ
-	花井メイサ  加藤ツバキ  星アンジェ 諸星セイラ	
-	大沢佑香
-		北條麻妃
-			波多野結衣
-			中出
-	情色
-	長澤あずさ
-	性
-	 官能
-	 Hard\s*Core
-	 脅迫
-	 调教
-	 伊甸园
-米其林
- 桐原あずさ 藤崎ひなた 楓乃々花 多岐川一葉
-  顔射  姦淫
-  近親 相姦 美尻 
-  しすぎる三姉妹暴行 近親相姦レイプ 妃乃ひかり 柳田やよい
-  愛唯偵察
-  精液
-赌博 
-MM公寓
-黒沢爱
- 爱城
-  千野さくら 吹石絵梨子
-  坂本愛海
-  澄川ロア
-
- 情色美眉娱乐
- 彩季レナ
- 美脚
-敏感
-诱惑
-誘惑
-18P2P
-父親愛人
-悪魔
-誘脚
-超絶
-美女
-巨乳
- 少妇\s+论坛
- Porn 
- 情色伊甸园
- 性欲
- 柏拉圖秘密花園
- adult
- 露出  HOTAVXXX
- 华人城论坛
- Sasuke Jam Vol 4 超極上淫亂美女大暴走 星野あかり Akari Hoshino
- 淫語
-上原亜衣
-大槻ひびき
-飯田せいこ
-爱城
-JAV xxx169 ac168
-	套图
-	套圖
-	weipai
-	微拍
-	
-	小美
-	黑丝
-	丝袜
-	
-	内衣
-	原味
-	情趣
-	洗澡
-	激情
-自摸
-自慰
-	叫床
-	近親相姦 
-美尻
-有沢実紗
-凌辱 今野梨乃
- 小坂めぐる
- 
-痴漢
-花野真衣  官能
-星野桃  野中あんり
-教師 痴女 
-早乙女ルイ  催眠快獄
-真性中出  桃太郎映像
-誘惑
-星野光
-騎乢位
-zoink
-18p2p
-痙攣  新藥 地獄
-中出 交尾
- Slut
-	伊莉
-	eyny.com
-	桜木凜
-		18p2p
-	三匹狼論壇
-	城市風情
-	親親社區
-	香港廣場
-	MimiP2P
-	P.R俱樂部
-	救國P2P
-	hotavxxx
-	touch99
-	avxxx
-	ＭＭ公寓
-ＡＶ影片
-FDZone-Forum
-公仔箱論壇
-HD1080.org
-eXBii
-無碼
-av9898vod
-香港討論區
-discuss.com.hk
-痴漢俱樂部
- 色女
-  川上ゆう私拍
-   加藤なお
-    東方小鎮
- dfxz.org
- 	性交
-	色中色
-	XIAAV
-	sex8
-	私拍
-	肉丝
-	义母
-	风流
-	情人
-	合体门
-	秋千门
-	公仔箱
-	色域色吧
-	色一色吧
-	情色帝国
-	女優
-	最新加勒比
-	流出
-	巨乳
-	处女
-	开房
-	北美
-	AV女
-	××论坛
-	紫色
-	卡提諾論壇
-	威強男人網
-	捷克論壇
-	色女
-	脫衣
-	NetMe.cc
-	地球人討論區
-	av9898vod
-	台灣討論區
-	炼狱岛
-	1000人斬り
-	www.lyd5.info
-	www.lyd7.info
-	套图
-	夢工廠
-	发情
-	高潮
-	性感
-	大波
-	黑社会
-	爆乳痴女
-	青山菜々
-	大島あいる
-	上原カエラ
-	天上人间
-	BT工厂
-	国产自拍
-	上門服務
-	神器
-	台灣
-	香蕉魔盒
-	破处
-	内内
-	外射
-	后入
-	hav520.com
-mowa66.com
-www.cao1024.com
- www.ch5.cc
- 夢幻圖碼
- 梦幻图码
- 找樂子論壇
- 無限討論區
- WK綜合論壇
- Plus28
- 公仔箱論壇
- FDZone-Forum
-HD1080.org
-百乐汇娱乐城
-魔王
-魔王在線
-魔王之家
-Porn
-炮友
-痴漢
-赌博
-	乃亜
-	小阪めぐる
-	情色黄金屋
-	新亲密爱人
-		黑暗圣殿
-	ourmonk
-	救国P2P
-	公仔箱
-		
-	city9x.com
-	资讯交流网
-		灌肠
-	丝袜
-	屁股
-	virgin
-	nude
-	av名人
-	c1523.uk
-	草榴社区
-	草Liu社区
-	麻薬
-	姐妹花
-	淫荡
-	自慰
+	南の島 羽田あい 相内しおり 椎名みくる 
+	失禁 れのん 小姐威客 色网 骑兵 凌辱 澳门 真人 同城 BK373 红音 连裤 芸能人 美人秘書 初裸 捜査官 熟オナニー ザーメン Nadeshiko Max-A MUTEKI Moodyz 大桥Miku 希志 Sasuke\s+Premium 隐退作 死夜恶 zoink.it 恥辱 妻 感謝祭 滚滚红尘 發情 性开放 禁断 荡妇 第一会所 (XXX-AV)(20989)超美爆乳！極上悩殺エロボディー連続ファック 星野あかり.wmv SYK-187 Beauty Venus - Risa Murakami, Yuri Kousaka, Akari Hoshino, Ai Kurosawa, Yui Komiya 星野あかり, 黖沢愛, 小宮ゆい お義姉さん 静候轮回@www.5exin5ex.net@接吻和同性間亂交 黒木麻衣 星野あかり!!BWB-002 性吧 http://www.18p2p.com 痴女 誘惑 義姉凌辱調教 淫亂 青姦 輪姦 巨乳ギャル痴漢バス 人妻 淫 有码 強X 義姉 仁科百華 雨宮琴音 黒木麻衣 原千尋 春咲あずみ ましろ杏 鈴音りおな 三浦芽依 水城奈緒 勃起 風間ゆみ 長澤リカ 真中かおり 川上ゆう 雪野ひかる 三浦亜沙妃 村上涼子 かすみ果穂 鮎川なお 鷹宮りょう 森ななこ 松すみれ 花井メイサ 加藤ツバキ 星アンジェ 諸星セイラ 大沢佑香 北條麻妃 波多野結衣 中出 情色 長澤あずさ 性 官能 Hard\s*Core 脅迫 调教 伊甸园 米其林 桐原あずさ 藤崎ひなた 楓乃々花 多岐川一葉 顔射 姦淫 近親 相姦 美尻 しすぎる三姉妹暴行 近親相姦レイプ 妃乃ひかり 柳田やよい 愛唯偵察 精液 赌博 MM公寓 黒沢爱 爱城 千野さくら 吹石絵梨子 坂本愛海 澄川ロア 情色美眉娱乐 彩季レナ 美脚 敏感 诱惑 誘惑 18P2P 父親愛人 悪魔 誘脚 超絶 美女 巨乳 少妇\s+论坛 Porn 情色伊甸园 性欲 柏拉圖秘密花園 adult 露出 HOTAVXXX 华人城论坛 Sasuke Jam Vol 4 超極上淫亂美女大暴走 星野あかり Akari Hoshino 淫語 上原亜衣 大槻ひびき 飯田せいこ 爱城 JAV xxx169 ac168 套图 套圖 weipai 微拍 小美 黑丝 丝袜 内衣 原味 情趣 洗澡 激情 自摸 自慰 叫床 近親相姦 美尻 有沢実紗 凌辱 今野梨乃 小坂めぐる 痴漢 花野真衣 官能 星野桃 野中あんり 教師 痴女 早乙女ルイ 催眠快獄 真性中出 桃太郎映像 誘惑 星野光 騎乢位 zoink 18p2p 痙攣 新藥 地獄 中出 交尾 Slut 伊莉 eyny.com 桜木凜 18p2p 三匹狼論壇 城市風情 親親社區 香港廣場 MimiP2P P.R俱樂部 救國P2P hotavxxx touch99 avxxx ＭＭ公寓 ＡＶ影片 FDZone-Forum 公仔箱論壇 HD1080.org eXBii 無碼 av9898vod 香港討論區 discuss.com.hk 痴漢俱樂部 色女 川上ゆう私拍 加藤なお 東方小鎮 dfxz.org 性交 色中色 XIAAV sex8 私拍 肉丝 义母 风流 情人 合体门 秋千门 公仔箱 色域色吧 色一色吧 情色帝国 女優 最新加勒比 流出 巨乳 处女 开房 北美 AV女 ××论坛 紫色 卡提諾論壇 威強男人網 捷克論壇 色女 脫衣 NetMe.cc 地球人討論區 av9898vod 台灣討論區 炼狱岛 1000人斬り www.lyd5.info www.lyd7.info 套图 夢工廠 发情 高潮 性感 大波 黑社会 爆乳痴女 青山菜々 大島あいる 上原カエラ 天上人间 BT工厂 国产自拍 上門服務 神器 台灣 香蕉魔盒 破处 内内 外射 后入 hav520.com mowa66.com www.cao1024.com www.ch5.cc 夢幻圖碼 梦幻图码 找樂子論壇 無限討論區 WK綜合論壇 Plus28 公仔箱論壇 FDZone-Forum HD1080.org 百乐汇娱乐城 魔王 魔王在線 魔王之家 Porn 炮友 痴漢 赌博 乃亜 小阪めぐる 情色黄金屋 新亲密爱人 黑暗圣殿 ourmonk 救国P2P 公仔箱 city9x.com 资讯交流网 灌肠 丝袜 屁股 virgin nude av名人 c1523.uk 草榴社区 草Liu社区 麻薬 姐妹花 淫荡 自慰 六月联盟 瀬咲るな 飯島夏希 爱唯侦查 宣传文本 美妇 东方后宫 77自由爱 赤裸宮殿 烽火连城 奇幻之国 无双国土 新巴黎中文社区 新天下华人娱乐 欲望天涯 開放註冊 淫亂 开放注册 友情天地 小小淫 香艳三级 深田梨菜 あずみ恋 希咲あや 爱城 騙姦 愛川香織 広田さくら 羽田夕夏 石川優季奈 浅井舞香 澤田なつみ 滝沢優奈 長澤リオン 白石ひより 椎名りく 貞操 
 /;
 =cut
 =qustionable 
@@ -803,6 +173,17 @@ foreach(@keys) {
 	$ufilter{$ukey} = $utf8->encode($filter{$_});
 }
 
+my $LOGF;
+sub log_print {
+	my $fh = shift;
+	$fh = $LOGF unless(!$fh);
+	if($fh) {
+		print $fh @_;
+	}
+	print STDERR @_;
+	1;
+}
+
 
 sub clean_text {
 	my $text = shift;
@@ -821,13 +202,13 @@ sub clean_text {
 		$text =~ s/$_/$ufilter{$_}/gi;
 	}
 	$text = $text . $suf;
-	print STDERR "Processing $position";
+	log_print($LOGF,"Processing $position");
 	if($old eq $text) {	
-		print  "\t$text [NO change]\n";
+		log_print($LOGF,"\t$text [NO change]\n");
 		return $text,undef;
 	}
 	else {
-		print STDERR  "\n      $old\n    =>$text\n";
+		log_print($LOGF,"\n      $old\n    =>$text\n");
 		return $text,1;
 	}
 }
@@ -880,6 +261,7 @@ sub process {
 	my $filename = shift;
 	my $chunks = '';
 	
+	
 	print STDERR "PROCESS\n\t$filename\n";
 	
 	if($filename =~ m/\.MASKED.torrent$/) {
@@ -890,6 +272,11 @@ sub process {
 		print STDERR "Error opening $filename: $!\n";
 		return undef,'E_OPENING';
 	}
+	my $logfile = $filename;
+	$logfile =~ s/\.torrent$/.ct.txt/;
+	close $LOGF if($LOGF);
+	open $LOGF,">",$logfile if($OPTS{log});
+	
 	my $ok = undef;
 	my $chunk = undef;
 	my $bufsize = 1024;
@@ -898,13 +285,13 @@ sub process {
 	}
 	close FI;
 	if(!(defined $ok)) {
-		print STDERR ("Error reading $filename: $!\n");
+		log_print($LOGF,"Error reading $filename: $!\n");
 		return undef,'E_READING';
 	}
 	my $torrent;
 	eval '$torrent = bdecode($chunks);';
 	if(!$torrent) {
-		print STDERR "Decode failed, maybe invalid torrent file: $filename\n";
+		log_print($LOGF,"Encode failed, maybe invalid torrent file: $filename\n");
 		return undef,'E_DATA';
 	}
 	#print STDERR to_string($torrent,"torrent",0,"  ","piece");
@@ -924,19 +311,19 @@ sub process {
 				$torrent->{info}->{$_} = $OPTS{name};
 			}
 			$dirty = 1;
-			print STDERR "Set torrent->{info}->{name} = $torrent->{info}->{name}\n";
+			log_print($LOGF,"Set torrent->{info}->{name} = $torrent->{info}->{name}\n");
 		}
 		elsif($OPTS{filename}) {
 			foreach(qw/name name.utf-8/) {
 				$torrent->{info}->{$_} = $name;
 			}
 			$dirty = 1;
-			print STDERR "Set torrent->{info}->{name} = $torrent->{info}->{name}\n";
+			log_print($LOGF,"Set torrent->{info}->{name} = $torrent->{info}->{name}\n");
 		}
-		foreach my $key("private","comment","publisher","created by") {
+		foreach my $key("private.utf-8","private","comment.utf-8","comment","publisher.utf-8","publisher","created by.utf-8","created by","publisher-url.utf-9","publisher-url") {
 			foreach($torrent,$torrent->{info}) {
 				if(defined $_->{$key}) {
-					print STDERR "Delete {" . $key . "} = " . $_->{$key} . "\n";
+					log_print($LOGF,"Delete {" . $key . "} = " . $_->{$key} . "\n");
 					$_->{$key} = undef;
 					delete $_->{$key};
 					$dirty = 1;
@@ -947,7 +334,7 @@ sub process {
 			my $v = $torrent->{info}->{$key};
 			if(defined $v) {
 				if($v !~ /^[a-zA-Z0-9]+$/) {
-					print STDERR "Delete torrent->{info}->{" . $key . "} = " . $torrent->{info}->{$key} . "\n";
+					log_print($LOGF,"Delete torrent->{info}->{" . $key . "} = " . $torrent->{info}->{$key} . "\n");
 					delete $torrent->{info}->{$key};
 					$dirty = 1;
 				}
@@ -975,7 +362,7 @@ sub process {
 			$output =~ s/^.*[\/\\]+//;
 			$output =~ s/\.([^\.]+)$/.MASKED.$1/;
 		}
-		print STDERR "Writting $output ...\n";
+		log_print($LOGF,"Writting $output ...\n");
 		if($torrent->{info}->{"name.utf-8"}) {
 			$torrent->{encoding}="UTF-8";
 		}
@@ -985,16 +372,17 @@ sub process {
 			return 1,$output;
 		}
 		else {
-			print STDERR ("Error opening $output for writting:$!\n");
+			log_print($LOGF,"Error opening $output for writting:$!\n");
 			return undef,'E_OUTPUT';
 		}
 	}
 	else {
-		print STDERR "No changes made to $filename\n";
+		log_print($LOGF,"No changes made to $filename\n");
 		return undef,'E_NOCHANGE';
 	}
 	#print STDERR to_string($torrent,"torrent",0,"  ","piece");
 	#die(Data::Dumper->Dump([$torrent->{info}->{files}],['torrent->files']),"\n");
+	close $LOGF if($LOGF);
 }
 
 my $exit = 0;

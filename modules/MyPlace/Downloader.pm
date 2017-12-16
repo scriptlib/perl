@@ -71,7 +71,7 @@ sub extname {
 }
 
 sub normalize {
-	my $_ = $_[0];
+	local $_ = $_[0];
 	if($_) {
 		s/[\?\*:\\\/]/ /g;
 	}
@@ -199,7 +199,7 @@ sub save_bdhd {
 	$link = lc($link);
 	if(!$filename) {
 		foreach my $p (qw/bdhd ed2k/) {
-			my $_ = $EXPS{$p};
+			local $_ = $EXPS{$p};
 			if($link =~ m/$_/) {
 				$filename = "$2.$p";
 				$filename = normalize($filename);
@@ -210,7 +210,7 @@ sub save_bdhd {
 	else {
 		$filename = normalize($filename);
 		foreach my $p (qw/bdhd ed2k/) {
-			my $_ = $EXPS{$p};
+			local $_ = $EXPS{$p};
 			if($link =~ m/$_/) {
 				$link = $1 . $filename . $3;
 				$filename = "$filename.$p";
@@ -256,7 +256,7 @@ sub save_qvod {
 	$link = lc($link);
 	if(!$filename) {
 		foreach my $p (qw/qvod bdhd ed2k http/) {
-			my $_ = $EXPS{$p};
+			local $_ = $EXPS{$p};
 			if($link =~ m/$_/) {
 				$filename = "$2.$p";
 				last;
@@ -267,7 +267,7 @@ sub save_qvod {
 	else {
 		$filename = normalize($filename);
 		foreach my $p (qw/qvod bdhd ed2k/) {
-			my $_ = $EXPS{$p};
+			local $_ = $EXPS{$p};
 			if($link =~ m/$_/) {
 				$link = "$1$filename$3";
 				$filename = "$filename.$p";

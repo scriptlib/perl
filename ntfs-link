@@ -102,7 +102,7 @@ sub usage {
 }
 
 sub get_basename {
-	my $_ = shift;
+	local $_ = shift;
 	s/[\/\\]+$//;
 	s/.*[\/\\]+//;
 	return $_;

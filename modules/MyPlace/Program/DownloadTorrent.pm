@@ -42,12 +42,13 @@ our @SITES = (
 	#http://torrage.com/torrent/:HASH:.torrent
 	#http://zoink.it/torrent/:HASH:.torrent
 	#http://www.mp4ba.com/down.php?date=1422367802&hash=:HASH:
+	#https://torrentproject.se/torrent/:HASH:.torrent
+	#http://torrage.biz/torrent/:HASH:.torrent
+	#https://torcache.net/torrent/:HASH:.torrent
+	#post://www.torrent.org.cn/download.php?hash=:HASH:
 	qw{
 		https://itorrents.org/torrent/:HASH:.torrent
-		https://torrentproject.se/torrent/:HASH:.torrent
-		http://torrage.biz/torrent/:HASH:.torrent
-		https://torcache.net/torrent/:HASH:.torrent
-		post://www.torrent.org.cn/download.php?hash=:HASH:
+		https://www.seedpeer.eu/torrent/:HASH:
 	}
 );
 #@SITES = ( 'post://www.torrent.org.cn/download.php?hash=:HASH:',);
@@ -148,7 +149,7 @@ sub check_type {
 }
 
 sub normalize {
-	my $_ = $_[0];
+	local $_ = $_[0];
 	if($_) {
 		$_ = js_unescape($_) if(m/%[^%]+/);#%[^%]+%[^%]+/);
 		s/_*[\?\*\/:\\+]_*/_/g;
@@ -160,7 +161,7 @@ sub normalize {
 
 my $MAX_PATH = 206;
 sub short_filename {
-	my $_ = shift;
+	local $_ = shift;
 	if($_) {
 		if(length($_) > $MAX_PATH) {
 			app_warning("Filename too long, cut it\n");

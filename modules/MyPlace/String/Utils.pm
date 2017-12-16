@@ -42,7 +42,7 @@ sub dequote_test {
 }
 
 sub dequote {
-	my $_ = shift;
+	local $_ = shift;
 	return unless($_);
 	print STDERR "TARGET: $_\n" if($DEBUG);
 	foreach my $q(@QUOTES) {

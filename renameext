@@ -27,7 +27,7 @@ my @OPTIONS= qw/
 	rule|r:s
 	dir|d:s
 	delete
-	mkdir|md
+	mkdir|makedir|make-dir|md
 /;
 GetOptions(\%OPTS,@OPTIONS);
 exit_usage(0,$0) if($OPTS{'help'});

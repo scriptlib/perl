@@ -31,7 +31,7 @@ sub process {
     print STDERR "Get remotes [",scalar(keys %remotes), "]:\n";
     print STDERR join("\n",map {"$_ = $remotes{$_}"} keys %remotes),"\n";
     foreach my $host (keys %remotes) {
-        my $_ = $remotes{$host};
+        local $_ = $remotes{$host};
         eval("s/$exp/g");
         if($_ eq $remotes{$host}) {
             print STDERR "[$host] doesn't change\n";

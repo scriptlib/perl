@@ -77,7 +77,7 @@ foreach my $dump_file (@ARGV) {
 		svnload($1,$2);
 	}
 	else {
-		my $_ = $dump_file;
+		local $_ = $dump_file;
 		$_ =~ s/^.+\///;
 		if(m/^(.+)_r\d+_[\d-]+.*$/) {
 			svnload($dump_file,$1);

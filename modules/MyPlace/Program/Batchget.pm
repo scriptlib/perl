@@ -308,7 +308,7 @@ sub execute {
 		if($self->{IAMKILLED}) {
 			last;
 		}
-		my $_ = shift @{$self->{tasks}};
+		local $_ = shift @{$self->{tasks}};
 		$index++;
 		my $msghd = $count > 1 ? "${prefix}\[$index/$count]" : "";
 		next unless($_);

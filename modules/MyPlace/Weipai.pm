@@ -796,7 +796,8 @@ sub get_profile {
 #		$id =~ s/^.*\///;
 #		$id =~ s/[\/\._].*$//;
 		my %pro;
-		foreach my $r (get_data('profile',$id),get_data('user',$id)) {
+		#foreach my $r (get_data('profile',$id),get_data('user',$id)) {
+		foreach my $r (get_data('profile',$id)) {
 			if($r->{socialList}) {
 				foreach my $k (@{$r->{socialList}}) {
 					$r->{$k->{socialName} . "_profile"} = $k->{socialUrl};

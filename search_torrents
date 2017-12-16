@@ -35,16 +35,20 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 
 my %ENGINES = (
 	#Mirror btkitty.org
+	'btdb'=>[
+		'https://btdb.to/q/###QUERY###/',
+		1,
+	],
 	'btkitty'=>[
-		'http://btkitty.pet/?###QUERY###',
+		'https://btkitty.pet/?###QUERY###',
 		3,
 	],
-	'btdigg.org'=>[
-		'https://btdigg.org/?###QUERY###',
-		2,
-	],
-	'#sobt5.com'=>[
-		'http://www.sobt5.com/q/###QUERY###',
+#	'btdigg.org'=>[
+#		'https://btdigg.org/?###QUERY###',
+#		2,
+#	],
+	'sobt5.com'=>[
+		'http://www.sobt8.com/q/###QUERY###',
 		1,
 	],
 	'torrentkitty'=>[
@@ -56,34 +60,38 @@ my %ENGINES = (
 	#	'http://www.torrentkittyzw.com/###QUERY###',
 	#	3,
 	#],
-	'#btdigg.ws'=>[
-		'https://btdigg.ws/?###QUERY###',
+	'btdigg.me'=>[
+		'https://btdigg.xyz/?###QUERY###',
 		3,
 	],
 #	'ganluzhe.com'=>[
 #		'http://www.ganluzhe.com/###QUERY###',
 #		2,
 #	],
-	'btbibi.com'=>[
-		'http://btbibi.com/###QUERY###',
-		3,
-	],
-	'torrentproject'=>[
-		'https://torrentproject.se/?safe=off&t=###QUERY###',
-		2,
-	],
+#	'btbibi.com'=>[
+#		'http://btbibi.com/###QUERY###',
+#		3,
+#	],
+#	'torrentproject'=>[
+#		'https://torrentproject.se/?safe=off&t=###QUERY###',
+#		2,
+#	],
 #	'mp4ba.com'=>[
 #		'http://www.mp4ba.com/search.php?keyword=###QUERY###',
 #		2,
 #	],
-	'kat.cr'=>[
+#	'kat.cr'=>[
 		#'https://kat.cr/?###QUERY###',
-		'http://kickasstorrentsan.com/?###QUERY###',
-		2,
-	],
+#		'http://kickasstorrentsan.com/?###QUERY###',
+#		2,
+#	],
 	'bitsnoop'=>[
 		'https://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
 		2,
+	],
+	'btbiti'=>[
+		'https://btbiti.com/search/###QUERY###.html',
+		1,
 	],
 );
 
@@ -100,16 +108,18 @@ my %ENGINES2  = (
 
 my %GROUPS = (
 	'NSFW'=>[qw/
+		btdb
 		torrentproject
 		torrentkitty
 		sobt5.com
 		btkitty
-		btdigg.ws
+		btdigg.me
 		btbibi.com
 		torrentkittyzw.com
 		breadsearch.com
 		ganluzhe.com
 		kat.cr
+		btbiti
 		/
 	],
 	'SAFE'=>[qw/

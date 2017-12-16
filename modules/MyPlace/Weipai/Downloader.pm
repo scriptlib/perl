@@ -41,7 +41,7 @@ sub init {
 }
 
 sub get_url_id {
-	my $_ = shift;
+	local $_ = shift;
 	my $ext = shift;
 	if(!$ext) {
 		$ext = $_;
@@ -121,10 +121,10 @@ sub _parse_suffix {
 			#.jpg .1.jpg .2.jpg .p.1.jpg .p.2.jpg/];
 		}
 		elsif($url =~ m/\.m3u8/) {
-			$r = [qw/.ts .flv .mov .mp4/];
+			$r = [qw/.ts.ts .ts .flv .mov .mp4/];
 		}
 		elsif($url =~ m/\/video\/[^\/]+$/) {
-			$r = [qw/.ts .flv .mov .mp4/];
+			$r = [qw/.ts.ts .ts .flv .mov .mp4/];
 		}
 		else {
 			$r = [qw/\/500k.ts/];
@@ -326,7 +326,7 @@ sub _preprocess {
 	$url = $nurl;
 	$suffix = _parse_suffix($url,$suffix);
 
-	my $noext = qr/(?:\/500k\.ts|\/500k\.mp4|\.mov\.l\.jpg|\.mov\.3in1\.jpg|\.jpg|\.\d\.jpg|\.mov|\.mp4|\.flv|\.f4v|\.ts\.png)$/o;
+	my $noext = qr/(?:\/500k\.ts|\/500k\.mp4|\.mov\.l\.jpg|\.mov\.3in1\.jpg|\.jpg|\.\d\.jpg|\.mov|\.mp4|\.flv|\.f4v|\.ts\.ts|\.ts|\.png)$/o;
 
 	$url =~ s/$noext//;
 	$url =~ s/\/thumbnail\/.*\/video\//\/video\//;

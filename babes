@@ -657,7 +657,7 @@ sub move_to {
 	else {
 		$dstd = '#SAME DIRECTORY#';
 	}
-
+	
 	if($OPTS->{clips} or $OPTS->{into}) {
 		print STDERR "  Move files into <$dstd>:\n";
 		print STDERR "\tNothing to do,  files not found\n" unless(%clips);
@@ -689,12 +689,25 @@ sub move_to {
 		}
 	}
 	else {
-		print STDERR "  Move directories into <$dstd>:\n";
+		my @ods;
 		foreach(@_) {
+			if(-l $_) {
+				push @ods,scalar(readlink($_));
+			}
+			else {
+				push @ods,$_;
+			}
+		}
+		print STDERR "  Move directories into <$dstd>:\n";
+		foreach(@ods) {
 			print STDERR "    <= $_\n";
-			$exit = cmd_mv($_,$_,$dstd);
-
+			$exit = run('mv','-t',$dstd,'--',$_);
 		};
+		print STDERR "  Delete links:\n";
+		foreach(@_) {
+			print STDERR "    XX $_\n";
+			unlink $_;
+		}
 		print STDERR "  Delete catalog links in <#Catalogs>:\n";
 		foreach(@_) {
 			my $catalog_dir = '#Catalogs/' . uc(substr($_,0,1)) . '/' . $_;
@@ -1530,7 +1543,7 @@ sub process {
 			if($OPTS->{'unfollow'}) {
 				Babes::Follow::unfollow($OPTS,$SRC);
 			}
-			#Babes::Update::process($OPTS,$SRC);
+			Babes::Update::process($OPTS,$SRC);
 		}
 		
 

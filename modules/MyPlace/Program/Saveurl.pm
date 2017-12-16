@@ -150,7 +150,7 @@ sub doTasks {
 	}
 	while($idx < $count) {
 		$idx++;
-		my $_ = shift(@{$tasks});
+		local $_ = shift(@{$tasks});
 		my $proto = "http";
 		if($_ =~ m/^([^:\/]+):\/\//) {
 			$proto = $1;
