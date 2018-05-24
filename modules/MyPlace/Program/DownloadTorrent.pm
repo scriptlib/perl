@@ -49,6 +49,7 @@ our @SITES = (
 	qw{
 		https://itorrents.org/torrent/:HASH:.torrent
 		https://www.seedpeer.eu/torrent/:HASH:
+		http://btcache.me/torrent/:HASH:
 	}
 );
 #@SITES = ( 'post://www.torrent.org.cn/download.php?hash=:HASH:',);

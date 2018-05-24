@@ -25,17 +25,17 @@ my $do_unlink = $OPT{d} ? 1 : 0;
 my $ext = $OPT{e} ? $OPT{e} : ".zip";
 my @dirs;
 foreach(@ARGV) {
-    foreach(bsd_glob($_)) {
+	#    foreach(bsd_glob($_)) {
     if(-d $_) {
         push(@dirs,$_);
         next;
     }
     print STDERR ("\"$_\" Ingored\n");
-    }
+	#}
 }
 die("Nothing to do\n") unless(@dirs);
 
-my $USER=$ENV{USER} || "xiaoranzzz";
+my $USER="zipfolder";
 my $HOSTNAME=`hostname` || "myplace.hell";
 my $MACHINE=`uname -omsr` || "windows";
 my $DATE =  localtime;
@@ -44,7 +44,7 @@ my $COMMENT="Creator  :  $USER\n" .
             "Machine  :  $MACHINE" .
             "Date     :  $DATE";
 
-my $ZIPPROGRAM="zip -Xrz";
+my $ZIPPROGRAM="zip -UN=utf8 -Xrz";
 
 sub resetLine {
     print "\r" . " "x50;

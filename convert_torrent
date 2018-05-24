@@ -57,7 +57,7 @@ sub escape {
 }
 
 my %HZPY = qw/
-なお$ Nao 聊 Liao 欲 Yv 性 Xing 做 Zuo 交$ Jiao 肛 Gang 屄$ Bi 乳 Rv 榴$ Liu 色 Se 奇 Qi 狼 Lang 爱$ Ai 訊 Xun 优$ You 訊 Xun 淫 Yin 乱 Luan 网$ Wang 察$ Cha 城$ Chen 里沙 りさ 春香 はるか 咲 さき 美穂 みほ 百合 ゆり 小夏 こなつ 優乃 ゆうの 愛 あい 奈津美 なつみ 里子 りこ 梓ユイ 梓えい 翔 しょう 瞳 ひとみ 麻妃 まき 沙英 さえ 心美 ここみ 恋 こい 恭子 きょうこ レイ Rei 奸 Jian 大 Da 涩 Se 女 Nv 嫖 Piao 妓 Ji 射 She 骚 Sao 妻 Qi 丝 Si 露 Lu 姦 Jian 妇 fu 兰 LAN 蘭 LAN 花 HUA 川 CHUAN 子 ZI 春 CHUN 赌 DU 爱 AI
+なお$ Nao 聊 Liao 欲 Yv 性 Xing 做 Zuo 交$ Jiao 肛 Gang 屄$ Bi 乳 Rv 榴$ Liu 色 Se 奇 Qi 狼 Lang 爱$ Ai 訊 Xun 优$ You 訊 Xun 淫 Yin 乱 Luan 网$ Wang 察$ Cha 城$ Chen 里沙 りさ 春香 はるか 咲 さき 美穂 みほ 百合 ゆり 小夏 こなつ 優乃 ゆうの 愛 あい 奈津美 なつみ 里子 りこ 梓ユイ 梓えい 翔 しょう 瞳 ひとみ 麻妃 まき 沙英 さえ 心美 ここみ 恋 こい 恭子 きょうこ レイ Rei 奸 Jian 大 Da 涩 Se 女 Nv 嫖 Piao 妓 Ji 射 She 骚 Sao 妻 Qi 丝 Si 露 Lu 姦 Jian 妇 fu 兰 LAN 蘭 LAN 花 HUA 川 CHUAN 子 ZI 春 CHUN 赌 DU 爱 AI 屌 Diao
 /;
 
 my %DICT = qw/
@@ -80,13 +80,13 @@ my @dirty = (
 	'SUN16',	'Mofuku Tsuma',	'Sky Angel',	'MAS-',	'ARM-',	'SKY-',	'CRPD',	'GAR-',	'Erotic',	'HBAD-',	'Kamikaze Premium',	'九 九 情 色 论 坛',
 );
 push @dirty,(qw{
-Agemix 爱唯侦查 赌博 Amateur 性愛 pornolab.net porn 色界 丽春苑 巨乳 淫色 1pondo Uncensored 乱交 潮吹 手淫 輪姦 轮奸 被奸 翻墙 性伴侣 露出 性器 黑丝 touch99 -AV jav akb99 vip视频 BTOP MimiP2P hentai 18禁 RARBG.com rarbg.to 色情电影 玉蒲团 颜射 骚妻 嫖妓 女主播 18p2p 你懂的 招妓 乳交 大尺度 涩工厂 橘なお 迷奸 裸聊 视频聊天 大奶 爆操 南レイ 情色论坛 潮吹 丁字裤 苏小美 波波妹 夫妻交换 换妻 上门服务 99bt JPAVGOD 色狼 selang 女教师 熟女 援交 六月天 品色堂 肉欲 性交 性爱 肛交 美屄 美乳 草榴 fuck sexinsex sex 一夜情 色中色 成人 都市奇爱网 狼友 爱唯侦察 dioguitar D.C.資訊交流網 女优 sis001 淫乱 乱交 乱~交 乱x交 性吧 娱乐城 有码 无码 少妇 Cover 荡妇 内射 武藤兰 朝河蘭 骚妇 東方花園 淫娃 18BT动力工厂 1024核工厂 6china.info 9453社區 Chenvip905 996t工厂 waikeung.org FastZone.ORG zhaofuli KK69 P2P101 vip709  905zy kk.51688 xvdada 爱城地址 淫民 sav88 m6688 FB559 ime688 tohav 愛液 性奴隷 
+Agemix 爱唯侦查 赌博 Amateur 性愛 pornolab.net porn 色界 丽春苑 巨乳 淫色 1pondo Uncensored 乱交 潮吹 手淫 輪姦 轮奸 被奸 翻墙 性伴侣 露出 性器 黑丝 touch99 -AV jav akb99 vip视频 BTOP MimiP2P hentai 18禁 RARBG.com rarbg.to 色情电影 玉蒲团 颜射 骚妻 嫖妓 女主播 18p2p 你懂的 招妓 乳交 大尺度 涩工厂 橘なお 迷奸 裸聊 视频聊天 大奶 爆操 南レイ 情色论坛 潮吹 丁字裤 苏小美 波波妹 夫妻交换 换妻 上门服务 99bt JPAVGOD 色狼 selang 女教师 熟女 援交 六月天 品色堂 肉欲 性交 性爱 肛交 美屄 美乳 草榴 fuck sexinsex sex 一夜情 色中色 成人 都市奇爱网 狼友 爱唯侦察 dioguitar D.C.資訊交流網 女优 sis001 淫乱 乱交 乱~交 乱x交 性吧 娱乐城 有码 无码 少妇 Cover 荡妇 内射 武藤兰 朝河蘭 骚妇 東方花園 淫娃 18BT动力工厂 1024核工厂 6china.info 9453社區 Chenvip905 996t工厂 waikeung.org FastZone.ORG zhaofuli KK69 P2P101 vip709  905zy kk.51688 xvdada 爱城地址 淫民 sav88 m6688 FB559 ime688 tohav 愛液 性奴隷 桃花族 大屌
 });
 
 
 
 =safekey
-	南の島 羽田あい 相内しおり 椎名みくる 
+	南の島 羽田あい 相内しおり 椎名みくる  thzbt TaoHuaZu
 	失禁 れのん 小姐威客 色网 骑兵 凌辱 澳门 真人 同城 BK373 红音 连裤 芸能人 美人秘書 初裸 捜査官 熟オナニー ザーメン Nadeshiko Max-A MUTEKI Moodyz 大桥Miku 希志 Sasuke\s+Premium 隐退作 死夜恶 zoink.it 恥辱 妻 感謝祭 滚滚红尘 發情 性开放 禁断 荡妇 第一会所 (XXX-AV)(20989)超美爆乳！極上悩殺エロボディー連続ファック 星野あかり.wmv SYK-187 Beauty Venus - Risa Murakami, Yuri Kousaka, Akari Hoshino, Ai Kurosawa, Yui Komiya 星野あかり, 黖沢愛, 小宮ゆい お義姉さん 静候轮回@www.5exin5ex.net@接吻和同性間亂交 黒木麻衣 星野あかり!!BWB-002 性吧 http://www.18p2p.com 痴女 誘惑 義姉凌辱調教 淫亂 青姦 輪姦 巨乳ギャル痴漢バス 人妻 淫 有码 強X 義姉 仁科百華 雨宮琴音 黒木麻衣 原千尋 春咲あずみ ましろ杏 鈴音りおな 三浦芽依 水城奈緒 勃起 風間ゆみ 長澤リカ 真中かおり 川上ゆう 雪野ひかる 三浦亜沙妃 村上涼子 かすみ果穂 鮎川なお 鷹宮りょう 森ななこ 松すみれ 花井メイサ 加藤ツバキ 星アンジェ 諸星セイラ 大沢佑香 北條麻妃 波多野結衣 中出 情色 長澤あずさ 性 官能 Hard\s*Core 脅迫 调教 伊甸园 米其林 桐原あずさ 藤崎ひなた 楓乃々花 多岐川一葉 顔射 姦淫 近親 相姦 美尻 しすぎる三姉妹暴行 近親相姦レイプ 妃乃ひかり 柳田やよい 愛唯偵察 精液 赌博 MM公寓 黒沢爱 爱城 千野さくら 吹石絵梨子 坂本愛海 澄川ロア 情色美眉娱乐 彩季レナ 美脚 敏感 诱惑 誘惑 18P2P 父親愛人 悪魔 誘脚 超絶 美女 巨乳 少妇\s+论坛 Porn 情色伊甸园 性欲 柏拉圖秘密花園 adult 露出 HOTAVXXX 华人城论坛 Sasuke Jam Vol 4 超極上淫亂美女大暴走 星野あかり Akari Hoshino 淫語 上原亜衣 大槻ひびき 飯田せいこ 爱城 JAV xxx169 ac168 套图 套圖 weipai 微拍 小美 黑丝 丝袜 内衣 原味 情趣 洗澡 激情 自摸 自慰 叫床 近親相姦 美尻 有沢実紗 凌辱 今野梨乃 小坂めぐる 痴漢 花野真衣 官能 星野桃 野中あんり 教師 痴女 早乙女ルイ 催眠快獄 真性中出 桃太郎映像 誘惑 星野光 騎乢位 zoink 18p2p 痙攣 新藥 地獄 中出 交尾 Slut 伊莉 eyny.com 桜木凜 18p2p 三匹狼論壇 城市風情 親親社區 香港廣場 MimiP2P P.R俱樂部 救國P2P hotavxxx touch99 avxxx ＭＭ公寓 ＡＶ影片 FDZone-Forum 公仔箱論壇 HD1080.org eXBii 無碼 av9898vod 香港討論區 discuss.com.hk 痴漢俱樂部 色女 川上ゆう私拍 加藤なお 東方小鎮 dfxz.org 性交 色中色 XIAAV sex8 私拍 肉丝 义母 风流 情人 合体门 秋千门 公仔箱 色域色吧 色一色吧 情色帝国 女優 最新加勒比 流出 巨乳 处女 开房 北美 AV女 ××论坛 紫色 卡提諾論壇 威強男人網 捷克論壇 色女 脫衣 NetMe.cc 地球人討論區 av9898vod 台灣討論區 炼狱岛 1000人斬り www.lyd5.info www.lyd7.info 套图 夢工廠 发情 高潮 性感 大波 黑社会 爆乳痴女 青山菜々 大島あいる 上原カエラ 天上人间 BT工厂 国产自拍 上門服務 神器 台灣 香蕉魔盒 破处 内内 外射 后入 hav520.com mowa66.com www.cao1024.com www.ch5.cc 夢幻圖碼 梦幻图码 找樂子論壇 無限討論區 WK綜合論壇 Plus28 公仔箱論壇 FDZone-Forum HD1080.org 百乐汇娱乐城 魔王 魔王在線 魔王之家 Porn 炮友 痴漢 赌博 乃亜 小阪めぐる 情色黄金屋 新亲密爱人 黑暗圣殿 ourmonk 救国P2P 公仔箱 city9x.com 资讯交流网 灌肠 丝袜 屁股 virgin nude av名人 c1523.uk 草榴社区 草Liu社区 麻薬 姐妹花 淫荡 自慰 六月联盟 瀬咲るな 飯島夏希 爱唯侦查 宣传文本 美妇 东方后宫 77自由爱 赤裸宮殿 烽火连城 奇幻之国 无双国土 新巴黎中文社区 新天下华人娱乐 欲望天涯 開放註冊 淫亂 开放注册 友情天地 小小淫 香艳三级 深田梨菜 あずみ恋 希咲あや 爱城 騙姦 愛川香織 広田さくら 羽田夕夏 石川優季奈 浅井舞香 澤田なつみ 滝沢優奈 長澤リオン 白石ひより 椎名りく 貞操 
 /;
 =cut

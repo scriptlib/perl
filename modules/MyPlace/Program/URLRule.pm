@@ -649,7 +649,7 @@ sub CMD_ADD {
 		$OPTS->{hosts} = $OPTS->{hosts} ? $OPTS->{hosts} . "," . $OPTS->{host} : $OPTS->{host};
 	}
 
-	if(!defined $OPTS->{hosts}) {
+	if(!$OPTS->{hosts}) {
 		die("Error <HOSTS> not defined\n");
 	}
 	if($OPTS->{follow} || $OPTS->{'ffollow'}) {

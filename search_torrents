@@ -40,7 +40,7 @@ my %ENGINES = (
 		1,
 	],
 	'btkitty'=>[
-		'https://btkitty.pet/?###QUERY###',
+		'https://cnbtkitty.org/?###QUERY###',
 		3,
 	],
 #	'btdigg.org'=>[
@@ -61,17 +61,17 @@ my %ENGINES = (
 	#	3,
 	#],
 	'btdigg.me'=>[
-		'https://btdigg.xyz/?###QUERY###',
+		'https://btdigg.cc/?###QUERY###',
 		3,
 	],
 #	'ganluzhe.com'=>[
 #		'http://www.ganluzhe.com/###QUERY###',
 #		2,
 #	],
-#	'btbibi.com'=>[
-#		'http://btbibi.com/###QUERY###',
-#		3,
-#	],
+	'btbibi.com'=>[
+		'http://btbibi.com/###QUERY###',
+		3,
+	],
 #	'torrentproject'=>[
 #		'https://torrentproject.se/?safe=off&t=###QUERY###',
 #		2,
@@ -85,14 +85,14 @@ my %ENGINES = (
 #		'http://kickasstorrentsan.com/?###QUERY###',
 #		2,
 #	],
-	'bitsnoop'=>[
-		'https://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
-		2,
-	],
-	'btbiti'=>[
-		'https://btbiti.com/search/###QUERY###.html',
-		1,
-	],
+#	'bitsnoop'=>[
+#		'https://bitsnoop.com/search/all/###QUERY###+safe:no/c/d/1',
+#		2,
+#	],
+#	'btbiti'=>[
+#	'https://btbiti.com/###QUERY###',
+#		2,
+#	],
 );
 
 my %ENGINES2  = (

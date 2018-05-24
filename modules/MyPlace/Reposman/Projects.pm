@@ -334,6 +334,9 @@ sub parse_url {
 	if(!$type) {
 		$type = $project->{type};
 	}
+	if((!$type) and $pull =~ m/[\/\.](git|svn|hg)$/) {
+		$type = $1;
+	}
 	return {'push'=>$push,'pull'=>$pull,'user'=>$user,'type'=>$type};
 }
 

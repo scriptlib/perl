@@ -15,6 +15,9 @@ use utf8;
 use Encode;
 use Getopt::Long;
 use MyPlace::Script::Usage qw/exit_usage/;
+#binmode STDERR,"utf8";
+#binmode STDOUT,"utf8";
+#binmode STDIN,"utf8";
 
 my %OPTS;
 my @OPTIONS= qw/
@@ -27,6 +30,7 @@ my @OPTIONS= qw/
 	rule|r:s
 	dir|d:s
 	delete
+	lastname|l
 	mkdir|makedir|make-dir|md
 /;
 GetOptions(\%OPTS,@OPTIONS);
@@ -124,6 +128,20 @@ my %RULES = (
 		s/^(201\d)([2-9])(\d+)/${1}0${2}${3}/;
 		return $p1 . $_;
 	},
+	fiction=>sub {
+		my $old = shift;
+		my $new = $old;
+		$new =~ s/[-_\s]*(?:派派小说|powered_by_Discuz\!)//g;
+		$new =~ s/[《》＜＞〔〕\[\]〈〉「」『』〖〗【】（）［］｛｝\s]+/_/g;
+		$new =~ s/_+/_/g;
+		$new =~ s/^_+//g;
+		$new =~ s/([\\\/])_+/$1/g;
+		$new =~ s/_+$//g;
+		$new =~ s/_+([\\\/])$/$1/g;
+		$new =~ s/_+([-\.　－＿])/$1/g;
+		$new =~ s/([-\.　－＿])_+/$1/g;
+		return $new;
+	},
 );
 
 my $exp;
@@ -132,6 +150,10 @@ if(defined $OPTS{rule}) {
 	if($OPTS{rule} && defined $RULES{$OPTS{rule}}) {
 		print STDERR "[RenameEXT] Rule => \"$OPTS{rule}\"\n";
 		$exp = $RULES{$OPTS{rule}};
+	}
+	elsif(-f $OPTS{rule}) {
+		print STDERR "[RenameEXT] Rule => \"$OPTS{rule}\"\n";
+		$OPTS{filerule} = 1;
 	}
 	elsif($OPTS{rule}) {
 		print STDERR "Error, rule \"$OPTS{rule}\" not defined.\n";
@@ -165,6 +187,43 @@ my $RENAMER;
 if(ref $exp) {
 	$RENAMER = $exp;
 	print STDERR "[RenameEXT] Exp => <REF>\n";
+}
+elsif($OPTS{filerule}) {
+	print STDERR "[RenameEXT] Read rules from <" . $OPTS{rule} . ">\n";
+	my @trs;
+	if(open my $fi,"<:utf8",$OPTS{rule}) {
+		while(<$fi>) {
+			chomp;
+			s/^\s+//;
+			s/\s+$//;
+			next unless($_);
+			my $ori = $_;
+			my $chd = $ori;
+			if(m/^([^\t]+)\t(.*)$/) {
+				$ori = $1;
+				$chd = $2;
+			}
+			else {
+				$chd =~ s/(.){1}/$1_/g;
+			}
+			push @trs,[$ori,$chd];
+			#print STDERR "\t" . $ori . " => " . $chd . "\n";
+		}
+		close $fi;
+	}
+	
+	$RENAMER = sub {
+		my $r = shift;
+		foreach(@trs) {
+			#print $_->[0] . " => " . $_->[1] . "\n";
+			$r =~ s/$_->[0]/$_->[1]/g;
+			$r =~ s/_{2,}/_/g;
+			$r =~ s/_\$//g;
+			$r =~ s/^_//g;
+			$r =~ s/_\+(\.[^.]+)$/$1/;
+		}
+		return $r;
+	};
 }
 elsif($exp =~ /\/.*\//) {
 	print STDERR "[RenameEXT] Exp => \"$exp\"\n";
@@ -256,15 +315,23 @@ elsif(!@files) {
 my $dfile=0;
 foreach my $old(grep !/^\.\.?$/,@files) {
 	print STDERR "$old\n" if($OPTS{'debug'});
-	my $uold = $utf8->decode($old);
+	$old =~ s/\/+$//;
+	my $base = '';
+	my $input = $old;
+	if($OPTS{lastname}) {
+		if($old =~ m/^(.+[\/\\]+)([^\/\\]+)$/) {
+			$base = $1;
+			$input = $2;
+		}
+	}
+	my $uold = $utf8->decode($input);
     my $unew = &$RENAMER($uold);
-	my $new = $utf8->encode($unew);
+	my $new = $base . $utf8->encode($unew);
     if($new eq $old) {
 		print STDERR ("\"$old\" [Ignored]\n") if($OPTS{verbose});
         next;
     }
 	$new =~ s/\/+$//;
-	$old =~ s/\/+$//;
 #	if($OPTS{force} && -e $new) {
 #		print STDERR "[FORCE] backup $new.\n";
 #		my $backup = $new . '.backup~';

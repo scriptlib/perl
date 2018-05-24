@@ -120,7 +120,7 @@ sub format_time {
 sub strtime {
 	my $time =  shift(@_) || time();
 	my @r = localtime($time);
-	return format_time([@r]);
+	return format_time([@r],@_);
 }
 
 sub strtime2 {

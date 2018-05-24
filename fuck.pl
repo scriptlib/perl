@@ -12,6 +12,7 @@ my @OPTIONS = qw/
 	group|g=s
 	videos|c=s
 	video-only
+	babes|b=s
 /;
 my %OPTS;
 if(@ARGV)
@@ -46,7 +47,8 @@ else {
 my @DEF_DIR = (qw{
 	/z/datapool
 	/z/datapool2
-	/myplace/appdata/dp
+	/z/datapool3
+	/z/datapool4/
 	/u/datapool
 	/service/Temp/
 });
@@ -121,6 +123,9 @@ sub find_babes {
 #				return ($fd) if(-d $fd);
 			}
 		}
+	}
+	foreach my $name(@_) {
+		push @result,$name if(-d $name);
 	}
 	return @result;
 }
