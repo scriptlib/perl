@@ -259,10 +259,21 @@ sub new_response {
 		unless(defined $result->{level}) {
 			$result->{level} = $rule->{level}  - 1;
 		}
-
+		
 		if($result->{data}) {
 			$result->{count} = @{$result->{data}};
-			delete $result->{data} if($result->{count}<1);
+			if($result->{count}<1) {
+				delete $result->{data};
+			}
+			elsif($result->{info} && ref $result->{info} && (ref $result->{info} eq 'HASH')) {
+				foreach(keys %{$result->{info}}) {
+					my $k = $_;
+					my $v = $result->{info}->{$k} || "";
+					$k =~ s/[\r\n]+/\\n/g;
+					$v =~ s/[\r\n]+/\\n/g;
+					push @{$result->{data}},"#$k : \t$v";
+				}
+			}
 		}
 
 		if($result->{pass_data} && @{$result->{pass_data}}) {
@@ -534,6 +545,12 @@ sub urlrule_quick_parse {
 		'Error',
 		"Failed restriving $url",
 	) unless($html);
+	if($html =~ m/"why_captcha_detail"[^>]*>([^<]*)</) {
+		return (
+			'Error',
+			"需要验证：$1",
+		);
+	}
     my @data;
     my @pass_data;
     my @pass_name;

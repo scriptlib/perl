@@ -46,11 +46,10 @@ our @SITES = (
 	#http://torrage.biz/torrent/:HASH:.torrent
 	#https://torcache.net/torrent/:HASH:.torrent
 	#post://www.torrent.org.cn/download.php?hash=:HASH:
-	qw{
-		https://itorrents.org/torrent/:HASH:.torrent
-		https://www.seedpeer.eu/torrent/:HASH:
-		http://btcache.me/torrent/:HASH:
-	}
+	#https://itorrents.org/torrent/:HASH:.torrent
+	#https://www.seedpeer.eu/torrent/:HASH:
+	#http://btcache.me/torrent/:HASH:
+	"https://t.torrage.info/download?h=:HASH:\thttps://torrage.info/torrent.php?h=:HASH:",
 );
 #@SITES = ( 'post://www.torrent.org.cn/download.php?hash=:HASH:',);
 our %SITES2 = (
@@ -203,6 +202,7 @@ sub download {
 		"-r",$REF,
 		"-u",$URL,
 		"-s",$output,
+		'--cookie','/myplace/appdata/cookies.txt',
 		@OPTS) == 0
 	) {
 		my ($ok,$type) = check_type($output);
@@ -307,8 +307,13 @@ sub download_torrent {
 			my $url = $site;
 			$url =~ s/:HASH:/$hash/g;
 	#		print STDERR "<= $url\n";
+			my $rurl = $url;
+			if($url =~ m/^(.+)\t+(.+)$/) {
+				$url = $1;
+				$rurl = $2;
+			}
 			print STDERR "  Try [$sitename] ... ";
-			if(download($output,$url)) {
+			if(download($output,$url,$rurl)) {
 				color_print('GREEN',"  [OK]\n");
 				write_hash($hash,"$title\t$url");
 				$exit = error_no("OK");

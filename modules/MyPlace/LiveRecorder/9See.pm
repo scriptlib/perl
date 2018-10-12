@@ -11,7 +11,7 @@ sub def_check1 {
 	return {
 		match=>qr/"roominfo"/,
 		CURL=>[
-			'http://www.9see.com/MiaoBo/live/live_room_userinfo.aspx?useridx=' . $id,
+			'http://www.miaobolive.com/MiaoBo/live/live_room_userinfo.aspx?useridx=' . $id,
 		],
 		stop=>1,
 	};
@@ -20,7 +20,7 @@ sub def_check1 {
 sub def_live {
 	my $self = shift;
 	my $id = shift;
-	my $url = 'http://www.9see.com/MiaoBo/live/live_room_userinfo.aspx?useridx=' . $id;
+	my $url = 'http://www.miaobolive.com/MiaoBo/live/live_room_userinfo.aspx?useridx=' . $id;
 	if(open FI,'-|','curl','--silent',$url) {
 		while(<FI>) {
 			if(m/"flv"\s*:\s*"([^"]+\.flv)"/) {

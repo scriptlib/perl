@@ -183,6 +183,15 @@ my $USQ;
 			my $info = MyPlace::Meipai::extract_info($url);
 			return $info->{uid},$info->{uname},'meipai.com';
 		}
+		elsif($url =~ m/^http/) {
+			require MyPlace::URLRule;
+			my $rule = MyPlace::URLRule::parse_rule($url,":info");
+			print STDERR "Applying RULE $rule->{source}\n";
+			my ($status,$info) = apply_rule($rule);
+			if($status) {
+				return $info->{profile},"$info->{uname}\t$info->{dyid}",$info->{host};
+			}
+		}
 	}
 
 sub _validate_cmd {
@@ -343,6 +352,8 @@ sub work {
 		fullname
 		no-download
 		item
+		images
+		videos
 	/);
 
 	my @USQ_OPTS_GROUP2 = (qw/
@@ -498,9 +509,9 @@ sub work {
 						my $dbfile = $dbs{$dbname};
 						if(usq_test_key($dbfile,$target)) {
 							push @qhosts,$dbname;
-							if($dbname eq 'weibo.com') {
-								push @qhosts,'sinacn.weibodangan.com';
-							}
+							#				if($dbname eq 'weibo.com') {
+							#	push @qhosts,'sinacn.weibodangan.com';
+							#}
 						}
 					}
 				}
@@ -511,13 +522,13 @@ sub work {
 			if(!@qhosts) {
 				@qhosts = qw/
 					weipai.cn
-					vlook.cn
 					meipai.com
 					miaopai.com
 					weibo.com
 					moko.cc
 					meitulu.com
 				/;
+				#vlook.cn
 			}
 			print STDERR "HOSTS [$hosts_o] => ";
 			$hosts_o = join(",",@qhosts);
@@ -1253,6 +1264,7 @@ sub execute_task {
 sub execute {
 	my $self = shift;
 	my $OPTS = shift;
+	#die(join("\n",@_,"\n"));
 	my $task = MyPlace::Tasks::Task->new('urlrule',@_);
 	$task->{options} = $OPTS;
 	use Cwd qw/getcwd/;
@@ -1273,9 +1285,12 @@ sub OPTIONS {qw/
 	no-download|nd
 	disable-download|dd=s
 	disable-all-download|dad=s
+	hosts=s
 	fullname
 	include|I:s
 	exclude|X:s
+	images
+	videos
 /;}
 sub USAGE {
 	my $appname = $0;
@@ -1296,6 +1311,10 @@ sub MAIN {
 	$APP->{source_dir} = "urlrule";
 	if($OPTS->{directory}) {
 		$APP->{target_dir} = $OPTS->{directory};
+	}
+	if($OPTS->{hosts}) {
+		$APP->{hosts} = $OPTS->{hosts};
+		%USQ_HOSTS = usq_locate_db($OPTS->{hosts});
 	}
 	exit $APP->execute($OPTS,@_);
 }

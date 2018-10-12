@@ -153,7 +153,7 @@ sub _process {
     my $cmdline=shift;
     my $retry = shift(@_) || 0;
     my $r=0;
-#	print STDERR join(" ",@{$cmdline}),"\n";
+	#print STDERR join(" ",@{$cmdline}),"\n";
 	my $output = "$taskname.downloading";
 	$output =~ s/[\/\\*?:"'\[\]\{\}\s,#!\>\<^&~\|+_\-]+//g;
 	unlink $output if(-f $output);

@@ -18,6 +18,7 @@ sub new {
 	my $self = bless {
 			options=>{},
 		},$class;
+	delete $self->{exited};
 	$self->set(@_);
 	return $self;
 }
@@ -74,6 +75,7 @@ sub p_warn {
 
 }
 sub _read_lines {
+	my $self = shift;
 	my $filename = shift;
 	my $dir = shift;
 	my $source = $dir ? catfile($dir,$filename) : $filename;
@@ -87,6 +89,11 @@ sub _read_lines {
 		foreach(<$FI>) {
 			chomp;
 			next unless($_);
+			if(m/^#([^:]+?)\s*:\s*(.*)$/) {
+				p_warn "source $1 => $2\n";
+				$self->{source}->{$1} = ($2 || "");
+				next;
+			}
 			$counter++;
 			push @input,$_;
 		}
@@ -172,9 +179,15 @@ sub unique {
 
 sub run {
 	my $self = shift;
+	my $CWD_KEPT = getcwd;
+	my @x = $self->_run(@_);
+	chdir $CWD_KEPT;
+	return @x;
+}
 
-
-
+sub _run {
+	my $self = shift;
+	delete $self->{exited};
 	my %opt = %{$self->{options}};
 	my @arguments = @_;
 	
@@ -207,10 +220,12 @@ sub run {
 	
 	my $CWD_KEPT;
 	if($opt{directory}) {
-		$CWD_KEPT = getcwd;
+		#$CWD_KEPT = getcwd;
 		#	print STDERR "CWD:$CWD_KEPT\n";
 		p_msg "Entering $opt{directory}\n" unless($opt{simple} or $opt{quiet});
+		#print STDERR "chdir $opt{directory}\n";
 		if(!chdir $opt{directory}) {
+			p_err "PWD:\t$CWD_KEPT\n";
 			p_err "Error:$! [$opt{directory}]\n";
 			return undef,4,"$! [$opt{directory}]";
 		}
@@ -227,6 +242,7 @@ sub run {
 			push @subdir,$_ if(-d $_);
 		}
 		foreach(@subdir) {
+			#chdir $KWD;
 			$self->{options}->{directory} = $_;
 			$self->{options}->{title} = $MSG_PROMPT . $_;
 			$MSG_PROMPT .=  $_;
@@ -238,7 +254,6 @@ sub run {
 			$self->{options}->{title} = $kt;
 			$MSG_PROMPT = $km;
 		}
-		#chdir $KWD;
 	}
 
 
@@ -246,18 +261,18 @@ sub run {
 	my (@queue,@done,@failed,@ignore,@input);
 	my %duplicated;
 
-	@input = &_read_lines($opt{input}) if($opt{input});
+	@input = $self->_read_lines($opt{input}) if($opt{input});
 	push @input,@arguments;
 
 	if($opt{simple}) {
 		push @queue,@input;
 	}
 	elsif(-d $CONFIG_DIR) {
-		@done = &_read_lines($DB_DONE,$CONFIG_DIR);
-		@failed = &_read_lines($DB_FAILED,$CONFIG_DIR);
-		@ignore = &_read_lines($DB_IGNORE,$CONFIG_DIR);
+		@done = $self->_read_lines($DB_DONE,$CONFIG_DIR);
+		@failed = $self->_read_lines($DB_FAILED,$CONFIG_DIR);
+		@ignore = $self->_read_lines($DB_IGNORE,$CONFIG_DIR);
 		my @dup;
-		push @queue, &_read_lines($DB_QUEUE,$CONFIG_DIR) unless($opt{'no-queue'});
+		push @queue, $self->_read_lines($DB_QUEUE,$CONFIG_DIR) unless($opt{'no-queue'});
 		if($opt{'no-unique'}) {
 			unshift @queue,@input;
 		}
@@ -328,6 +343,7 @@ sub run {
 	push @wopts,'--overwrite' if($opt{overwrite});
 	push @wopts,"--force" if($opt{force});
 	push @wopts,"--referer",$opt{referer} if($opt{referer});
+	push @wopts,"--referer",$self->{source}->{referer} if($self->{source}->{referer});
 
 	my $IAMKILLED = undef;
 	
@@ -372,7 +388,16 @@ sub run {
 		my $r;
 		$index++;
 		&p_prompt("[$index/$count] $queue[0]\n");
-		if(ref $worker) {
+		if($task =~ m/^#/) {
+			if($task =~ m/^#([^:]+?)\s*:\s*(.*)$/) {
+				p_msg "$1 : $2\n";
+			}
+			else {
+				p_msg $task,"\n";
+			}
+			$r = $self->EXIT_CODE("DEBUG");
+		}
+		elsif(ref $worker) {
 			$r = &$worker($task,@wopts);
 		}
 		else {
@@ -430,15 +455,24 @@ sub run {
 
 sub exit {
 	my $self = shift;
-	my $CWD_KEPT = shift;
-	if($CWD_KEPT) {
-		#	p_msg "Return to directory:$CWD_KEPT\n" unless($opt{simple} or $opt{quiet});
-		if(!chdir $CWD_KEPT) {
-			p_err "Error:$!\n";
-			return undef,4,"$!";
-		}
+	return @{$self->{exited}} if(defined $self->{exited});
+	my %opt = %{$self->{options}};
+	if($opt{include}) {
+		p_msg "INCLUDE: " . $opt{include} . "\n";
 	}
-	return @_;
+	if($opt{exclude}) {
+		p_msg "EXCLUDE: " . $opt{exclude} . "\n";
+	}
+#	my $CWD_KEPT = shift;
+#	if($CWD_KEPT) {
+#		#	p_msg "Return to directory:$CWD_KEPT\n" unless($opt{simple} or $opt{quiet});
+#		if(!chdir $CWD_KEPT) {
+#			p_err "Error:$!\n";
+#			$self->{exited} = [undef,4,"$!"];
+#		}
+#	}
+	$self->{exited} = [@_];
+	return @{$self->{exited}};
 }
 
 1;

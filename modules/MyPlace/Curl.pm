@@ -198,7 +198,7 @@ sub _run_curl
             push @args,$_;
         }
     }
-#	print STDERR join(" ",@CURL,@args),"\n";
+	#print STDERR join(" ",@CURL,@args),"\n";
     open FI,"-|",@CURL,@args;
     my $data = join("",<FI>);
     close FI;
@@ -285,3 +285,6 @@ sub print {
 }
 
 1;
+
+__END__
+

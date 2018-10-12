@@ -25,7 +25,7 @@ my %EXIT_CODE = qw/
 /;
 
 
-my $DEFAULT_HOST = "weibo.com,weipai.cn,vlook.cn,google.search.image,moko.cc";
+my $DEFAULT_HOST = "weibo.com,weipai.cn,moko.cc";
 my @DEFAULT_HOST = split(/\s*,\s*/,$DEFAULT_HOST);
 my @OPTIONS = qw/
 		help|h
@@ -51,6 +51,8 @@ my @OPTIONS = qw/
 		exclude|X:s
 		force-action|fa
 		item
+		images
+		videos
 /;
 
 sub new {
@@ -753,6 +755,11 @@ sub execute {
 	foreach my $defkey(qw/createdir recursive/) {
 		$OPT->{$defkey} = $OPT->{"no-$defkey"} ? 0 : 1;
 	}
+	my @include;
+	push @include,$OPT->{include} if($OPT->{include});
+	push @include,'\.(?:jpg|gif|png|jpeg)' if($OPT->{images});
+	push @include,'\.(?:flv|mov|f4v|avi|mkv|mpg|mpeg|rmvb|asf|wmv|ts|mp4|3pg)' if($OPT->{'videos'});
+	$OPT->{include} = join("|",@include) if(@include);
 	$self->{NAMES} = @argv ? \@argv : undef;
 	$self->{COMMAND} = 	$OPT->{additem} ? 'ADDITEM' : $OPT->{add} ? 'ADD' : $OPT->{list} ? 'LIST' : $OPT->{update} ? 'UPDATE' : $OPT->{file} ? 'FILE' : $OPT->{command} ? uc($OPT->{command}) : 'UPDATE';
 	$self->{COMMAND} = "SAVEURL" if($OPT->{saveurl});

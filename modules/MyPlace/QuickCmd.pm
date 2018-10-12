@@ -50,8 +50,15 @@ sub _build_prompt {
 }
 
 sub qcmd_prompt {
+	my $return_string = shift;
 	print "\e]2;" . _build_prompt(undef,undef,@_) . "\7";;
-	print STDERR _build_prompt('GREEN','CYAN',@_);
+	if($return_string) {
+		return _build_prompt('GREEN','CYAN',@_);
+	}
+	else {
+		print STDERR _build_prompt('GREEN','CYAN',@_);
+	}
+	return 0;
 }
 
 my %vtable = (
@@ -88,9 +95,11 @@ sub qcmd_execute {
 }
 
 sub qcmd_run {
-	&qcmd_prompt;		
+	#&qcmd_prompt;		
 	my $ok = 1;
-	while(<STDIN>) {
+	use Term::ReadLine;
+	my $term = Term::ReadLine->new('MyPlace QuickCmd Controler');
+	while(defined($_ = $term->readline(&qcmd_prompt(1)))) {
 		chomp;
 		if($_) {
 			my($verb,@words) = split(/\s+/,$_);
@@ -121,7 +130,7 @@ sub qcmd_run {
 				$ok = qcmd_execute($CMD,@ARGS,@words);
 			}
 		}
-		&qcmd_prompt;
+		#		&qcmd_prompt;
 	}
 	return $ok ? 0 : 1;
 }

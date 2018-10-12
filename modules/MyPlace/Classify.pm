@@ -35,14 +35,14 @@ sub read_rules {
 			print STDERR "Rule <$file> not exists\n";
 			next;
 		}
-		print STDERR "Rules read from <$RULE_FILE>\n";
+		print STDERR "Rules reading from <$RULE_FILE>\n";
 		$A->readfile($RULE_FILE);
 		push @data, $A->get_data;
 	}
 	my $count = 0;
 	foreach my $def (@data) {
 		my @value = @$def;
-		$_ = shift @value;
+		$_ = shift(@value);
         if(m/^#include\s+(.+)$/) {
 			my $r = read_rules($1,$dest);
             push @rules,@$r if($r);
@@ -61,6 +61,11 @@ sub read_rules {
         elsif(m/^\/\//) {
 			next;
         }
+		elsif(m/\s*,\s*/) {
+			my @a = split(/\s*,\s*/,$_);
+			$_ = shift @a;
+			unshift(@value,@a);
+		}
 		
 		#Translate values like "AB CD EF" to "AB[-~_\.\s]*CD[-~_\.\s]*EF
 		my %r;
@@ -68,9 +73,8 @@ sub read_rules {
 		$r{dest} = $dest;
 		$r{keyword} = [];
 		foreach(@value) {
-			if(index($_,'<SN>') eq 0) {
-				push @{$r{keyword}},substr($_,4);
-				$_ = "\\b$_\[-~_\\.\\s]*\\d+";
+			if(m/^<[^>]+>\s*(.+)\s*$/) {
+				push @{$r{keyword}},$1;
 			}
 			else {
 				push @{$r{keyword}},$_;
@@ -108,15 +112,15 @@ sub read_rules {
 		}
 		else {
 			s/^\/</</;
-			s/([\[\]\(\)\@\$\*\?\^])/\\\\$1/g;
+			#s/([\[\]\(\)\@\$\*\?\^])/\\\\$1/g;
 			s/\s+/[-~_\.\\s]*/g;
-			s/^#+//;
+			#s/^#+//;
 			$_ = '\b' . $_ . '\b' if($OPTS{word});
 			$r{exp} = join('|',$_,@value);
 		}
 		push @rules,\%r;
 		$count++;
-		print STDERR "\r$count rules read";
+		print STDERR "\rRules count : $count";
 	}
 	print STDERR "\n";
 	return \@rules;

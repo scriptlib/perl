@@ -121,11 +121,18 @@ my $FHLOG;
 my @INPUTS;
 
 sub prompt {
+	my $str = shift;
 	my $cwd = getcwd;
 	my $cwdname = $cwd =~ s/.*[\/\\]//r;
 	my $prefix = $DATA ? "[$DATA]" : $PROMPT ? "$PROMPT>" : @_ ? join(" ",@_) . "#" : '';
 	print "\e]2;" . "$cwdname>$prefix " . "\7";
-	print STDERR color('GREEN'),"$cwdname",color('RESET'),'>',color('YELLOW'),$prefix,color('RESET')," ";
+	if($str) {
+		$str = color('GREEN') . "$cwdname" . color('RESET') . '>' . color('YELLOW') . $prefix . color('RESET') . " ";
+	}
+	else {
+		print STDERR color('GREEN'),"$cwdname",color('RESET'),'>',color('YELLOW'),$prefix,color('RESET')," ";
+	}
+	return $str if($str);
 }
 
 sub feed {
@@ -310,15 +317,18 @@ sub start {
 #		feed('EXIT');
 	}
 	my $EXIT = &work();
-	&prompt();
-	while(<STDIN>) {
+	#&prompt();
+	use Term::ReadLine;
+	my $term = Term::ReadLine->new('MyPlace ICmd Controler');
+	while(defined($_ = $term->readline(&prompt(1)))) {
 		my $LAST;
 		chomp;
 		if($_) {
+			#$term->addhistory($_);
 			&feed($_);
 			$EXIT = &work();
 		}
-		&prompt();
+		#&prompt();
 	}
 	&load('END');
 }

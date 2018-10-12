@@ -8,7 +8,7 @@ BEGIN {
     $VERSION        = 1.00;
     @ISA            = qw(Exporter);
     @EXPORT         = qw();
-    @EXPORT_OK      = qw(dequote no_empty strtime strtime2);
+    @EXPORT_OK      = qw(dequote no_empty strtime strtime2 utf8_repack from_xdigit);
 }
 use utf8;
 my $DEBUG=0;
@@ -175,6 +175,60 @@ sub strtime2 {
 	}
 	my $style = shift;
 	return format_time(\@r,(defined $style ? $style : -5),@_);
+}
+
+sub utf8_repack {
+	foreach(@_) {
+		s/\\u([0-9a-fA-F]{4})/pack("U",,hex($1))/eg;
+	}
+	return @_;
+}
+
+sub from_xdigit {
+	my %digit = (
+        "&#xe60d;"=>0,
+        "&#xe603;"=>0,
+        "&#xe616;"=>0,
+        "&#xe60e;"=>1,
+        "&#xe618;"=>1,
+        "&#xe602;"=>1,
+        "&#xe605;"=>2,
+        "&#xe610;"=>2,
+        "&#xe617;"=>2,
+        "&#xe611;"=>3,
+        "&#xe604;"=>3,
+        "&#xe61a;"=>3,
+        "&#xe606;"=>4,
+        "&#xe619;"=>4,
+        "&#xe60c;"=>4,
+        "&#xe60f;"=>5,
+        "&#xe607;"=>5,
+        "&#xe61b;"=>5,
+        "&#xe61f;"=>6,
+        "&#xe612;"=>6,
+        "&#xe608;"=>6,
+        "&#xe61c;"=>7,
+        "&#xe60a;"=>7,
+        "&#xe613;"=>7,
+        "&#xe60b;"=>8,
+        "&#xe61d;"=>8,
+        "&#xe614;"=>8,
+        "&#xe615;"=>9,
+        "&#xe61e;"=>9,
+        "&#xe609;"=>9,
+);
+	foreach(@_) {
+		foreach my $k(keys %digit){
+			s/$k/$digit{$k}/g;
+		}
+	}
+	if(wantarray) {
+		return @_;
+	}
+	else {
+		return shift(@_);
+	}
+
 }
 
 1;

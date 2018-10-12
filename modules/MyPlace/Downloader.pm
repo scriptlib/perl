@@ -153,6 +153,9 @@ sub save_http {
 		return $self->{LAST_EXIT} if($self->file_exists($url,$filename));
 		push @opts,'--saveas',$filename if($filename);
 	}
+	if($url =~ m/:\/\/mtl.ttsqgs.com/) {
+		push @opts,"--refurl","https://www.meitulu.com/item/12345.html";
+	}
 	my $r = system('download',@opts);
 	$r = $r>>8 if(($r != 0) and $r != 2);
 	return $r;
@@ -468,6 +471,12 @@ sub download {
 	elsif(m/^(https?:\/\/.+)$/) {
 		$exit = $self->save_http($1);
 	}
+	elsif(m/^:?(\/\/.+)\t(.+)$/) {
+		$exit = $self->save_http("http:$1",$2);
+	}
+	elsif(m/^:?(\/\/.+)$/) {
+		$exit = $self->save_http("http:$1");
+	}
 	elsif(m/^file:\/\/(.+)\t(.+)$/) {
 		$exit = $self->save_file($1,$2);
 	}
@@ -515,6 +524,10 @@ sub MAIN {
 	}
 	my $exit;
 	foreach my $url (@lines) {
+		if($url =~ m/^#([^:]+?)\s*:\s*(.*)$/) {
+			$self->{source}->{$1} = $2;
+			next;
+		}
 		$exit = $self->download($url);
 	}
 	return $exit;

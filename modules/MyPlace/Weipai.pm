@@ -25,7 +25,7 @@ our %URLSTPL = (
 	fans=>'/user_fans_list?count=$2&relative=after&uid=$1&cursor=$3',
 	follows=>'/user_follow_list?count=$2&relative=after&uid=$1&cursor=$3',
 	likes=>'/user/compresseduserlikes?count=$2&cursor=$3&relative=after&user_id=$1',
-	search_user=>'/search_user?count=$2&cursor=$3&relative=after&keyword=$1',
+	search_user=>'/search_user?count=$2&relative=after&keyword=$1',
 	search_video=>'/search_video?count=$2&cursor=$3&relative=after&keyword=$1',
 	video_defender=>'/top_defender?count=$2&relative=after&vid=$1&next_cursor=$3',
 	defender=>'/top_defender?count=$2&relative=after&uid=$1&next_cursor=$3',
@@ -849,6 +849,33 @@ sub save_profile {
 	
 }
 
+sub check_follows {
+	my $opt = shift;
+	my $id = shift;
+	my $limits = shift;
+	my $count = 0;
+	my @results;
+		my $nc = undef;
+		do {
+			my $follows = get_follows($id,40,$nc);
+			last unless($follows);
+			#print STDERR Data::Dumper->Dump([$follows],['follows']),"\n";
+			$nc = $follows->{next_cursor} || undef;
+			foreach(@{$follows->{user_list}}) {
+				$count++;
+				if($limits and $limits < $count) {
+					return 0;
+				}
+				print $_->{user_id},"\t",$_->{nickname},"\n";
+				my $pro = get_profile($_->{user_id});
+				foreach(qw/intro video_num fans_num hotNum level vip_level coins tuhao_score star_score sendi last_active_time/) {
+					print "\t$_ : \t",$pro->{$_},"\n" if($pro->{$_});
+				}
+			}
+		} while($nc);
+	return 0;
+}
+
 sub show_follows {
 	my $opt = shift;
 	my $id = shift;
@@ -936,6 +963,9 @@ sub MAIN {
 	}
 	elsif($command eq 'PROFILE') {
 		return show_profile($opts,@_);
+	}
+	elsif($command eq 'CHECK_FOLLOWS') {
+		return check_follows($opts,@_);
 	}
 	elsif($command eq 'FOLLOWS') {
 		return show_follows($opts,@_);
@@ -1087,6 +1117,12 @@ sub MAIN {
 	}
 	elsif($command eq 'MD5SUM') {
 		return cmd_md5sum($opts,@_);
+	}
+	elsif($command eq 'WORKER') {
+		system('urlrule_worker','sites','weipai.cn',@_);
+	}
+	else {
+		system('urlrule','--hosts','weipai.cn',lc($command),@_);
 	}
 }
 

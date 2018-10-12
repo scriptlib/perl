@@ -595,6 +595,7 @@ sub parse_url {
 		require MyPlace::URLRule;
 		my $rule = MyPlace::URLRule::parse_rule($url,":info");
 		my ($status,$result) = apply_rule($rule);
+		print $result->{profile},"\n";
 		if($status and $result->{profile}) {
 			return 1,$result;
 		}
@@ -613,13 +614,17 @@ sub CMD_ADD {
 	my $id = shift;
 	my $host = shift(@_) || $OPTS->{hosts} || $OPTS->{db};
 	my $exitval = 0;
-
-	if(!$id) {
-		$id = $name;
-		$name = '';
+	my $url =  $id || $name;
+	if($OPTS->{url}) {
+		$url = $OPTS->{url};
 	}
-	if(!$host) {
-		my ($r,$result) = parse_url($id);
+	elsif(!defined $id) {
+		$url = $name;
+		$name = undef;
+		$id = undef;
+	}
+	if((!$host) or ($url and $url =~ m/^http/)) {
+		my ($r,$result) = parse_url($url);
 		if($r) {
 			if($result->{profile}) {
 				p_msg "ID => $result->{profile}\n";
@@ -641,6 +646,9 @@ sub CMD_ADD {
 	}
 	if(!$name) {
 		die("No name defnied\n");
+	}
+	if(!$id) {
+		die("No ID defined\n");
 	}
 	if(defined $OPTS->{hosts} or defined $OPTS->{all}) {
 		$OPTS->{hosts} = $host if($host);
