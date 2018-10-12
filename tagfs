@@ -14,6 +14,7 @@ use strict;
 #OR nothing will work
 use lib $ENV{XR_PERL_MODULE_DIR};
 
+use Cwd qw/getcwd/;
 use Getopt::Long;
 use MyPlace::Script::Usage qw/format_help/;
 
@@ -37,7 +38,7 @@ if($OPTS{'help'}) {
 	exit 1;
 }
 
-
+my $PDIR = getcwd;
 my $root = $OPTS{root} || "";
 my $TEST = $OPTS{test};
 
@@ -52,7 +53,7 @@ my @files;
 ($tags,@files)=@ARGV;
 die(format_help($0)) unless(@files);
 
-my @linker = ('ln','-f', ($OPTS{hard} ? () : '-s'), '-t');
+my @linker = ('ln','-f', ($OPTS{hard} ? () : '-s'), '--');
 my @ntfs_linker = ('ntfs-link');
 	foreach(qw/symbol hard junction/) {
 		push @ntfs_linker,'--' . $_ if($OPTS{$_});
@@ -64,12 +65,17 @@ sub create_taglink {
 	my $is_file = shift;
 	my @cmds;
 	if($ENV{OS} and $ENV{OS} =~ m/Windows/i) {
-		push @cmds,@ntfs_linker,'--target',$taglink;
-		push @cmds,'--symbol' if($is_file);
-		push @cmds,$source;
+		push @cmds,@ntfs_linker;
+		if($is_file) {
+			push @cmds,"--symbol";
+		}
+		#else {
+		#	push @cmds,"--junction";
+		#}
+		push @cmds,$source,$taglink;
 	}
 	else {
-		push @cmds,@linker,$taglink,$source;
+		push @cmds,@linker,$source,$taglink;
 	}
 	system_execute(@cmds);
 }
@@ -123,7 +129,9 @@ sub now {
 if($root and (! -d $root)) {
 	create_dir($root) or die("$!\n");
 }
-my $saved_in = "$root$REALTAG";
+chdir($root) if($root);
+
+my $saved_in = "$REALTAG";
 if(! -d $saved_in) {
     create_dir($saved_in) or die("$!\n");
 }
@@ -135,7 +143,7 @@ die("Empty tag list!\n") unless(%tags);
 $tags{now(1)} = 1 if($OPTS{date} || $tags{new} || $tags{newly} || $tags{income} || $tags{incoming});#unless($tags{retag});
 @tags = keys %tags;
 
-my $log_files=$root . "tagfs.logs";
+my $log_files="tagfs.logs";
 if(!$TEST) {
 	open FO,">>$log_files";
 }
@@ -179,12 +187,26 @@ sub tag_files {
 			push @opts,'--file';
 	   }
        foreach my $tag (@tags) {
-            if(! -d "$root$tag") {
-                create_dir("$root$tag") or die("$!\n");
+            if(! -d "$tag") {
+                create_dir("$tag") or die("$!\n");
             }
 			my @level = ($tag =~ m/\//g);
 			my $dotdot = scalar(@level) + 1;
-			create_taglink("$root$tag","../"x$dotdot . "$REALTAG/$basename",@opts);
+			my $dst = "$tag/$basename";
+			if(-l $dst) {
+				system("rm","-vf","--",$dst);
+			}
+			if(!chdir($tag)) {
+				print STDERR "Error chang directory: $tag\n";
+				next;
+			}
+			else {
+				print STDERR "TAG: $tag\n";
+				create_taglink($basename,"../"x$dotdot . "$REALTAG/$basename",@opts);
+				chdir($PDIR);
+				chdir($root) if($root);
+			}
+
 #            system_execute(@linker,"$root$tag","../"x$dotdot . "$REALTAG/$basename");
        }
     }
@@ -192,8 +214,9 @@ sub tag_files {
 use utf8;
 use File::Glob qw/bsd_glob/;
 foreach (@files) {
+	local $_ = "$PDIR/$_";
     if(-e $_) {
-        tag_files($_);
+        tag_files("$_");
     }
     else {
         tag_files(bsd_glob($_));

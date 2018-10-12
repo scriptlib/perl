@@ -66,8 +66,12 @@ foreach my $idx(0 .. $#dirs) {
     my $bn=$src;
     $bn =~ s/[\/\\]$|^.*[\/\\]//g;
     $bn .= $ext;
-    my $fn= File::Spec->rel2abs($src,$pwd) . $ext;
-    my $comment="Filename  : $bn\n" . $COMMENT;
+    my $fd= File::Spec->rel2abs($src,$pwd);
+	use MyPlace::String::Utils qw/strtime/;
+	my $pt = strtime(undef,5);
+	my $fn = $fd . "_packed_$pt" . $ext;
+	$fd =~ s/^.*\/([^\/]+\/[^\/]+\/[^\/]+)\/?$/$1\//;
+    my $comment="Filename  : $bn\nPath      : $fd\n" . $COMMENT;
     print("$src->$bn\n$comment");
     if(!chdir($src)) {print STDERR ("$!\n");next;}
 

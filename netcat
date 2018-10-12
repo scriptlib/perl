@@ -7,9 +7,47 @@
 ###APPUSAGE:	(url)
 ###APPEXAMPLE:	netcat www.google.com
 use strict;
-use MyPlace::URLRule::Utils qw/get_url/;
-print STDOUT scalar(get_url(@ARGV));
-
+use MyPlace::Curl;
+my %ua = (
+	'android'=>'Mozilla/5.0 (Android 9.0; Mobile; rv:61.0) Gecko/61.0 Firefox/61.0',
+	'firefox'=>'Mozilla/5.0 (Windows NT 6.1; rv,2.0.1) Gecko/20100101 Firefox/4.0.1',
+	'ie'=>'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0;',
+	'chrome'=>'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_0) AppleWebKit/535.11 (KHTML, like Gecko) Chrome/17.0.963.56 Safari/535.11',
+	'iphone'=>'Mozilla/5.0 (iPhone; U; CPU iPhone OS 4_3_3 like Mac OS X; en-us) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8J2 Safari/6533.18.5',
+);
+my $cookie = $ENV{HOME} . "/.curl_cookies.dat";
+my $p = MyPlace::Curl->new(
+	"location"=>'',
+	"silent"=>'',
+	"show-error"=>'',
+	"cookie"=>$cookie,
+	"max-time"=>120,
+);
+my @args;
+my $ua;
+while(@ARGV) {
+	my $a = shift(@ARGV);
+	if($a =~ m/^(?:--user-agent|--useragent|--ua|-u)$/) {
+		$ua = shift(@ARGV);
+	}
+	else {
+		push @args,$a;
+	}
+}
+if($ua) {
+	$ua = 'firefox' unless($ua{$ua});
+	push @args,"--user-agent",$ua{$ua};
+}
+print STDERR "curl " . join(" ",@args),"\n";
+my($exit,$data) = $p->get(@args);
+if($exit == 0) {
+	print $data,"\n";
+	exit 0;
+}
+else {
+	print STDERR "Error: $data\n";
+	exit $exit;
+}
 
 __END__
 

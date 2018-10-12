@@ -155,7 +155,7 @@ use File::Glob qw/bsd_glob/;
 use Cwd qw/getcwd/;
 
 my $IMG_EXP = qr/\.(?:jpg|png|gif|jpeg)$/;
-my $VIDEO_EXP = qr/\.(?:flv|mp4|mpg|qt|ts|mpeg|avi|wmv|3gp|rm|rmvb|f4v|mp3|wma|wav)$/;
+my $VIDEO_EXP = qr/\.(?:flv|mp4|mpg|qt|ts|mpeg|avi|wmv|3gp|rm|rmvb|f4v|mp3|wma|wav)f?$/;
 sub get_dir {
 	my $dir = shift;
 	my @images;

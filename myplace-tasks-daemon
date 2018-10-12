@@ -14,6 +14,7 @@ my @OPTIONS = qw/
 	no-pull|np
 	debug|D
 	no-push
+	hosts=s
 	runonce|run
 	no-download|nd:s
 	include|I:s
@@ -39,6 +40,7 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
     exit $v;
 }
 
+push @INC,".";
 use File::Spec;
 use MyPlace::SimpleConfig qw/sc_from_file sc_to_file/;
 use MyPlace::Script::Message;
@@ -54,7 +56,7 @@ if($ENV{DEBUG} || $OPTS{'debug'}) {
 	$OPTS{'debug'} = 1;
 }
 
-our $CONFIGDIR = '.mtd';
+our $CONFIGDIR = '../taskspool/.mtd';
 if(! -d $CONFIGDIR) {
 	mkdir $CONFIGDIR or die("Error creating directory [$CONFIGDIR]:$!\n");
 }

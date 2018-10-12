@@ -18,6 +18,7 @@ my @OPTIONS = qw/
 	worker
 	group|g=s
 	all|a
+	subdir|sd:s
 /;
 my %OPTS;
 if(@ARGV)
@@ -32,15 +33,39 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
     exit $v;
 }
 
+sub _safe_path {
+	foreach(@_) {
+		next unless($_);
+		s/[\<\?*\:\"\|\>]+/_/;
+		s/^\.+//g;
+		s/:/ - /g;
+		#s/[\/\\\?\*]/_/g;
+		s/^\s+|[\.\s]+$|(?<=\/)\s+|[\.\s]+(?=\/)//g;
+		s/\s+/ /g;
+	}
+	if(wantarray) {
+		return @_;
+	}
+	else {
+		return $_[0] if($_[0]);
+	}
+}
 
 my %ENGINES = (
-	#Mirror btkitty.org
+	'zhongziso.com'=>[
+		'https://m.zhongziso.com/?###QUERY###',
+		2,
+	],
+	'digbt'=>[
+		'https://www.digbt.org/search/###QUERY###/',
+		2,
+	],
 	'btdb'=>[
 		'https://btdb.to/q/###QUERY###/',
 		1,
 	],
 	'btkitty'=>[
-		'https://cnbtkitty.org/?###QUERY###',
+		'https://cnbtkitty.xyz/?###QUERY###',
 		3,
 	],
 #	'btdigg.org'=>[
@@ -48,7 +73,7 @@ my %ENGINES = (
 #		2,
 #	],
 	'sobt5.com'=>[
-		'http://www.sobt8.com/q/###QUERY###',
+		'http://www.btmule.org/q/###QUERY###',
 		1,
 	],
 	'torrentkitty'=>[
@@ -120,6 +145,8 @@ my %GROUPS = (
 		ganluzhe.com
 		kat.cr
 		btbiti
+		digbt
+		zhongziso.com
 		/
 	],
 	'SAFE'=>[qw/
@@ -193,12 +220,23 @@ if(!@ARGV) {
 	exit 1;
 }
 
+if($OPTS{subdir}) {
+	$OPTS{dest} = _safe_path($OPTS{subdir});
+}
 if($OPTS{dest}) {
 	if(! -d $OPTS{dest}) {
 		mkdir $OPTS{dest} or die("Error creating directory $OPTS{dest}: $!\n");
 	}
 	chdir $OPTS{dest} or die("Error changing to directory $OPTS{dest}: $!\n");
 	app_warning "Enter $OPTS{dest} ...\n";
+}
+if($OPTS{subdir}) {
+	if(! -e 'HASH.lst') {
+		if(! -e "../HASH.lst") {
+			system("touch","--","../HASH.lst");
+		}
+		system("ln","-svf","../HASH.lst","HASH.lst");
+	}
 }
 
 sub do_action {

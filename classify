@@ -69,13 +69,13 @@ my %Actions;
 			my ($files,$rule) = @_;
 			my $target = $rule->{dest} . '/' . $rule->{name} . '/'; 
 		    system_run('mkdir','-pv','--',$target) unless(-d $target || $TESTMODE);
-			print STDERR "For [" . $rule->{name},"]\n";
 			my @prog = ();
 			push @prog,split(/\s+/,$OPTS{prefix}) if($OPTS{prefix});
 			@prog = (qw/echo/) unless(@prog);
 			my @suf = ();
 			push @suf,split(/\s+/,$OPTS{suffix}) if($OPTS{suffix});
-			print STDERR "Execute @prog ...\n" if(@prog);
+			print STDERR "  <@prog>, " if(@prog);
+			print STDERR $rule->{name},"\n";
 			my @keywords;
 			push @keywords,$rule->{name} unless($rule->{exclude_name});
 			push @keywords, @{$rule->{keyword}} if($rule->{keyword});
@@ -83,8 +83,26 @@ my %Actions;
 			chdir $target;
 			foreach my $key (@keywords) {
 				$key =~ s/\\.[\+\*]?//g;
-				print STDERR "    Processing [" . $rule->{name} . "/$key] ...\n";
-				system(@prog,$key,@suf);
+				print STDERR "    [$key] ...\n";
+				my @cmdline;
+				my $replaced;
+				my $nokey;
+				foreach(@prog,@suf) {
+					my $word = $_;
+					#print STDERR "\$word: $word\n";
+					if($word =~ s/\$_/$key/g) {
+						$replaced = 1;
+					}
+					if($word =~ s/\$\$$//g) {
+						$replaced = 1;
+					}
+					push @cmdline,$word;
+
+				}
+				if(!$replaced) {
+					@cmdline = (@prog,$key,@suf);
+				}
+				system(@cmdline);
 			}
 			chdir $CWD;
 		},
@@ -93,8 +111,8 @@ my %Actions;
 		},
 		'NOFILES'=>1,
 	},
-	'rules'=>{
-		'name'=>'rules',
+	'query'=>{
+		'name'=>'query',
 		'init'=>0,
 		'do'=>sub {
 			if(!$Actions{'rules'}->{init}) {
@@ -102,7 +120,30 @@ my %Actions;
 				print "\nResult:\n\n";
 			}
 			my($files,$rule,$idx) = @_;
-			printf "%4d.%s\n",$idx,$rule->{name};
+			printf "%d.\n  Name:\n\t%s\n  Keyword:\n",$idx,$rule->{name};
+			if($rule->{keyword}) {
+				print "        $_\n" foreach(@{$rule->{keyword}});
+			}
+			print "  Exp:\n";
+			if($rule->{exp}) {
+				print "        $rule->{exp}\n";
+			}
+			print "\n";
+			return 1;
+		},
+		'check'=>sub{1;},
+		'NOFILES'=>1,
+	},
+	'echo'=>{
+		'name'=>'echo',
+		'init'=>0,
+		'do'=>sub {
+			if(!$Actions{'rules'}->{init}) {
+				$Actions{'rules'}->{init} = 1;
+				print "\nResult:\n\n";
+			}
+			my($files,$rule,$idx) = @_;
+			printf "%s\n",$rule->{name};
 			if($rule->{keyword}) {
 				print "        $_\n" foreach(@{$rule->{keyword}});
 			}
@@ -167,19 +208,38 @@ my %TestMethod;
 			my $rule = shift;
 			return ($left eq $rule->{name});
 		},
-		'case'=>1,
+		'case'=>0,
 	},
 	'text'=>{
 		'name'=>'text',
 		'test'=>sub {
 			my $left = shift;
 			my $right = shift;
-			#if($left =~ m/082312-110/ and $right =~ m/Carib/) {
-			#	print STDERR "Left:$left\nRgith:$right\n";
-			#	print STDERR $left =~ /$right/ ? "Match: True\n" : "Match: False\n";
-			#	die();
-			#}
-			return ($TestMethod{text}->{case}) ? ($left =~ $right) : ($left =~ /$right/i) ;
+			my $rule = shift;
+			my $regexp = undef;
+			if(($right =~ m/^\//) and ($right =~ m/\/$/)) {
+				$regexp = 1;
+			}
+			elsif($right =~ m/\*|\?/) {
+				$regexp = 1;
+			}
+			my $icase = $TestMethod{text}->{case};
+			my @icase;
+			my $ileft = lc($left);
+			foreach($right,$rule->{name},@{$rule->{keyword}}) {
+				return 1 if($left eq $_);
+				push @icase,$_ unless($icase);
+			}
+			foreach(@icase) {
+				return 1 if($ileft eq $_);
+			}
+			if($icase) {
+				return $left =~ $right;
+			}
+			else {
+				return $left =~ /$right/i;
+			}
+			return undef;
 		},
 		'case'=>0,
 	},
@@ -199,7 +259,7 @@ my %TestMethod;
 				$TestMethod{filename}->{_cache}->{$left} = $a;
 				$left = $a;
 			}
-			return $TestMethod{text}->{test}->($left,$right);
+			return $TestMethod{text}->{test}->($left,$right,@_);
 		},
 	},
 	'filecontent'=>{
@@ -305,25 +365,29 @@ sub classify {
 sub process_nofiles {
 	my $files = shift;
 	my $rules = shift;
+	my $idx = 0;
 	my @match = ();
 	if($files and @$files) {
 		foreach my $rule(@$rules) {
 			foreach my $file(@files) {
-				if($rule->{name} =~ /$file/i) {
+				if(test($file,$rule)) {
 					push @match,$rule;
 				}
 			}
 		}
 	}
-	else {
-		@match = (@$rules);
-	}
-	my $idx = 0;
+	print STDERR "Rules matched : ",scalar(@match),"\n";
+	print STDERR "Taking actions:\n";
 	foreach my $rule(@match) {
 		$idx++;
 		do_action($files,$rule,$idx);
 	}
-	exit 0;
+	if($idx>0) {
+		return 0;
+	}
+	else {
+		return 1;
+	}	
 }
 
 sub process_file {
@@ -377,7 +441,7 @@ $DEST = $OPTS{'dest'} || '.';
 $METHOD = $OPTS{'by'} || 'text';
 $RULE_FILE = $OPTS{'rule'} || 'classify.rule';
 $TESTMODE = $OPTS{'test'} || '';
-my $ACTION_NAME=$OPTS{'action'} || 'print';
+my $ACTION_NAME=$OPTS{'action'} || 'query';
 $ACTION=$Actions{$ACTION_NAME};
 
 if($OPTS{dump}) {

@@ -45,7 +45,7 @@ sub process_file {
 	my $basename = pop(@dirs);
 	$basename =~ s/\.[^\.]+$//;
 	$basename = join("/",@dirs,$basename);
-	my $dst = $basename . "_001.jpg";
+	my $dst = $basename . ".jpg";
 	system(@$prog,'--',$_);
 	my $n = 1;
 	while(-f $dst) {

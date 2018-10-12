@@ -703,17 +703,35 @@ sub move_to {
 			print STDERR "    <= $_\n";
 			$exit = run('mv','-t',$dstd,'--',$_);
 		};
-		print STDERR "  Delete links:\n";
+		#print STDERR "  Delete links:\n";
 		foreach(@_) {
 			print STDERR "    XX $_\n";
 			unlink $_;
 		}
-		print STDERR "  Delete catalog links in <#Catalogs>:\n";
+		#print STDERR "  Delete catalog links in <#Catalogs>:\n";
 		foreach(@_) {
 			my $catalog_dir = '#Catalogs/' . uc(substr($_,0,1)) . '/' . $_;
 			if(-l $catalog_dir) {
 				print STDERR "    XX $catalog_dir\n";
 				unlink $catalog_dir;
+			}
+		};
+		#print STDERR "  Delete parts links in <#parts>:\n";
+		my @parts;
+		open FI,'<','#parts/#parts.lst';
+		while(<FI>) {
+			chomp;
+			push @parts,$_;
+		}
+		close FI;
+		foreach(@_) {
+			foreach my $p(@parts) {
+				my $catalog_dir = '#parts/' . $p . '/' . $_;
+				if(-l $catalog_dir) {
+					print STDERR "    XX $catalog_dir\n";
+					unlink $catalog_dir;
+					last;
+				}
 			}
 		};
 	}
@@ -1302,6 +1320,7 @@ sub process {
 	if($OPTS->{weipai}) {
 		$OPTS->{empty} = 1 unless(defined $OPTS->{empty});
 		$OPTS->{'images-without-videos'} = 1 unless(defined $OPTS->{'images-without-videos'});
+		$OPTS->{'videos-without-images'} = 1 unless(defined $OPTS->{'videos-without-images'});
 	}
 	foreach(@_) {
 		print STDERR "Processing [$_] ...\n";
@@ -1473,7 +1492,14 @@ sub process {
 		print STDERR "Error: $!\n";
 	}
 	foreach(@names) {
-		my $r = Babes::Editor::process({once=>1},'^([^#][^\s]+)\s+(' . $_ . ')$','$1' . "\t" . '#Trash\/$2',@files);
+		my $exp;
+		if(m/^(#[^\/]+)\/(.+)$/) {
+			$exp = ['^([^#][^\s]+)\s+' . "$1\\\/($2)", '$1' . "\t" . '#Trash\/$2'];
+		}
+		else {
+			$exp = ['^([^#][^\s]+)\s+(' . $_ . ')$','$1' . "\t" . '#Trash\/$2'];
+		}
+		my $r = Babes::Editor::process({once=>1},$exp->[0],$exp->[1],@files);
 		if($r == 0) {
 			$edit = 1;
 		}

@@ -66,7 +66,6 @@ sub create_link {
 		$OPTS={symbold=> 1};
 	}
 
-	
 	if($OPTS->{symbol} || $OPTS->{file}) {
 		print STDERR "Creating symbol link for files";
 	}
@@ -98,6 +97,7 @@ sub junction {
 
 
 sub usage {
+	require Pod::Usage;
 	Pod::Usage::pod2usage(-verbose=>$1);
 }
 
@@ -110,11 +110,26 @@ sub get_basename {
 
 sub ms_path {
 	my $src = shift;
-	my $dst = `cygpath -w  -- "$src"`;
-	chomp($dst);
+	#my $dst = `cygpath -w  -- "$src"`;
+	#chomp($dst);
+	my $dst = $src;
+	$dst =~ s/\//\\/g;
 	return $dst;
 }
 
+sub print_link {
+	my $l = shift;
+	my $d;
+	if(-l $l) {
+		$d = readlink($l);
+	}
+	if($d) {
+		print STDERR $l," => ",$d,"\n";
+	}
+	else {
+		print STDERR $l, " [ NOT A LINK ]\n";
+	}
+}
 
 my $failed;
 if($OPTS{'target'}) {
@@ -152,8 +167,16 @@ else {
 	elsif($junction =~ m/\/$/) {
 		$junction = catfile($junction,get_basename($target));
 	}
+	print STDERR "Create link [$junction] for $target ...\n";
+	if(-l $junction) {
+		print STDERR "Before: ";
+		print_link($junction);
+		system('rm','-v','-i',$junction);
+	}
 	$OPTS{file} = 1 if(-f $target);
 	$failed=1 unless(create_link(\%OPTS,ms_path($target),ms_path($junction)));
+		print STDERR "After : ";
+		print_link($junction);
 }
 exit 1 if($failed);
 exit 0;
