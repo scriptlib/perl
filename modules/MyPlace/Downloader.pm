@@ -161,7 +161,7 @@ sub read_m3u8_url {
 	my $FI;
 	if(!open $FI,"<:utf8",$f_m3u) {
 		print STDERR "Error opening file $f_m3u: $!\n";
-		return 0;
+		return;
 	}
 	my @urls;
 	my @m3u8;
