@@ -1,0 +1,294 @@
+#!/usr/bin/perl -w
+# $Id$
+package MyPlace::Script::urlrule_search;
+use strict;
+use MyPlace::Script::Message;
+use MyPlace::Program;
+use MyPlace::URLRule::OO;
+our %EXIT_CODE = %MyPlace::Program::EXIT_CODE;
+
+our $VERSION = 'v0.1';
+my @OPTIONS = qw/
+	help|h|? 
+	manual|man
+	engine|e=s
+	dest|directory=s
+	action=s
+	group|g=s
+	all|a
+	subdir|sd=s
+	method|by|m=s
+/;
+my %OPTS;
+if(@ARGV)
+{
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+}
+if($OPTS{'help'} or $OPTS{'manual'}) {
+	require Pod::Usage;
+	my $v = $OPTS{'help'} ? 1 : 2;
+	Pod::Usage::pod2usage(-exitval=>$v,-verbose=>$v);
+    exit $v;
+}
+
+sub _safe_path {
+	foreach(@_) {
+		next unless($_);
+		s/[\<\?*\:\"\|\>]+/_/;
+		s/^\.+//g;
+		s/:/ - /g;
+		#s/[\/\\\?\*]/_/g;
+		s/^\s+|[\.\s]+$|(?<=\/)\s+|[\.\s]+(?=\/)//g;
+		s/\s+/ /g;
+	}
+	if(wantarray) {
+		return @_;
+	}
+	else {
+		return $_[0] if($_[0]);
+	}
+}
+
+sub do_action {
+	my $OPTS = shift;
+	my $action = shift;
+	my @request = @_;
+	my $idx = 0;
+	my $URLRULE = new MyPlace::URLRule::OO(
+			'action'=>$action,
+			'thread'=>$OPTS->{thread},
+			'createdir'=>1,
+			'buildurl'=>1,
+			'options'=>{
+				fullname=>$OPTS->{fullname},
+			},
+			'include'=>$OPTS->{include},
+			'exclude'=>$OPTS->{exclude},
+	);
+	my $count = @request;
+	foreach(@request) {
+		$idx++;
+		$_->{progress} = "[$idx/$count]";
+		$URLRULE->autoApply($_);
+		$URLRULE->reset();
+	}
+	if($URLRULE->{DATAS_COUNT}) {
+		return $EXIT_CODE{OK};
+	}
+	else {
+		return $EXIT_CODE{DO_NOTHING};
+	}
+}
+
+
+my %ENGINES = (
+	'txxx'=>{
+		domain=>'txxx.com',
+		keyword=>['https://txxx.com/search/?s=###QUERY###',2,'+'],
+		category=>['https://www.txxx.com/categories/###QUERY###/',2,'-'],
+		name=>['https://txxx.com/models/###QUERY###/',2,'-'],
+		groups=>'porn,nsfw',
+	},
+	'spankbang'=>{
+		domain=>'spankbang.com',
+		keyword=>['https://spankbang.com/s/###QUERY###/',2,'+'],
+		category=>['https://spankbang.com/category/###QUERY###/',2,'+'],
+		tags=>['https://spankbang.com/tag/###QUERY###/',2,'+'],
+		groups=>'default,porn,nsfw',
+	},
+	'xhamster'=>{
+		domain=>'xhamster.one',
+		keyword=>['https://xhamster.one/search?q=###QUERY###',2,'+'],
+		name=>['https://xhamster.one/pornstars/###QUERY###',2,'-'],
+		category=>['https://xhamster.one/categories/###QUERY###',2,'-'],
+		tags=>['https://xhamster.one/tags/###QUERY###',2,'-'],
+		groups=>'porn,nsfw',
+	},
+	'tubepornclassic'=>{
+		domain=>'cn.tubepornclassic.com',
+		category=>['https://xhamster.one/categories/###QUERY###',2,'-'],
+		keyword=>['https://cn.tubepornclassic.com/search/###QUERY###',2,'%20'],
+		name=>['https://cn.tubepornclassic.com/models/###QUERY###/',2,'-'],
+		groups=>'porn,nsfw',
+	},
+	'megatube'=>{
+		domain=>'megatube.xxx',
+		category=>['https://www.megatube.xxx/###QUERY###.porn',2,'-'],
+		name=>['https://www.megatube.xxx/###QUERY###.pornstar',2,'-'],
+		keyword=>['https://www.megatube.xxx/search/###QUERY###/',2,'-'],
+		groups=>'porn,nsfw',
+	},
+	'javmobile'=>{
+		domain=>'javmobile.mobi',
+		keyword=>['https://javmobile.mobi/videos/###QUERY###/',2,'-'],
+		groups=>'jav,nsfw',
+	},
+	'yase'=>{
+		domain=>'9.yase520.com',
+		keyword=>['https://9.yase520.com/search/keywords/###QUERY###',2,'%20'],
+		groups=>'clips,jav,homemade,cn,leakage,nsfw',
+	},
+);
+
+my %engine;
+my @engine;
+
+if($OPTS{all}) {
+	%engine = map {$_=>1} keys %ENGINES;
+}
+elsif($OPTS{engine}) {
+	foreach(keys %ENGINES) {
+		if(m/$OPTS{engine}/) {
+			$engine{$_} = 1;
+		}
+	}
+}
+else{
+	$OPTS{group} = 'default' unless($OPTS{group});
+	foreach(keys %ENGINES) {
+		my $groups = $ENGINES{$_}->{groups};
+		if($groups =~ m/$OPTS{group}/) {
+			$engine{$_} = 1;
+		}
+	}
+}
+$OPTS{method} = "keyword" unless($OPTS{method});
+$OPTS{method} = 'keyword|category|name|tags' if(lc($OPTS{method}) eq 'all');
+foreach(keys %engine) {
+	next if(m/^#/);
+	my $e = $ENGINES{$_};
+	foreach my $method (keys %$e) {
+		next if($method eq 'domain');
+		next if($method eq 'group');
+		next unless($method =~ m/$OPTS{method}/);
+		app_message2 "uses engine $_, search by $method\n";
+		push @engine,[$_,@{$e->{$method}}];		
+	}
+}
+
+if(!@engine) {
+	app_error "No search engine specified\n";
+	exit 1;
+}
+
+if(!@ARGV) {
+	foreach my $fk(qw/keywords.lst keywords.txt/) {
+		next unless(-f $fk);
+		app_message2 "Read queires from <$fk>\n";
+		open FI,'<',$fk or next;
+		foreach(<FI>) {
+			s/[\r\n]+$//;
+			next unless($_);
+			push @ARGV,$_;
+			app_message2 "  : $_\n" 
+		}
+		close FI;
+	}
+}
+
+if(!@ARGV) {
+	app_warning "Usage:$0 [-d] <Queries...>\n";
+	exit 1;
+}
+
+if($OPTS{subdir}) {
+	$OPTS{dest} = _safe_path($OPTS{subdir});
+}
+if($OPTS{dest}) {
+	if(! -d $OPTS{dest}) {
+		mkdir $OPTS{dest} or die("Error creating directory $OPTS{dest}: $!\n");
+	}
+	chdir $OPTS{dest} or die("Error changing to directory $OPTS{dest}: $!\n");
+	app_warning "Enter $OPTS{dest} ...\n";
+}
+if($OPTS{subdir}) {
+	if(! -e 'urls.lst') {
+		if(! -e "../urls.lst") {
+			system("touch","--","../urls.lst");
+		}
+		system("ln","-svf","../urls.lst","urls.lst");
+	}
+}
+
+
+#app_message2 "uses engines: [",join("],[", map($_->[0],@engine)),"]","\n";
+
+my @request;
+foreach my $QUERY(@ARGV) {
+	foreach my $e(@engine) {
+		my $key = $QUERY;
+		my $name = $e->[0];
+		my $url = $e->[1];
+		my $level = $e->[2];
+		my $space = $e->[3];
+		#app_message2 "Search \<$QUERY\> using engine \[$name\]\n";
+		$key =~ s/\s+/$space/g;
+		$url =~ s/###QUERY###/$key/g;
+		app_message2 "builds request [$level]$url\n";
+		push @request,{
+			count=>1,
+			url=>$url,
+			level=>$level,
+			prompt=>"$name:$QUERY",
+		};
+	}
+}
+my $action = $OPTS{action} || 'DATABASE';
+app_message2 "with action:$action\n";
+app_message2 "executing...\n";
+my $exit = do_action(\%OPTS,$action,@request);
+exit 1 unless(defined $exit);
+exit $exit;
+
+__END__
+
+=pod
+
+=head1  NAME
+
+urlrule_search - PERL script
+
+=head1  SYNOPSIS
+
+urlrule_search [options] ...
+
+=head1  OPTIONS
+
+=over 12
+
+=item B<--version>
+
+Print version infomation.
+
+=item B<-h>,B<--help>
+
+Print a brief help message and exits.
+
+=item B<--manual>,B<--man>
+
+View application manual
+
+=item B<--edit-me>
+
+Invoke 'editor' against the source
+
+=back
+
+=head1  DESCRIPTION
+
+___DESC___
+
+=head1  CHANGELOG
+
+    2014-10-15 03:14  xiaoranzzz  <xiaoranzzz@MyPlace>
+        
+        * file created.
+
+=head1  AUTHOR
+
+xiaoranzzz <xiaoranzzz@MyPlace>
+
+=cut
+
+#       vim:filetype=perl
