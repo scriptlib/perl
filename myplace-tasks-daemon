@@ -19,6 +19,7 @@ my @OPTIONS = qw/
 	no-download|nd:s
 	include|I:s
 	exclude|X:s
+	limits:s
 	no-saveurl|ns
 	disable-download|dd:s
 	disable-all-download|dad:s

@@ -80,12 +80,12 @@ my $USQ;
 
 	sub expand_url {
 		my $url = shift;
-		if($url =~ m{^http://url.cn} || $url =~ m{http://[^\.]+\.l\.mob\.com}) {
+		if($url =~ m{^(?:https?://url\.cn|https?://[^\.]+\.l\.mob\.com|https?://t\.cn)}) {
 			print STDERR "Retriving $url ...\n";
-			if(open FI,"-|","curl","--progress","-D","/dev/stdout",$url) {
+			if(open FI,"-|","curl","--progress","--dump-header","-","--",$url) {
 				while(<FI>) {
 					chomp;
-					if(m/\s*Location\s*:\s*(.+?)\s*$/) {
+					if(m/^\s*<?\s*Location\s*:\s*(.+?)\s*$/) {
 						my $next = $1;
 						next unless($next =~ m/^http/);
 						print STDERR "URL: $url \n => $next\n";
@@ -100,6 +100,7 @@ my $USQ;
 				return;
 			}
 		}
+		return undef;
 	}
 	sub extract_info_from_url {
 		my $url = shift;
@@ -189,7 +190,10 @@ my $USQ;
 			print STDERR "Applying RULE $rule->{source}\n";
 			my ($status,$info) = apply_rule($rule);
 			if($status) {
-				return $info->{profile},"$info->{uname}\t$info->{dyid}",$info->{host};
+				return unless($info->{uname});
+				my $name = $info->{uname};
+				$name = $name . "\t$info->{id2}" if($info->{id2});
+				return $info->{profile},$name,$info->{host};
 			}
 		}
 	}

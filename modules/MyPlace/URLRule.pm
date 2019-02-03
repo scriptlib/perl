@@ -64,6 +64,7 @@ sub get_domain($) {
 	$url =~ s/^.*?:\/+//g;
 	$url =~ s/\/.*//g;
 	$url =~ s/:\d+$//;
+	$url =~ s/^www\.//;
 	return $url;
     if($url =~ /([^\.\/]+\.[^\.\/]+)\//) {
         return $1;
@@ -528,13 +529,13 @@ sub urlrule_quick_parse {
 		$data_exp,$data_map,
 		$pass_exp,$pass_map,$pass_name_exp,$pass_name_map,
 		$pages_exp,$pages_map,$pages_pre,$pages_suf,$pages_start,$pages_margin,
-		$pages_limit,
+		$pages_limit,$pages_error,
 		$charset) = @args{qw/
         title_exp title_map
         data_exp data_map
 		pass_exp pass_map pass_name_exp pass_name_map 
         pages_exp pages_map pages_pre pages_suf pages_start pages_margin
-		pages_limit
+		pages_limit pages_error
         charset
     /};
 	
@@ -600,8 +601,12 @@ sub urlrule_quick_parse {
 				start=>$pages_start,
 				margin=>$pages_margin,
 				limit=>$pages_limit,
+				error=>$pages_error,
 		);
-		if(!@pass_data) {
+		if(!ref $pages) {
+			return (error=>$pages);
+		}
+		elsif(!@pass_data) {
 			@pass_data = @{$pages};
 		}
 		else {

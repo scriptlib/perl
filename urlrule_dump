@@ -20,6 +20,7 @@ my @OPTIONS = qw/
 	help|h|? 
 	manual|man
 	info|i
+	rule|u=s
 /;
 my %OPTS;
 if(@ARGV)
@@ -56,7 +57,13 @@ elsif($level !~ /^\d+$/) {
 }
 
 my $uh = new MyPlace::URLRule;
-my $rule = $uh->rule($url,$level);
+my $rule;
+if($OPTS{rule}) {
+	$rule = $uh->rule($OPTS{rule},$level);
+}
+else {
+	$rule = $uh->rule($url,$level);
+}
 print STDERR Data::Dumper->Dump([$rule],['*rule']) unless(@ARGV);
 #my ($status,$result) = $uh->process($rule);
 my ($status,$result) = $uh->process($url,$level);

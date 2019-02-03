@@ -130,12 +130,15 @@ sub strtime {
 	}
 }
 
+use File::Spec::Functions qw/splitpath catdir/;
 sub junction {
 	my $SRC = shift;
 	my $DST = shift;
+	#print STDERR "$SRC => $DST\n";
 	my $exit = 0;
+	my (undef,$p,$name) = splitpath($SRC);
 	if($ENV{OS} and $ENV{OS} =~ m/Windows/i) {
-		if(run("ntfs-link","$DST/$SRC",$SRC)) {
+		if(run("ntfs-link",catdir($DST,$name),$SRC)) {
 			print STDERR "\t [OK]\n";
 			$exit = 0;
 		}
@@ -145,10 +148,7 @@ sub junction {
 		}
 	}
 	else {
-		my $name = $SRC;
-		$name =~ s/\/+$//;
-		$name =~ s/^.*\///;
-		my $target = "$DST/$name";
+		my $target = catdir($DST,$name);
 		my $junction = $SRC;
 		if(run("ln","-sfT","--",$target,$junction)) {
 			print STDERR "\t [OK]\n";
@@ -310,6 +310,9 @@ sub execute {
 	}
 	elsif($CMD eq 'FILES') {
 		exit Babes::Files::process(\%OPTS,@ARGV);
+	}
+	elsif($CMD eq 'LINK') {
+		exit Babes::Link::process(\%OPTS,@ARGV);
 	}
 	else {
 		die("Command not found: $cmd\n");
@@ -619,7 +622,7 @@ sub process {
 #######################################################################
 
 package Babes::Move;
-use File::Spec::Functions qw/catfile catdir/;
+use File::Spec::Functions qw/catfile catdir splitpath/;
 use strict;
 
 our $MOVE_TRASH_DIR = '#Trash';
@@ -781,8 +784,10 @@ our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 			$exit = move_to($OPTS,$OPTS->{into},@_);
 			delete $OPTS->{into};
 	}
-
-	if($OPTS->{clips}) {
+	
+	if($OPTS->{just_link}) {
+	}
+	elsif($OPTS->{clips}) {
 		return move_to($OPTS,$MOVE_CLIPS_DIR,@_);
 	}
 	elsif($OPTS->{reposter}) {
@@ -808,7 +813,26 @@ our $MOVE_REPOSTER_DIR = Babes::get_pref('reposter-dir','#Reposter');
 	
 	$exit = 0;
 	foreach my $SRC (@_) {
-		print STDERR "  [$SRC] Moving to $DST/\n";
+		if($OPTS->{just_link}) {
+				print STDERR " [$SRC] Creating link in $DST/\n";
+				return 2 unless &Babes::create_dir($DST);
+				my $srcd = $SRC;
+				if(-l $SRC) {
+					$srcd = readlink($SRC);
+					if($srcd =~ m/^\.\.\/(.*)$/) {
+						$srcd = $1;
+					}
+					#print STDERR "\tSource:$srcd\n";
+				}
+				my (undef,$p,$n) = splitpath($srcd);
+				#die($p,"\n",$n,"\n");
+				$exit = Babes::junction(catdir($DST,$n),$p);#run("ntfs-link","--",$srcd,catdir($DST,$n));
+				#$exit = run("ntfs-link","--",$srcd,catdir($DST,$n));
+			next;
+		}
+		else {
+			print STDERR "  [$SRC] Moving to $DST/\n";
+		}
 		if(-l $SRC) {
 			my $link = readlink($SRC);
 			print STDERR "  [$SRC] is a symbol link to $link\n";
@@ -1023,6 +1047,7 @@ sub get_images_without_videos {
 			.wmv
 			.rmvb
 			.rm
+			.txt
 		/
 	);
 }
@@ -1048,7 +1073,7 @@ sub get_videos_without_images {
 			.p.3..jpg
 			.p.4.jpg
 			.p.5.jpg
-
+			.txt
 		/,
 	);
 }
@@ -1232,9 +1257,10 @@ use warnings;
 use File::Spec::Functions qw/catfile catdir/;
 use Cwd qw/getcwd/;
 
-sub process_weipai {
+sub process_profile {
 	my $OPTS = shift;
 	my $dir = shift;
+	my $host = shift;
 	my $name = shift;
 #	my $cwd = getcwd;
 #	if(!chdir $dir) {
@@ -1252,13 +1278,13 @@ sub process_weipai {
 			print STDERR "	Ignored, profile files exist\n";
 		}
 		else {
-			system("weipai","save-profile",$id);
+			system("urlrule","--hosts",$host,"save_profile",$id);
 		}
 		$processed = 1;
 	}
 #	chdir($cwd);
 	if(!$processed) {
-		print STDERR "	Error, No weipai ID found for $name\n";
+		print STDERR "	Error, No profile found for $name\n";
 	}
 }
 sub process_dir {
@@ -1271,8 +1297,8 @@ sub process_dir {
 	}
 	my $processed;
 	foreach(glob('*')) {
-		if(m/^(weipai\.cn)$/) {
-			process_weipai($OPTS,$_,$dir);
+		if(m/^(douyin\.com)$/) {
+			process_profile($OPTS,$_,$_,$dir);
 			$processed = 1;
 		}
 	}
@@ -1569,6 +1595,8 @@ sub process {
 			if($OPTS->{'unfollow'}) {
 				Babes::Follow::unfollow($OPTS,$SRC);
 			}
+			#NO UPDATE (Saving Profile)
+			#print STDERR "Ignored profile saving ..\n";
 			Babes::Update::process($OPTS,$SRC);
 		}
 		
@@ -1631,6 +1659,54 @@ sub process {
 		$exit = &Babes::run(@prog,$_);
 	}
 	return $exit;
+}
+1;
+#######################################################################
+package Babes::Link;
+sub process {
+	my $OPTS = shift;
+	my $DST;
+	my %lopts = (%$OPTS);
+	$OPTS = \%lopts;
+	$OPTS->{junction} = 1;
+	$OPTS->{just_link} = 1;
+	$DST = shift;
+
+	#my $INTO = $OPTS->{into};
+	#delete $OPTS->{into};
+
+	if(!@_) {
+		die("Usage: $0 link [options] target_directory source_directory\n");
+	}
+	
+	foreach my $SRC (@_) {
+		if($OPTS->{'mkdir'}) {
+			if(! -d $SRC) {
+				print STDERR "[$SRC] creating directory";
+				if(mkdir $SRC) {
+					print STDERR "\t[OK]\n";
+				}
+				else {
+					print STDERR "\t[FAILED]\n";
+					next;
+				}
+			}
+
+		}
+
+		if($DST) {
+			Babes::Move::process($OPTS,$DST,$SRC);
+		}
+		else {
+			Babes::Move::process($OPTS,$SRC);
+		}
+#		if($OPTS->{junction} and $INTO) {
+#			my %llopts = (%$OPTS);
+#			delete $llopts{junction};
+#			$llopts{into} = $INTO;
+#			Babes::Move::process(\%llopts,$SRC);
+#		}
+	}
 }
 1;
 #######################################################################

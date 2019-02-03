@@ -6,7 +6,7 @@ BEGIN {
     our ($VERSION,@ISA,@EXPORT,@EXPORT_OK,%EXPORT_TAGS);
     $VERSION        = 1.00;
     @ISA            = qw(Exporter);
-    @EXPORT         = qw(&qcmd_run);
+    @EXPORT         = qw(&qcmd_run &qcmd_set &qcmd_name &qcmd_add);
     @EXPORT_OK      = qw();
 }
 use Term::ANSIColor qw/color/;
@@ -88,6 +88,9 @@ sub qcmd_add {
 sub qcmd_execute {
 	my $cmd = shift;
 	$cmd = 'echo' unless($cmd);
+	if(ref $cmd) {
+		return &$cmd(@_);
+	}
 #	if($ctable{uc($cmd)}) {
 #		return system(@{$ctable{uc($cmd)}},@_) == 0;
 #	}
@@ -103,12 +106,8 @@ sub qcmd_run {
 		chomp;
 		if($_) {
 			my($verb,@words) = split(/\s+/,$_);
-			my $VERB = $vtable{uc($verb)};
-			if(!$VERB) {
-				@words = split(/\s+>\s+/,$PREFIX . $_);
-				$ok = qcmd_execute($CMD,@ARGS,@words);
-			}
-			elsif($VERB eq 'QUIT') {
+			my $VERB = $vtable{uc($verb)} || '';
+			if($VERB eq 'QUIT') {
 				$ok = 1;
 				last;
 			}
@@ -127,7 +126,24 @@ sub qcmd_run {
 			}
 			else {
 				@words = split(/\s+>\s+/,$PREFIX . $_);
-				$ok = qcmd_execute($CMD,@ARGS,@words);
+				my @args;
+				foreach(@ARGS) {
+					if(m/^\$(\d+)$/) {
+						my $n=$1-1;
+						if(defined $words[$n]) {
+							push @args,$words[$n];
+							$words[$n] = undef;
+						}
+					}
+					else {
+						push @args,$_;
+					}
+				}
+				foreach(@words) {
+					push @args,$_ if(defined $_);
+				}
+				print STDERR join(" ",$CMD,@args),"\n";
+				$ok = qcmd_execute($CMD,@args);
 			}
 		}
 		#		&qcmd_prompt;

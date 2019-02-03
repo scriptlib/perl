@@ -39,25 +39,82 @@ my @OPTIONS = qw/
 		mirror|or=s@
 		post=s
 		max-time|maxtime|m=i
+		mobile
+		continue
 	/;
 my $proxy = '127.0.0.1:9050';
 my $blocked_host = '\n';#wretch\.cc|facebook\.com|fbcdn\.net';
 my $BLOCKED_EXP = qr/^[^\/]+:\/\/[^\/]*(?:$blocked_host)(?:\/?|\/.*)$/;
 my @WGET = qw{
-    wget --connect-timeout 15 -q --progress bar
+    wget -nv -t 3 --connect-timeout 15 --progress bar --show-progress
 };
 my @CURL = qw{
         curl
 		--fail --globoff --location
-		--progress-bar --create-dirs
+		--create-dirs
 		--connect-timeout 15
-		--location
+		--progress-bar
 };
+
 #my $UA = 'Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)';
 my $UA = 'Mozilla/5.0 (Windows NT 6.1; rv:38.0) Gecko/20100101 Firefox/38.0';
 #'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.3) Gecko/2008092416 Firefox/3.0.3 Firefox/3.0.1';
+$UA = 'Mozilla/5.0 (Android 9.0; Mobile; rv:63.0) Gecko/63.0 Firefox/63.0';
 push @WGET,'--user-agent',$UA;
 push @CURL,'--user-agent', $UA;
+
+my $DEFAULT_PROGRAM = 'wget';
+my @PROG = @CURL;
+
+my %PROG_OPT_MAP = (
+	'curl'=>{
+		'--saveas'=>'--output',
+		"--post"=>"-d",
+		"--quiet"=>"--silent",
+		"--continue"=>'IGNORED',
+		"--no-verbose"=>'IGNORED',
+	},
+	'wget'=>{
+		'--saveas'=>'--output-document',
+		"--cookie"=>"--save-cookie",
+		"--cookie-jar"=>"--load--cookie",
+		"--max-time"=>"--read-timeout",
+		"--output"=>"--output-document",
+		"--url"=>'IGNORED',
+		"--post"=>"--post-data",
+		"--compressed"=>'IGNORED',
+        "--socks5-hostname"=>'NOTHING',
+	},
+);
+
+sub prog_get {
+	my $name = shift;
+	if($name =~ m/^wget$/i) {
+		return @WGET;
+	}
+	else {
+		return @CURL;
+	}
+}
+
+sub prog_set {
+	my $opt = shift;
+	return () unless($opt);
+	my $mopt = $PROG_OPT_MAP{$DEFAULT_PROGRAM}->{$opt};
+	if(!defined $mopt) {
+		return $opt,@_;
+	}
+	elsif($mopt eq "IGNORED") {
+		return @_;
+	}
+	elsif($mopt eq "NOTHING") {
+		print STDERR "Program [$DEFAULT_PROGRAM] not supports option <$opt>\n";
+		return ();
+	}
+	else {
+		return $mopt,@_;
+	}
+}
 
 sub new {
 	my $class = shift;
@@ -110,41 +167,30 @@ sub log($$) {
     close FO;
 }
 
+
 sub build_cmdline {
     my($name,$url,$saveas,%OPTS) = @_;
 	#my($name,$url,$saveas,$refer,$cookie,$quiet,$maxtime) = @_;
     return undef unless($url);
     my @result;
-    if($name =~ /^wget$/i) {
-        push @result,@WGET;
-        push @result,"--referer",$OPTS{referer} || $url;
-        push @result,"--output-document",$saveas if($saveas);
-		if($OPTS{cookie}) {
-			push @result,"--save-cookie",$OPTS{cookie};
-			push @result,"--load-cookie",$OPTS{cookie} if(-f $OPTS{cookie});
-		}	
-        push @result,'--read-timeout',$OPTS{'max-time'} if($OPTS{'max-time'});
-        push @result,$url;
+	push @result,prog_get($name);
+	push @result,prog_set("--url",$url);
+	push @result,prog_set("--referer",$OPTS{referer} || $url);
+    push @result,prog_set("--output",$saveas) if($saveas);
+	push @result,prog_set("--post",$OPTS{post}) if($OPTS{post});
+	if($OPTS{cookie}) {
+	    push @result,prog_set("--cookie",$OPTS{cookie})if(-f $OPTS{cookie});
+	    push @result,prog_set("--cookie-jar",$OPTS{cookie});
+	}
+    push @result,prog_set("--max-time",$OPTS{'max-time'}) if($OPTS{'max-time'});
+    push @result,prog_set("--connect-timeout",$OPTS{'connect-timeout'}) if($OPTS{'connect-timeout'});
+    push @result,prog_set("--quiet") if($OPTS{quiet});
+	push @result,prog_set("--compressed") unless($OPTS{'no-compressed'});
+    if($url =~ $BLOCKED_EXP) {
+        app_message "USE PROXY $proxy\n";
+        push @result,prog_set("--socks5-hostname",$proxy);
     }
-    else {
-        push @result,@CURL;
-        push @result,"--url",$url;
-        push @result,"--referer",$OPTS{referer} || $url;
-        push @result,"--output",$saveas if($saveas);
-		push @result,"-d",$OPTS{post} if($OPTS{post});
-		if($OPTS{cookie}) {
-	        push @result,"--cookie",$OPTS{cookie} if(-f $OPTS{cookie});
-		    push @result,"--cookie-jar",$OPTS{cookie};
-		}
-        push @result,"--max-time",$OPTS{'max-time'} if($OPTS{'max-time'});
-        push @result,"--connect-timeout",$OPTS{'connect-timeout'} if($OPTS{'connect-timeout'});
-		push @result,"--silent" if($OPTS{quiet});
-		push @result,"--compressed" unless($OPTS{'no-compressed'});
-        if($url =~ $BLOCKED_EXP) {
-            app_message "USE PROXY $proxy\n";
-            push @result,"--socks5-hostname",$proxy;
-        }
-    }
+	push @result,prog_set("--continue") if($OPTS{continue});
     return @result;
 }
 
@@ -156,6 +202,7 @@ sub _process {
 	#print STDERR join(" ",@{$cmdline}),"\n";
 	my $output = "$taskname.downloading";
 	$output =~ s/[\/\\*?:"'\[\]\{\}\s,#!\>\<^&~\|+_\-]+//g;
+	$output = substr($output,,40);
 	unlink $output if(-f $output);
     while($retry) {
         $retry--;
@@ -166,13 +213,16 @@ sub _process {
 #		}
 #		$r = $?;
 #		print STDERR "Execute: ",join(" ",@{$cmdline},'-o',$output),"\n";
-        $r=system(@{$cmdline},'-o',$output);
+        my @call = (@{$cmdline},prog_set('--output',$output));
+		#print STDERR "Execute: ",join(" ",@call),"\n";
+        $r=system(@call);
 		if($r == 0) {
-			open FI,'<:raw',$output;
-			@data = <FI>;
-			close FI;
-			unlink $output;
-			return 0,@data;
+			return 0,$output;
+			#			open FI,'<:raw',$output;
+			#@data = <FI>;
+			#close FI;
+			#unlink $output;
+			#return 0,@data;
 		}
 		unlink $output if(-f $output);
         return 2,$! if($r==2); #/KILL,TERM,USERINT;
@@ -400,7 +450,7 @@ sub _download {
 	my $self = shift;
 	my $options = shift;
 #	my $options = $self->{options} || {};
-	my $downloader = $options->{program} || 'curl';
+	my $downloader = $options->{program} || $DEFAULT_PROGRAM;
 	my $cookie= $options->{cookie} || '';
 	my $FAILLOG="download.failed";
 	my $DOWNLOADLOG="download.log";
@@ -496,18 +546,19 @@ sub _download {
 			next;
 		}
 		elsif($r==0 and @data) {
-			next if($options->{test});
-			if(open FO, ">:raw",$saveas) {
-				print FO @data;
-				close FO;
+			my $tmpfile = shift(@data);
+			if($options->{test}) {
+				unlink $tmpfile;
+				next;
+			}
+			if(system("mv","--",$tmpfile,$saveas) == 0) {
+				#print STDERR "\n";
 			}
 			else {
 				app_error("Error writting $saveas: $!\n");
 				$exitval = 4;
 				next;
 			}
-#		    unlink ($saveas) if(-f $saveas);
-#		    rename($saveas_temp,$saveas) or die("$!\n");
 		    &log("$url->$saveas\n","$DOWNLOADLOG") if($options->{log});
 		    app_ok "$name$saveas\t[Completed]\n" unless($options->{quiet});
 			$exitval = 0;

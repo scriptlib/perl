@@ -26,6 +26,7 @@ sub OPTIONS {qw/
 	output|saveas|o=s
 	max-time|mt=i
 	connect-timeout|ct=i
+	max-retry|mr=i
 /;}
 
 my %EXPS = (
@@ -60,6 +61,24 @@ my %DOWNLOADERS = (
 );
 
 my $BLOCKED_URLS = qr/vlook\.cn\/video\/high\/[^\/]+\.mp4$/;
+my $MAX_RETRY = 3;
+my %RETRIED;
+sub FAILED_RETRY {
+	my $self = shift;
+	my $key = "@_";
+	my $retry = $RETRIED{$key} || 0;
+	if($retry > $MAX_RETRY) {
+		print STDERR "Failed too much time\n";
+		$RETRIED{$key} = 0;
+		return $self->EXIT_CODE("FAILED");
+	}
+	else {
+		$retry++;
+		$RETRIED{$key} = $retry;
+		print STDERR "Failed, retring ...\n";
+		return $self->EXIT_CODE("RETRY");
+	}
+}
 
 sub extname {
 	my $filename = shift;
@@ -99,6 +118,154 @@ sub save_vlook {
 	my $url = shift;
 	my $filename = shift;
 
+}
+
+sub expand_url {
+	my $url = shift;
+			if(open FI,"-|","curl","--silent","--dump-header","/dev/stdout","--",$url) {
+				while(<FI>) {
+					#print STDERR $_;
+					chomp;
+					if(m/^\s*<?\s*location\s*:\s*(.+?)\s*$/i) {
+						my $next = $1;
+						next unless($next =~ m/^http/);
+						print STDERR "URL: $url \n => $next\n";
+						close FI;
+						return $next;
+						last;
+					}
+				}
+				close FI;
+			}
+	return $url;
+}
+sub read_m3u8_url {
+	my $self = shift;
+	my $url = shift;
+	my $f_m3u = shift;
+	my $furl = $url;
+
+	if(!-f $f_m3u) {
+		$furl = expand_url($url);
+	}
+	
+	my $f_base1 = $furl;
+	my $f_base2 = $furl;
+	$f_base1 =~ s/^([^\/]+\/\/[^\/]+).*/$1/;
+	$f_base2 =~ s/\/[^\/]+$//;
+
+	if(!-f $f_m3u) {
+		$self->save_http($furl,$f_m3u);
+		#return undef,undef unless(-f $f_m3u);
+	}
+	my $FI;
+	if(!open $FI,"<:utf8",$f_m3u) {
+		print STDERR "Error opening file $f_m3u: $!\n";
+		return 0;
+	}
+	my @urls;
+	my @m3u8;
+	my $idx = 0;
+	while(<$FI>) {
+		chomp;
+		next if(m/^#/);
+		if(m/^http/) {
+		}
+		elsif(m/^\/+/) {
+			$_ = "$f_base1/$_";
+		}
+		else {
+			$_ = "$f_base2/$_";
+		}
+		if($_ =~ m/\.m3u8$/ or ($f_base1 =~ m/ahcdn\.com/ and $_ =~ m/\.mp4$/)) {
+			$idx++;
+			my $fn = $f_m3u;
+			$fn =~ s/\.m3u8$/_$idx.m3u8/;
+			push @urls,$self->read_m3u8_url($_,$fn);
+		}
+		else {
+			push @urls,$_;
+		}
+	}
+	close $FI;
+	unlink $f_m3u;
+	return @urls;
+}
+
+sub save_m3u8 {
+	my ($self,$url,$name,$failed) = @_;
+	my $ext;
+	my $filename = $name;
+	if(!$filename) {
+		$filename = $url;
+		$filename =~ s/.*[\/\\]//;
+		if($filename =~ m/^(.+)\.([^\.]+)$/) {
+			$filename = $1;
+			$ext = $2;
+		}
+	}
+	if($filename =~ m/^(.+)\.([^\.]+)$/) {
+		$filename = $1;
+		$ext = $2;
+	}
+	else {
+		$ext = "ts";
+	}
+	my $dst = "$filename.$ext";
+	if(-f $dst) {
+		print STDERR "File exists: $dst\n";
+		return $self->EXIT_CODE("DONE");
+	}
+	my $f_m3u = $filename . ".m3u8";
+	my @urls = $self->read_m3u8_url($url,$f_m3u);
+	my $idx = 0;
+	my $count = @urls;
+	my @data;
+	my @files;
+	if($count < 1) {
+		return $self->FAILED_RETRY(@_);
+	}
+	foreach(@urls) {
+		$idx++;
+		my $output = $filename . '_' .  $idx . '.' . $ext;
+		print STDERR "  [$idx/$count] ";
+		$self->save_http($_,$output);
+		if(-f $output) {
+			push @files,$output;
+		}
+		else {
+			print STDERR "Download playlist falied\n";
+			return $self->FAILED_RETRY(@_);
+			#$failed = 0 unless(defined $failed);
+			#$failed++;
+			#if($failed <4) {
+			#	print STDERR "Failed $failed times,Retring ...\n";
+			#	return $self->save_m3u8($url,$name,$failed);
+			#}
+			#else {
+			#	print STDERR "Failed too much\n";
+			#	return $self->EXIT_CODE('FAILED');
+			#}
+		}
+	}
+	if(@files) {
+		if(!open FO,">:raw",$dst) { 
+			print STDERR "Error writting $dst : $!\n";
+			return $self->EXIT_CODE("ERROR");
+		}
+		foreach(@files) {
+			if(!open FI,"<:raw",$_) {
+				print STDERR "Error reading $_ : $!\n";
+				return $self->EXIT_CODE("ERROR");
+			}
+			print FO <FI>;
+			close FI;
+		}
+		print STDERR "Playlist saved to : $dst\n";
+		close FO;
+		unlink @files;
+	}
+	return $self->EXIT_CODE("DONE");
 }
 
 sub save_http_post {
@@ -341,9 +508,35 @@ sub save_torrent {
 	}
 }
 
+sub save_urlrule {
+	my $self = shift;
+	my $url = shift;
+	my $title = shift;
+	if($title) {
+		print STDERR "Downloading <$title>\n";
+		foreach($title,$title . ".ts") {
+			if(-f $_) {
+				print STDERR "$title exists\n";
+				return $self->EXIT_CODE("DONE");
+			}
+		}
+	}
+	my $r = system("urlrule","--url","download",$url,@_);
+	if($title) {
+		foreach($title,$title . ".ts") {
+			if(-f $_) {
+				return $self->EXIT_CODE("DONE");
+			}
+		}
+		return $self->EXIT_CODE("FAILED");
+	}
+	return $r;
+}
+
 use Cwd qw/getcwd/;
 sub download {
 	my $self = shift;
+	my @original_args = (@_);
 	my $line = shift;
 	my @opts = @_;
 	$_ = $line;
@@ -404,7 +597,7 @@ sub download {
 	elsif($self->{OPTS}->{markdone}) {
 		if(-f $filename) {
 			$self->print_msg("[Mark done] $filename\n");
-			$exit = $self->EXIT_CODE("IGNORED");
+			$exit = $self->EXIT_CODE("DONE");
 		}
 		else {
 			$self->print_msg("[Not exists] $filename\n");
@@ -412,6 +605,7 @@ sub download {
 		}
 	}
 
+	$MAX_RETRY = $self->{OPTS}->{"max-retry"} if(defined $self->{OPTS}->{"max-retry"});
 	foreach my $dld(keys %DOWNLOADERS) {
 		if(m/$DOWNLOADERS{$dld}->{'TEST'}/) {
 			my @args;
@@ -437,6 +631,12 @@ sub download {
 	elsif($_ =~ $BLOCKED_URLS) {
 		print STDERR "Error url blocked: $_\n";
 		$exit = $self->EXIT_CODE("ERROR");
+	}
+	elsif(m/^urlrule:(.+)\t+(.*)$/) {
+		$exit = $self->save_urlrule($1,$2);
+	}
+	elsif(m/^urlrule:(.+)$/) {
+		$exit = $self->save_urlrule($1);
 	}
 	elsif(m/^post:\/\/(.+)$/) {
 		$exit = $self->save_http_post($1);
@@ -464,6 +664,16 @@ sub download {
 	}
 	elsif(m/^http:\/\/[^\/]*(?:weipai\.cn|oldvideo\.qiniudn\.com)\/.*/) {
 		$exit = $self->save_weipai($_);
+	}
+	#https://pl.dfdkmj.com//20181102/bpz5ojNu/1435kb/hls/index.m3u8
+	elsif(m/^(https?:\/\/.*m3u8)\t(.+)$/) {
+		$exit = $self->save_m3u8($1,$2);
+	}
+	elsif(m/^https?:\/\/.*m3u8$/) {
+		$exit = $self->save_m3u8($_);
+	}
+	elsif(m/\.m3u8$/) {
+		$exit = $self->save_m3u8($_);
 	}
 	elsif(m/^(https?:\/\/.+)\t(.+)$/) {
 		$exit = $self->save_http($1,$2);
@@ -503,8 +713,12 @@ sub download {
 		$self->{mtm}->set_prompt($self->{saved_prompt}) if($self->{mtm});
 		chdir $KWD;
 	}
+	if($exit == $self->EXIT_CODE("RETRY")) {
+		return $self->download(@original_args);
+	}
 	return $exit;
 }
+
 
  
 
@@ -522,6 +736,7 @@ sub MAIN {
 	if((scalar(@lines) == 1) and $self->{OPTS}->{output}) {
 		$lines[0] .= "\t" . $self->{OPTS}->{output};
 	}
+	$MAX_RETRY = $self->{OPTS}->{"max-retry"} if(defined $self->{OPTS}->{"max-retry"});
 	my $exit;
 	foreach my $url (@lines) {
 		if($url =~ m/^#([^:]+?)\s*:\s*(.*)$/) {

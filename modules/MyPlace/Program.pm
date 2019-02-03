@@ -15,6 +15,7 @@ Getopt::Long::Configure ("bundling", "no_ignore_case");
 
 our %EXIT_CODE = (
 	OK=>0,
+	DONE=>0,
 	ERROR=>1,
 	KILLED=>2,
 	FAILED=>11,
@@ -22,6 +23,7 @@ our %EXIT_CODE = (
 	UNKNOWN=>19,
 	USAGE=>3,
 	DEBUG=>20,
+	RETRY=>21,
 );
 
 sub EXIT_CODE {

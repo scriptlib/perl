@@ -21,6 +21,7 @@ sub OPTIONS {qw/
 	force|f
 	exclude|X=s
 	include|I=s
+	count|c=i
 	url=s
 	touch
 	images|img
@@ -28,6 +29,18 @@ sub OPTIONS {qw/
 	markdone
 	no-queue|nq
 	no-download
+	no-failed|nf
+	no-done|nd
+	no-ignored|ng
+	no-mtm|nm
+	config=s
+	use=s
+	one|1
+	worker=s
+	nop
+	select=s
+	print
+	mark|m=s
 /;}
 
 sub download {
@@ -75,6 +88,13 @@ sub MAIN {
 			}
 		}	
 	}
+	foreach(qw/select/) {
+		next unless(defined $OPTS->{$_});
+		if($OPTS->{$_} !~ m/^(?:\d+|\d+\.\.\d+)$/) {
+			print STDERR "Option --$_ must be format as <number> or <number .. number>\n";
+			return 1;
+		}
+	}
 	if($self->{OPTS}->{url}) {
 		return $self->download($self->{OPTS}->{url});
 	}
@@ -91,6 +111,14 @@ sub MAIN {
 	push @exclude,'\.(?:flv|mov|f4v|avi|mkv|mpg|mpeg|rmvb|asf|wmv|ts|mp4|3pg)' if($OPTS->{'no-videos'});
 	if(@exclude) {
 		$OPTS->{exclude} = join("|",@exclude);
+	}
+
+	if($OPTS->{use}) {
+		$OPTS->{input} = $OPTS->{use} . "/urls.lst" unless($OPTS->{input});
+		$OPTS->{config} = $OPTS->{use} . "/.mtm" unless($OPTS->{config});
+	}
+	if($OPTS->{one}) {
+		$OPTS->{count} = 1;
 	}
 
 	my $mtm = MyPlace::Tasks::Manager->new(
@@ -111,13 +139,26 @@ sub MAIN {
 		quiet=>$OPTS->{quiet},
 		include=>$OPTS->{include},
 		exclude=>$OPTS->{exclude},
+		count=>$OPTS->{count},
 		'no-queue'=>$OPTS->{'no-queue'},
 		'no-download'=>$OPTS->{'no-download'},
+		'no-failed'=>$OPTS->{'no-failed'},
+		'no-done'=>$OPTS->{'no-done'},
+		'no-ignored'=>$OPTS->{'no-ignored'},
+		'no-mtm'=>$OPTS->{'no-mtm'},
+		'config'=>$OPTS->{'config'},
+		'nop'=>$OPTS->{'nop'},
+		'print'=>$OPTS->{'print'},
+		'select'=>$OPTS->{'select'},
+		'mark'=>$OPTS->{'mark'},
 	);
 	$self->{mtm} = $mtm;
 	
 	if($OPTS->{input}) {
 		$mtm->set('input',$OPTS->{input});
+	}
+	if($OPTS->{worker}) {
+		$mtm->set('worker',$OPTS->{worker});
 	}
 	return $mtm->run(@_);
 }

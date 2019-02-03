@@ -4,7 +4,7 @@ use MyPlace::Program qw/EXIT_CODE/;
 use strict;
 use warnings;
 
-use File::Spec::Functions qw/catfile catdir/;
+use File::Spec::Functions qw/catfile catdir splitdir/;
 
 our $CONFIG_DIR = '.mtm';
 our $DB_DONE = 'done.txt';
@@ -41,6 +41,24 @@ sub get {
 	else {
 		return (%{$self->{options}});
 	}
+}
+
+sub touch_path {
+	my $dir = shift;
+	my $level = shift;
+	$level = 5 unless(defined $level);
+	$level = 0 if($level < 0);
+	my @dirs = splitdir($dir);
+	my @ts;
+	while($level > 0) {
+		push @ts,$dir;
+		pop @dirs;
+		last unless(@dirs);
+		$dir = catdir(@dirs);
+		$level = $level - 1;
+	}
+	print STDERR "Touching path:\n\t" . join("\n\t",@ts) . "\n";
+	system("touch","--",@ts) == 0;
 }
 
 use Cwd qw/getcwd/;
@@ -138,6 +156,15 @@ sub get_key {
 		$str =~ s/:\/\/ww\d+\./:\/\/ww1./;
 		#print STDERR $str,"\n";
 	}
+	elsif($str =~ m/p\d*\.pstatp.com\/(large\/[^\s"&\/]+)\.jpe?g/) {
+		$str = "douyin:$1.jpg";
+	}
+	elsif($str =~ m/p\d*-dy\.bytecdn\.cn\/(large\/[^"&\s\/]+)\.jpe?g/) {
+		$str = "douyin:$1.jpg";
+	}
+	elsif($str =~ m/aweme\.snssdk\.com\/aweme\/.*\?video_id=([^\s&"]+)/) {
+		$str = "douyin:$1.mp4";
+	}
 	my $t = index($str,"\t");
 	if($t >0) {
 		return substr($str,0,$t);
@@ -193,13 +220,17 @@ sub _run {
 	
 	if(@arguments and $arguments[0] and -d $arguments[0] and !$opt{directory}) {
 		$opt{directory} = shift(@arguments);
-		
 	}
 
 	if(!(@arguments or $opt{input})) {
 		$opt{input} = 'urls.lst';
 	}
-
+	
+	if($opt{'no-mtm'}) {
+		foreach(qw/no-failed no-ignored no-done/) {
+			$opt{$_} = 1;
+		}
+	}
 
 
 	my $worker = $opt{worker};
@@ -225,7 +256,7 @@ sub _run {
 		p_msg "Entering $opt{directory}\n" unless($opt{simple} or $opt{quiet});
 		#print STDERR "chdir $opt{directory}\n";
 		if(!chdir $opt{directory}) {
-			p_err "PWD:\t$CWD_KEPT\n";
+			#p_err "PWD:\t$CWD_KEPT\n";
 			p_err "Error:$! [$opt{directory}]\n";
 			return undef,4,"$! [$opt{directory}]";
 		}
@@ -255,8 +286,10 @@ sub _run {
 			$MSG_PROMPT = $km;
 		}
 	}
-
-
+	my $config_dir = $CONFIG_DIR;
+	if($opt{config}) {
+		$config_dir = $opt{config};
+	}
 
 	my (@queue,@done,@failed,@ignore,@input);
 	my %duplicated;
@@ -267,12 +300,12 @@ sub _run {
 	if($opt{simple}) {
 		push @queue,@input;
 	}
-	elsif(-d $CONFIG_DIR) {
-		@done = $self->_read_lines($DB_DONE,$CONFIG_DIR);
-		@failed = $self->_read_lines($DB_FAILED,$CONFIG_DIR);
-		@ignore = $self->_read_lines($DB_IGNORE,$CONFIG_DIR);
+	elsif(-d $config_dir) {
+		@done = $self->_read_lines($DB_DONE,$config_dir) unless($opt{'no-done'});
+		@failed = $self->_read_lines($DB_FAILED,$config_dir) unless($opt{'no-failed'});
+		@ignore = $self->_read_lines($DB_IGNORE,$config_dir) unless($opt{'no-ignored'});
 		my @dup;
-		push @queue, $self->_read_lines($DB_QUEUE,$CONFIG_DIR) unless($opt{'no-queue'});
+		push @queue, $self->_read_lines($DB_QUEUE,$config_dir) unless($opt{'no-queue'});
 		if($opt{'no-unique'}) {
 			unshift @queue,@input;
 		}
@@ -282,7 +315,7 @@ sub _run {
 		else {
 			@queue = unique([@queue,@input],\@dup,@failed,@done,@ignore) if(@queue or @input);
 		}
-		#&_write_lines(\@queue,$DB_QUEUE,$CONFIG_DIR);
+		#&_write_lines(\@queue,$DB_QUEUE,$config_dir);
 		#	die(@queue);
 
 		if($opt{retry}) {
@@ -296,10 +329,11 @@ sub _run {
 					push @newfailed,$_;
 					next;
 				}
-				push @queue,$_;
+				print STDERR $_,"\n";
+				unshift @queue,$_;
 			}
 			@failed = @newfailed;
-			&_write_lines(\@failed,$DB_FAILED,$CONFIG_DIR);
+			&_write_lines(\@failed,$DB_FAILED,$config_dir);
 		}
 	}
 	elsif(!(@queue or @input)) {
@@ -314,14 +348,39 @@ sub _run {
 	else {
 		@queue = unique([@queue,@input],undef) if(@queue or @input);
 	}
-	&_write_lines(\@queue,$DB_QUEUE,$CONFIG_DIR);
+	&_write_lines(\@queue,$DB_QUEUE,$config_dir);
 	if($opt{include}) {
 		@queue = grep(/$opt{include}/,@queue);
 	}
 	if($opt{exclude}) {
 		@queue = grep(!/$opt{exclude}/,@queue);
 	}
+	if(defined $opt{select}) {
+		print STDERR "Select tasks [$opt{select}]\n";
+		my ($a1,$a2) = ($opt{select},$opt{select});
+		if($a1 =~ m/^(\d+)\s*[-\. ]+\s*(\d+)$/) {
+			$a1 = $1;
+			$a2 = $2;
+		}
+		$a1--;
+		$a2--;
+		if($a1 >=0 and $a2<=$#queue) {
+			@queue = @queue[$a1 .. $a2];
+		}
+		else {
+			@queue = ();
+		}
+	}
 	my $count = scalar(@queue);
+	if($opt{count}) {
+		if($opt{count}>0 and $count>=$opt{count}) {
+			@queue = @queue[0 .. ($opt{count}-1)];
+			$count = scalar(@queue);
+		}
+		else {
+			print STDERR "Invalid option count specified as $opt{count}\n";
+		}
+	}
 	p_msg "QUEUE:" . scalar(@queue) .
 		  ", DONE :" . scalar(@done) . 
 		  ", IGNORED: " . scalar(@ignore) . 
@@ -333,9 +392,9 @@ sub _run {
 	}
 	elsif($opt{simple}) {
 	}
-	elsif((! -d $CONFIG_DIR)) {
-		if(! mkdir $CONFIG_DIR) {
-			p_err "Error creating directory <$CONFIG_DIR>: $!\n";
+	elsif((! -d $config_dir)) {
+		if(! mkdir $config_dir) {
+			p_err "Error creating directory <$config_dir>: $!\n";
 		}
 	}
 	
@@ -350,18 +409,18 @@ sub _run {
 	my $SUBEXIT = sub {
 		if(!$opt{simple}) {
 			print STDERR "\n";
-			if(!-d $CONFIG_DIR) {
-				if(!mkdir($CONFIG_DIR)) {
-					&p_warn("Error creating directory $CONFIG_DIR: $!\n");
+			if(!-d $config_dir) {
+				if(!mkdir($config_dir)) {
+					&p_warn("Error creating directory $config_dir: $!\n");
 				}
 			}
-			#&_write_lines(\@done,$DB_DONE,$CONFIG_DIR);
-			&_write_lines(\@queue,$DB_QUEUE,$CONFIG_DIR);
+			#&_write_lines(\@done,$DB_DONE,$config_dir);
+			&_write_lines(\@queue,$DB_QUEUE,$config_dir);
 			if($opt{'ignore-failed'}) {
-				&_write_lines([@ignore,@failed],$DB_FAILED,$CONFIG_DIR);
+				&_write_lines([@ignore,@failed],$DB_FAILED,$config_dir);
 			}
 #			else {
-#					&_write_lines(\@failed,$DB_FAILED,$CONFIG_DIR);
+#					&_write_lines(\@failed,$DB_FAILED,$config_dir);
 #			}
 		}
 		return $self->exit(
@@ -381,9 +440,26 @@ sub _run {
 		print STDERR "MyPlace::Tasks::Manager KILLED\n";
 		return 2;
 	};
+	if($opt{print}) {
+		$opt{nop} = 1;
+		my $n = 1;
+		my $a2 = scalar(@queue);
+		print STDERR "$a2 tasks in queue:\n";
+		foreach(@queue) {
+			print STDERR " [$n/$a2] $_\n";
+			$n++;
+		}
+	}
+	return $self->EXIT_CODE("KILLED") if($opt{nop});
+	#print STDERR "Touching directories ...\n";
+	touch_path(getcwd);	
+
 	my $index = 0;
+	
+
 	while($queue[0]) {
 		last if($IAMKILLED);
+		last if($opt{nop});
 		my $task = $queue[0];
 		my $r;
 		$index++;
@@ -396,6 +472,20 @@ sub _run {
 				p_msg $task,"\n";
 			}
 			$r = $self->EXIT_CODE("DEBUG");
+		}
+		elsif($opt{mark}) {
+			if($opt{mark} eq 'done') {
+				$r = 0;
+			}
+			elsif($opt{mark} eq 'ignored') {
+				$r = $self->EXIT_CODE('IGNORED');
+			}
+			elsif($opt{mark} eq 'failed') {
+				$r = $self->EXIT_CODE('FAILED');
+			}
+			else {
+				$r = $self->EXIT_CODE('UNKNOWN');
+			}
 		}
 		elsif(ref $worker) {
 			$r = &$worker($task,@wopts);
@@ -414,7 +504,7 @@ sub _run {
 			#	&p_msg("[$index/$count] DONE\n");
 			$COUNTER++;
 			shift @queue;
-			&_write_lines([$task],$DB_DONE,$CONFIG_DIR,'>>');
+			&_write_lines([$task],$DB_DONE,$config_dir,'>>');
 			push @done,$task;
 		}
 		elsif($r == 2) {
@@ -425,7 +515,7 @@ sub _run {
 		elsif($r == $self->EXIT_CODE('IGNORED')) {
 			#	&p_msg("[$index/$count] IGNORED\n");
 				shift @queue;
-				&_write_lines([$task],$DB_DONE,$CONFIG_DIR,'>>');
+				&_write_lines([$task],$DB_DONE,$config_dir,'>>');
 				push @done,$task;
 		}
 		elsif($r == $self->EXIT_CODE("DEBUG")) {
@@ -437,7 +527,7 @@ sub _run {
 		else {
 			shift @queue;
 			#&p_msg("[$index/$count] FAILED\n");
-			&_write_lines([$task],$DB_FAILED,$CONFIG_DIR,'>>');
+			&_write_lines([$task],$DB_FAILED,$config_dir,'>>');
 			push @failed,$task;
 		}
 		unless($opt{quiet} or $opt{simple}) {

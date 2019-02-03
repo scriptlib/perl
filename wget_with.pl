@@ -15,7 +15,6 @@ use strict;
 
 our $VERSION = 'v0.1';
 my @OPTIONS = qw/
-	help|h|? 
 	manual|man
 	profile|pro=s
 	tee=s

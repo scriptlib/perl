@@ -10,12 +10,6 @@ use File::Spec::Functions qw/catdir catfile/;
 use Cwd qw/getcwd/;
 my $MSG_PROMPT = 'urlrule';
 
-my %EXIT_CODE = qw/
-	OK			0
-	FAILED		1
-	DO_NOTHING	2
-	ERROR_USAGE 3
-/;
 
 sub VERSION {'v0.1'}
 sub OPTIONS {qw/
@@ -29,7 +23,7 @@ sub OPTIONS {qw/
 	thread=i
 	retry
 	prompt|p=s
-	url|u
+	url
 	overwrite
 	force
 	files
@@ -43,6 +37,8 @@ sub OPTIONS {qw/
 	ffollow|ff
 	grep=s
 	host=s
+	level=i
+	rule|u=s
 /;}
 
 
@@ -296,7 +292,7 @@ sub CMD_LIST {
 sub CMD_ACTION {
 	my $self = shift;
 	my %OPTS = %{$self->{OPTS}};
-	my $cmd = shift(@_) || "UPDATE";
+	my $cmd = shift(@_) || "DATABASE";
 	my @target = @_;
 	use MyPlace::URLRule::OO;
 	my @request;
@@ -337,11 +333,11 @@ sub CMD_ACTION {
 		$URLRULE->autoApply($_);
 		$URLRULE->reset();
 	}
-	if($URLRULE->{DATAS_COUNT}) {
-		return $EXIT_CODE{OK},\%r;
+	if($URLRULE->{DATAS_COUNT}>=scalar(@request)) {
+		return $self->EXIT_CODE("DONE"),\%r;
 	}
 	else {
-		return $EXIT_CODE{DO_NOTHING},\%r;
+		return $self->EXIT_CODE("FAILED"),\%r;
 	}
 }
 
@@ -378,6 +374,9 @@ sub CMD_DOWNLOAD {
 	my @request;
 	my $count = 0;
 	my %r;
+	if($OPTS{URL}) {
+		return $self->CMD_ACTION('DOWNLOAD',@target);
+	}
 	$self->CMD_ACTION('DATABASE',@target);
 	use MyPlace::Program::Downloader;
 	my $DL = new MyPlace::Program::Downloader;
@@ -415,11 +414,11 @@ sub CMD_DOWNLOAD {
 			print STDERR "Error($error): $msg\n";
 		}
 	}
-	if($dlcount > 0) {
-		return $EXIT_CODE{OK},\%r;
+	if($dlcount >= scalar(@request)) {
+		return $self->EXIT_CODE("DONE"),\%r;
 	}
 	else {
-		return $EXIT_CODE{DO_NOTHING},\%r;
+		return $self->EXIT_CODE("FAILED"),\%r;
 	}
 }
 
@@ -533,7 +532,7 @@ sub CMD_DUMP {
 		my ($status,$r) = apply_rule($rule);
 		print STDERR Data::Dumper->Dump([$rule,$r],[qw/$rule $result/]),"\n";
 	}
-	return $EXIT_CODE{OK};
+	return $self->EXIT_CODE("DONE");
 }
 
 my %URL_EXPS = (
@@ -606,17 +605,31 @@ sub parse_url {
 	return 1,\%result;
 }
 
+sub CMD_NEW_RULE {
+	my $self = shift;
+	my $r = 0;
+	foreach(@_) {
+		if(system('urlrule_new',$_->{url},$_->{level}) != 0) {
+			$r = 1;
+		}
+	}
+	return $r;
+}
 
 sub CMD_ADD {
 	my $self = shift;
 	my $OPTS = $self->{OPTS};
+	my $url;
+	if($OPTS->{url}) {
+		$url = shift;
+	}
 	my $name = shift;
 	my $id = shift;
 	my $host = shift(@_) || $OPTS->{hosts} || $OPTS->{db};
 	my $exitval = 0;
-	my $url =  $id || $name;
+	$url = ($id || $name) unless($url);
+
 	if($OPTS->{url}) {
-		$url = $OPTS->{url};
 	}
 	elsif(!defined $id) {
 		$url = $name;
@@ -739,7 +752,52 @@ sub CMD_FOLLOW {
 	}
 	return $exitval;
 }
+sub CMD_SAVE_PROFILE {
+	my $self = shift;
+	my @target = @_;
+	foreach(@target) {
+		require MyPlace::URLRule;
+		my $url = $_->{url};
+		my $id = $_->{id};
+		my $rule = MyPlace::URLRule::parse_rule($url,":info");
+		my ($status,$result) = apply_rule($rule);
+		if($status) {
+			open FO,'>',"$id.txt" or next;
+			use Data::Dumper;
+			foreach(qw/rule level action/) {
+				delete $result->{$_};
+			}
+			print FO Data::Dumper->Dump([$result],[$id]),"\n";
+			close FO;
+			print STDERR "Save profile to <$id.txt>\n";
+			if($result->{avatar}) {
+				system("download","-s","$id.jpg","--",$result->{avatar});
+			}
+		}
+		else {
+			print STDERR "Error: failed extract information from URL <$url>";
+		}
 
+	}
+}
+	sub check_http {
+		my $http = 1;
+		foreach(@_) {
+			next if(m/^http/i);
+			next if(m/^\s+\d+$/);
+			$http = undef;
+			last;
+		}
+		return $http;
+	}
+
+my %DEF	= (
+	'SEARCH'=>{
+		url=>1,
+		options=>1,
+		execute=>'urlrule_search',
+	},
+);
 sub MAIN {
 	my $self = shift;
 	my $OPTS = shift;
@@ -751,6 +809,7 @@ sub MAIN {
 	}
 	$self->{OPTS} = $OPTS;
 	if($OPTS->{directory}) {
+		mkdir $OPTS->{directory} unless(-d $OPTS->{directory});
 		if(!chdir $OPTS->{directory}) {
 			p_err "Error changing directory to $OPTS->{directory}:$!\n";
 			return 1;
@@ -774,7 +833,32 @@ sub MAIN {
 		$cmd = $1;
 		$CMD = uc($cmd);
 	}
-
+	
+	if($DEF{$CMD}) {
+		my $dcmd = $DEF{$CMD};
+		if($dcmd->{url}) {
+			$OPTS->{url} = 1;
+		}
+		if($dcmd->{options}) {
+			my $optstr = shift;
+			foreach(split(/\s*,\s*/,$optstr)) {
+				if(m/^([^=]+)(.*)$/) {
+					my $opt = $1;
+					my $set = $2;
+					if(length($opt) >1) {
+						push @{$dcmd->{args}},"--$opt";
+					}
+					else {
+						push @{$dcmd->{args}},"-$opt";
+					}
+					if($set and $set =~ m/\s*=\s*(.+?)\s*$/) {
+						push @{$dcmd->{args}},$1;
+					}
+				}
+			}
+		}
+	}
+	
 	if($CMD eq 'HELP') {
 		return $self->USAGE;
 	}
@@ -795,17 +879,37 @@ sub MAIN {
 		}
 	}
 
-	if($CMD eq 'ADD') {
+
+	if(@_ and not $OPTS->{URL}) {
+		$OPTS->{URL} = check_http(@_);
+	}
+
+	my @queries =  @_;
+	
+
+	if($DEF{$CMD} and $DEF{$CMD}->{execute}) {
+		my $dcmd = $DEF{$CMD};
+		my @prog = ($dcmd->{execute});
+		push @prog,@{$dcmd->{args}} if($dcmd->{args});
+		push @prog,@_;
+		my $r = system(@prog);
+		return $r;
+	}
+	elsif($CMD eq 'ADD') {
 		return $self->CMD_ADD(@_);
 	}
 	elsif($CMD eq 'FOLLOW') {
 		return $self->CMD_FOLLOW(@_);
 	}
+	elsif($CMD eq 'NEWRULE' || $CMD eq 'NEW' || $CMD eq 'RULENEW' || $CMD eq 'RULE') {
+		$OPTS->{URL} = 1;
+	}
+	elsif($OPTS->{URL}) {
+	}
 	else {
 		$self->DB_INIT();
 	}
 	
-	my @queries =  @_;
 
 	if($OPTS->{input}) {
 		p_msg "Read inputs from $OPTS->{input} ...";
@@ -858,23 +962,60 @@ sub MAIN {
 		return $self->CMD_EDIT(@_);
 	}
 
-	$self->DB_LOAD();
+	if(@queries and not $OPTS->{URL}) {
+		$OPTS->{URL} = check_http(@queries);
+	}
 
-#	print STDERR join(", ",@queries);
-	my @target = $self->query(@queries);
+	my @target;
+	if($OPTS->{URL}) {
+			my $level = $OPTS->{level} || '0';
+			my $last;
+		foreach(@queries) {
+			if(m/^\s*(\d+)$/) {
+				$level = $1;
+				if($last) {
+					$last->{level} = $level;
+				}
+				next;
+			}
+			my $url = $_;
+			my $host = $url;
+			my $id = $url;
+			if($url =~ m/^(?:[^\/]+):\/\/([^\/]+)\/(.+)$/) {
+				$host = $1;
+				$id = $2;
+			}
+			if(m/^(.+)(?:\t+|\s{2,})(\d+)$/) {
+				$level = $2;
+				$url = $1;
+			}
+			$last = {url=>$url,level=>$level};
+			push @target,$last;
+		}
+	}
+	else {
+		$self->DB_LOAD();
+		@target = $self->query(@queries);
+	}
+
 	if(!@target) {
 		p_msg "Nothing to do\n";
 		return 1;
 	}
 	
-
-	if($CMD eq 'LIST') {
+	if($DEF{$CMD}) {
+		return $self->CMD_EXEC($CMD,$DEF{$CMD},@target);
+	}
+	elsif($CMD eq 'LIST') {
 		return $self->CMD_LIST(@target);
+	}
+	elsif($CMD eq 'CAT') {
+		return $self->CMD_ACTION('COMMAND:echo',@target);
 	}
 	elsif($CMD eq 'DOWNLOAD') {
 		return $self->CMD_DOWNLOAD(@target);
 	}
-	elsif($CMD eq 'DATABASE') {
+	elsif($CMD eq 'SAVE' or $CMD eq 'DATABASE') {
 		return $self->CMD_ACTION('DATABASE',@target);
 	}
 	elsif($CMD eq 'DUMP') {
@@ -882,6 +1023,12 @@ sub MAIN {
 	}
 	elsif($CMD eq 'MOVE') {
 		return $self->CMD_MOVE($args[0],@target);
+	}
+	elsif($CMD eq 'SAVE_PROFILE') {
+		return $self->CMD_SAVE_PROFILE(@target);
+	}
+	elsif($CMD eq 'NEWRULE' || $CMD eq 'NEW' || $CMD eq 'RULENEW' || $CMD eq 'RULE') {
+		return $self->CMD_NEW_RULE(@target);
 	}
 	else{
 		return $self->CMD_ACTION($cmd,@target);
