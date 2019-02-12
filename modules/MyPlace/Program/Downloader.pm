@@ -41,6 +41,7 @@ sub OPTIONS {qw/
 	select=s
 	print
 	mark|m=s
+	maxtry|mt=i
 /;}
 
 sub download {
@@ -160,19 +161,32 @@ sub MAIN {
 	if($OPTS->{worker}) {
 		$mtm->set('worker',$OPTS->{worker});
 	}
-	return $mtm->run(@_);
+	my @exits;
+	my $maxtry = $OPTS->{maxretry} || 1;
+	my $trying = 1;
+	while($trying<=$maxtry) {
+		@exits = $mtm->run(@_);
+		if($exits[0]) {
+			return @exits;
+		}
+		$trying++;
+		last if($trying>$maxtry);
+		print STDERR "Error($exits[1]):$exits[2],Try ($trying/$maxtry) againt ...\n";
+	}
+	return @exits;
 }
 
 return 1 if caller;
 my $PROGRAM = new MyPlace::Program::Downloader;
 my ($done,$error,$msg) = $PROGRAM->execute(@ARGV);
+#print STDERR "Done=>$done,error=>$error,msg=>$msg\n";
 if($error) {
 	print STDERR "Error($error): $msg\n";
 }
 if($done) {
 	exit 0;
 }
-elsif($error) {
+elsif(defined $error) {
 	exit $error;
 }
 else {

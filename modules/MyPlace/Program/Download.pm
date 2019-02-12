@@ -200,9 +200,14 @@ sub _process {
     my $retry = shift(@_) || 0;
     my $r=0;
 	#print STDERR join(" ",@{$cmdline}),"\n";
-	my $output = "$taskname.downloading";
-	$output =~ s/[\/\\*?:"'\[\]\{\}\s,#!\>\<^&~\|+_\-]+//g;
-	$output = substr($output,,40);
+	my $output = $taskname;
+	$output =~ s/[\?#].*$//;
+	$output =~ s/\/+$//;
+	$output =~ s/^.*\///;
+	$output =~ s/[\/\\\*\?:"'\[\]\{\}\s,#!\>\<^&~\|+_\-]+//g;
+	$output = $taskname unless($output);
+	$output = substr($output,,40) if(length($output)>40);
+	$output = $output . ".downloading";
 	unlink $output if(-f $output);
     while($retry) {
         $retry--;

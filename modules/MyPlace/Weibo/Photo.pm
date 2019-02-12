@@ -8,7 +8,7 @@ BEGIN {
     $VERSION        = 1.00;
     @ISA            = qw(Exporter);
     @EXPORT         = qw(get_albums get_photos);
-    @EXPORT_OK      = qw(get_albums get_photos get_url);
+    @EXPORT_OK      = qw(get_albums get_photos get_url get_photo);
 }
 
 use MyPlace::Weibo;
@@ -17,6 +17,26 @@ use base 'MyPlace::Program';
 
 sub get_url {
 	goto &MyPlace::Weibo::get_url;
+}
+
+sub get_photo {
+	my $url = shift;
+	my $html = get_url($url,"-v");
+	#print $html,"\n";
+	my %ph;
+	while($html =~ m/"([^"]+)"\s*:\s*(\d+)/g) {
+		$ph{$1} = $2;
+	}
+	while($html =~ m/"([^"]+)"\s*:\s*"([^"]+)"/g) {
+		$ph{$1} = $2;
+	}
+	foreach(keys %ph) {
+		$ph{$_} =~ s/\\//g;
+	}
+	$ph{id} = $ph{photo_id};
+	$ph{caption} = $ph{caption} || $ph{description} || '';
+	$ph{src} = $ph{pic_host} . "/large/" . $ph{pic_name};
+	return 1,(\%ph);
 }
 
 sub get_albums {
@@ -43,7 +63,7 @@ sub get_albums {
 }
 sub get_photos {
 	my ($uid,$page,$count) = @_;
-	return {error=>"Invalid uid: $uid"} unless($uid and $uid =~ m/^\d+$/);
+	return undef,"invalid uid" unless($uid and $uid =~ m/^\d+$/);
 	$page = 1 unless($page and $page>0);
 	$count = 5 unless($count and $count>0);
 	my $API_URL='http://photo.weibo.com/photos/get_all?' .
@@ -60,7 +80,7 @@ sub get_photos {
 		$_->{caption} = $_->{caption} || $_->{description} || '';
 		$_->{src} = $_->{pic_host} . "/large/" . $_->{pic_name};
 	}
-	return $j->{data}->{total},$j->{data}->{photo_list} ? @{$j->{data}->{photo_list}} : ();
+	return $j->{data}->{total},($j->{data}->{photo_list} ? @{$j->{data}->{photo_list}} : ());
 }
 
 

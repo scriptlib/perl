@@ -18,6 +18,8 @@ my @OPTIONS = qw/
 	all|a
 	subdir|sd=s
 	method|by|m=s
+	grep
+	append
 /;
 my %OPTS;
 if(@ARGV)
@@ -70,6 +72,12 @@ sub do_action {
 	foreach(@request) {
 		$idx++;
 		$_->{progress} = "[$idx/$count]";
+		if($_->{direct}) {
+			$URLRULE->{request}->{"dbfile"} = "urls.good.lst";
+		}
+		else {
+			$URLRULE->{request}->{"dbfile"} = "urls.search.lst";
+		}
 		$URLRULE->autoApply($_);
 		$URLRULE->reset();
 	}
@@ -85,9 +93,9 @@ sub do_action {
 my %ENGINES = (
 	'txxx'=>{
 		domain=>'txxx.com',
-		keyword=>['https://txxx.com/search/?s=###QUERY###',2,'+'],
+		keyword=>['https://www.txxx.com/search/?s=###QUERY###',2,'+'],
 		category=>['https://www.txxx.com/categories/###QUERY###/',2,'-'],
-		name=>['https://txxx.com/models/###QUERY###/',2,'-'],
+		name=>['https://www.txxx.com/models/###QUERY###/',2,'-'],
 		groups=>'porn,nsfw',
 	},
 	'spankbang'=>{
@@ -213,15 +221,23 @@ if($OPTS{subdir}) {
 
 
 #app_message2 "uses engines: [",join("],[", map($_->[0],@engine)),"]","\n";
+my @QUERIES;
+foreach(@ARGV) {
+	s/\/+$//;
+	s/^\.*\/+//;
+	s/^\.+//;
+	push @QUERIES,$_;
+}
 
 my @request;
-foreach my $QUERY(@ARGV) {
+foreach my $QUERY(@QUERIES) {
 	foreach my $e(@engine) {
 		my $key = $QUERY;
 		my $name = $e->[0];
 		my $url = $e->[1];
 		my $level = $e->[2];
 		my $space = $e->[3];
+		my $direct = $e->[4];
 		#app_message2 "Search \<$QUERY\> using engine \[$name\]\n";
 		$key =~ s/\s+/$space/g;
 		$url =~ s/###QUERY###/$key/g;
@@ -231,6 +247,7 @@ foreach my $QUERY(@ARGV) {
 			url=>$url,
 			level=>$level,
 			prompt=>"$name:$QUERY",
+			direct=>$direct,
 		};
 	}
 }
@@ -238,6 +255,28 @@ my $action = $OPTS{action} || 'DATABASE';
 app_message2 "with action:$action\n";
 app_message2 "executing...\n";
 my $exit = do_action(\%OPTS,$action,@request);
+if($OPTS{grep} and -f "urls.search.lst") {
+	my $pat = join(" ",@QUERIES);
+	my @prog = ("grep_edit",$pat,"urls.search.lst","--output","urls.lst");
+	push @prog,"--append" if($OPTS{append});
+	system(@prog);
+}
+foreach(qw/urls.good.lst urls.static.lst/) {
+	next unless(-f $_);
+	if(!open FO,">>","urls.lst") {
+		print STDERR "Error writting urls.lst ...\n";
+		exit 2;
+	}
+	if(!open FI,"<",$_) {
+		print STDERR "Error reading $_ ...\n";
+		next;
+	}
+	print FO <FI>;
+	close FI;
+	close FO;
+	print STDERR "Append $_ to urls.lst\n";
+}
+
 exit 1 unless(defined $exit);
 exit $exit;
 
@@ -274,6 +313,27 @@ View application manual
 Invoke 'editor' against the source
 
 =back
+
+=over 12
+
+=item B<-e>,B<--engine>
+
+Specify which engine for searching
+
+=item B<-g>,B<--group>
+
+Specify groups of searching engine
+
+=item B<-m>,B<--method>
+
+Specify methods for searching
+
+=item B<--grep>
+
+Execute B<greb_edit> against I<urls.lst>
+
+=back
+
 
 =head1  DESCRIPTION
 

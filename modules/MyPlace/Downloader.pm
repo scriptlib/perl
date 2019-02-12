@@ -522,15 +522,18 @@ sub save_urlrule {
 		}
 	}
 	my $r = system("urlrule","--url","download",$url,@_);
+	print STDERR ">>> downloader.save_urlrule [\$r = $r]\n";
+	if($r == 0) {
+		return $self->EXIT_CODE("DONE");
+	}
 	if($title) {
 		foreach($title,$title . ".ts") {
 			if(-f $_) {
 				return $self->EXIT_CODE("DONE");
 			}
 		}
-		return $self->EXIT_CODE("FAILED");
 	}
-	return $r;
+	return $self->EXIT_CODE("FAILED");
 }
 
 use Cwd qw/getcwd/;
@@ -743,7 +746,13 @@ sub MAIN {
 			$self->{source}->{$1} = $2;
 			next;
 		}
-		$exit = $self->download($url);
+		my $r = $self->download($url);
+		if($self->EXIT_NAME($r)) {
+			$exit = $r;
+		}
+		else {
+			$exit = $self->EXIT_CODE("UNKNOWN");
+		}
 	}
 	return $exit;
 }

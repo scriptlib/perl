@@ -24,6 +24,7 @@ our %EXIT_CODE = (
 	USAGE=>3,
 	DEBUG=>20,
 	RETRY=>21,
+	NOP=>22,
 );
 
 sub EXIT_CODE {
@@ -32,6 +33,30 @@ sub EXIT_CODE {
 		$code = shift;
 	}
 	return $code ? defined $EXIT_CODE{$code} ? $EXIT_CODE{$code} : $code : $EXIT_CODE{UNKNOWN};
+}
+
+sub EXIT_NAME {
+	my $code = shift;
+	if(ref $code) {
+		$code = shift;
+	}
+	foreach(keys %EXIT_CODE) {
+		if($EXIT_CODE{$_} == $code) {
+			return $_;
+		}
+	}
+	return undef;
+}
+
+sub EXIT {
+	my $code = shift;
+	return $EXIT_CODE{"UNKNOWN"} unless($code);
+	if(defined $EXIT_CODE{$code}) {
+		return $EXIT_CODE{$code};
+	}
+	else {
+		return $EXIT_CODE{"UNKNOWN"};
+	}
 }
 
 my $DEF_OPTIONS = [qw/

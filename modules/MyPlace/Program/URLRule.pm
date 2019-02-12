@@ -333,10 +333,16 @@ sub CMD_ACTION {
 		$URLRULE->autoApply($_);
 		$URLRULE->reset();
 	}
+	if($URLRULE->{SUCCESS} >=scalar(@request)) {
+		print STDERR ">>> CMD_ACTION.$cmd: SUCCESS\n";
+		return $self->EXIT_CODE("DONE"),\%r;
+	}
 	if($URLRULE->{DATAS_COUNT}>=scalar(@request)) {
+		print STDERR ">>> CMD_ACTION.$cmd: DONE\n";
 		return $self->EXIT_CODE("DONE"),\%r;
 	}
 	else {
+		print STDERR ">>> CMD_ACTION.$cmd: FAILED\n";
 		return $self->EXIT_CODE("FAILED"),\%r;
 	}
 }
@@ -1010,13 +1016,16 @@ sub MAIN {
 		return $self->CMD_LIST(@target);
 	}
 	elsif($CMD eq 'CAT') {
-		return $self->CMD_ACTION('COMMAND:echo',@target);
+		my ($r) = $self->CMD_ACTION('COMMAND:echo',@target);
+		return $r;
 	}
 	elsif($CMD eq 'DOWNLOAD') {
-		return $self->CMD_DOWNLOAD(@target);
+		my ($r) = $self->CMD_DOWNLOAD(@target);
+		return $r;
 	}
 	elsif($CMD eq 'SAVE' or $CMD eq 'DATABASE') {
-		return $self->CMD_ACTION('DATABASE',@target);
+		my ($r) = $self->CMD_ACTION('DATABASE',@target);
+		return $r;
 	}
 	elsif($CMD eq 'DUMP') {
 		return $self->CMD_DUMP(@target);
@@ -1031,7 +1040,8 @@ sub MAIN {
 		return $self->CMD_NEW_RULE(@target);
 	}
 	else{
-		return $self->CMD_ACTION($cmd,@target);
+		my ($r) = $self->CMD_ACTION($cmd,@target);
+		return $r;
 	}
 	return $EXIT;
 }

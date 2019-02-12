@@ -151,6 +151,7 @@ sub _write_lines {
 
 sub get_key {
 	my $str = shift;
+	#print STDERR "$str => ";
 	return unless($str);
 	if(index($str,'sinaimg.cn')) {
 		$str =~ s/:\/\/ww\d+\./:\/\/ww1./;
@@ -165,13 +166,9 @@ sub get_key {
 	elsif($str =~ m/aweme\.snssdk\.com\/aweme\/.*\?video_id=([^\s&"]+)/) {
 		$str = "douyin:$1.mp4";
 	}
-	my $t = index($str,"\t");
-	if($t >0) {
-		return substr($str,0,$t);
-	}
-	else {
-		return $str;
-	}
+	$str =~ s/(?:\t| {3,}).+$//;
+	#print "$str\n";
+	return $str;
 }
 
 sub unique {
@@ -188,19 +185,22 @@ sub unique {
 	foreach(@_) {
 		$holder{get_key($_)} = 1;
 	}
+	my $count = 0;
 	foreach(@{$source}) {
 		my $k = get_key($_);
 		if(defined($holder{$k})) {
 			push @$ignore,$_;
+			$count++;
+#			print STDERR "\r\b\b\b\b\b\b\b$count Ignored";
 #			print STDERR $k,"\n";
-#			print STDERR $_,"[IGNORED]\n";
+#			print STDERR "Ignored $_\n";
 		}
 		else {
 			$holder{$k} = 1;
 			push @r,$_;
 		}
 	}
-	print STDERR "\t",scalar(@$ignore) . " urls duplicated\n";
+	print STDERR "\t$count urls duplicated\n";
 	return @r;
 }
 
@@ -236,6 +236,7 @@ sub _run {
 	my $worker = $opt{worker};
 
 	my $COUNTER = 0;
+	my $COUNTALL = 0;
 
 	$MSG_PROMPT = defined($opt{title}) ? $opt{title} :
 			defined($opt{directory}) ? $opt{directory} : 
@@ -296,7 +297,7 @@ sub _run {
 
 	@input = $self->_read_lines($opt{input}) if($opt{input});
 	push @input,@arguments;
-
+	$COUNTALL = scalar(@input);
 	if($opt{simple}) {
 		push @queue,@input;
 	}
@@ -306,6 +307,7 @@ sub _run {
 		@ignore = $self->_read_lines($DB_IGNORE,$config_dir) unless($opt{'no-ignored'});
 		my @dup;
 		push @queue, $self->_read_lines($DB_QUEUE,$config_dir) unless($opt{'no-queue'});
+		$COUNTALL = scalar(@queue) + $COUNTALL;
 		if($opt{'no-unique'}) {
 			unshift @queue,@input;
 		}
@@ -386,6 +388,8 @@ sub _run {
 		  ", IGNORED: " . scalar(@ignore) . 
 		  ", FAILED: " . scalar(@failed) .
 	      "\n";
+	print STDERR ">>> COUNTALL = $COUNTALL, queue = " . scalar(@queue) . "\n"; 
+	$COUNTER = $COUNTALL - scalar(@queue);
 	if(!$count) {
 		&p_warn("Tasks queue was empty\n") unless($opt{quiet});
 		return $self->exit($CWD_KEPT,$COUNTER,$self->EXIT_CODE('IGNORED'),"Empty tasks queue");
@@ -450,7 +454,9 @@ sub _run {
 			$n++;
 		}
 	}
-	return $self->EXIT_CODE("KILLED") if($opt{nop});
+	if($opt{nop}) {
+		return $self->exit($CWD_KEPT,0,$self->EXIT_CODE("NOP"),"NOP");
+	}
 	#print STDERR "Touching directories ...\n";
 	touch_path(getcwd);	
 
@@ -512,8 +518,15 @@ sub _run {
 			print STDERR ("I AM KILLED\n");
 			last;
 		}
+		elsif($r == 12) {
+			$COUNTER++;
+			shift @queue;
+			&_write_lines([$task],$DB_DONE,$config_dir,'>>');
+			push @done,$task;
+		}
 		elsif($r == $self->EXIT_CODE('IGNORED')) {
 			#	&p_msg("[$index/$count] IGNORED\n");
+				$COUNTER++;
 				shift @queue;
 				&_write_lines([$task],$DB_DONE,$config_dir,'>>');
 				push @done,$task;
@@ -553,7 +566,7 @@ sub exit {
 	if($opt{exclude}) {
 		p_msg "EXCLUDE: " . $opt{exclude} . "\n";
 	}
-#	my $CWD_KEPT = shift;
+	my $CWD_KEPT = shift;
 #	if($CWD_KEPT) {
 #		#	p_msg "Return to directory:$CWD_KEPT\n" unless($opt{simple} or $opt{quiet});
 #		if(!chdir $CWD_KEPT) {
