@@ -23,6 +23,9 @@ my @OPTIONS = qw/
 	no-saveurl|ns
 	disable-download|dd:s
 	disable-all-download|dad:s
+	watch=s
+	worker=s
+	no-resume|new
 /;
 my %OPTS;
 my $USE_LAST_CONFIG = 1;
@@ -47,7 +50,7 @@ use MyPlace::SimpleConfig qw/sc_from_file sc_to_file/;
 use MyPlace::Script::Message;
 use MyPlace::Tasks::Utils qw/strtime/;
 use MyPlace::Tasks::Center::Git;
-use MyPlace::Tasks::Builder;
+#use MyPlace::Tasks::Builder;
 use MyPlace::Tasks::Listener;
 use MyPlace::Tasks::Worker;
 use MyPlace::Tasks::Task qw/$TASK_STATUS/;
@@ -57,7 +60,8 @@ if($ENV{DEBUG} || $OPTS{'debug'}) {
 	$OPTS{'debug'} = 1;
 }
 
-our $CONFIGDIR = '../taskspool/.mtd';
+my $PWD = getcwd;
+our $CONFIGDIR = File::Spec->catdir($PWD,'.mtd');
 if(! -d $CONFIGDIR) {
 	mkdir $CONFIGDIR or die("Error creating directory [$CONFIGDIR]:$!\n");
 }
@@ -66,7 +70,7 @@ our $CONFIGURATION = File::Spec->catdir($CONFIGDIR,"config");
 our $MYSETTING = $OPTS{runonce} ? {} :  sc_from_file($CONFIGURATION);
 
 my @CONFIG_KEYS = qw/sleep/;
-my @CMDLINE_OPTS = qw/no-pull no-push disable-download disable-all-download no-download no-git include exclude no-saveurl/;
+my @CMDLINE_OPTS = qw/no-resume no-pull no-push disable-download disable-all-download no-download no-git include exclude no-saveurl/;
 my @OPTS_KEYS = ($USE_LAST_CONFIG ? (@CONFIG_KEYS,@CMDLINE_OPTS) : @CONFIG_KEYS);
 foreach (@OPTS_KEYS) {
 	$OPTS{$_} = $MYSETTING->{"options.$_"} if(!defined $OPTS{$_});
@@ -84,7 +88,10 @@ foreach(@CONFIG_KEYS,@CMDLINE_OPTS) {
 $MYSETTING->{_DIR} = $CONFIGDIR;
 print STDERR "CONFIG : $CONFIGDIR\n" if($OPTS{debug});
 
-my $TASKER;
+our $TASKER;
+our @WATCHER;
+our @LISTENER;
+our @WORKER;
 
 ######DISABLE GIT
 if(!$OPTS{"no-git"}) {
@@ -100,6 +107,8 @@ if(!$OPTS{"no-git"}) {
 else {
 	$TASKER = MyPlace::Tasks::Center->new($MYSETTING);
 }
+
+$TASKER->{OPTS} = \%OPTS;
 foreach(@CONFIG_KEYS,@CMDLINE_OPTS) {
 	if(defined $OPTS{$_}) {
 		$TASKER->{options}->{$_} = $OPTS{$_};
@@ -170,15 +179,14 @@ sub CONTROL_INPUT {
 
 
 my $START_DIR = getcwd;
-my @TasksBuilders;
-push @TasksBuilders,
-	MyPlace::Tasks::Builder->new(level=>20,name=>'level_20');
-push @TasksBuilders,
-	MyPlace::Tasks::Builder->new(level=>10,name=>'level_10');
-push @TasksBuilders,
-	MyPlace::Tasks::Builder->new(level=>0,name=>'level_0');
-my @DEFAULT_LISTENERS = (
-		MyPlace::Tasks::Listener->new('dump', 
+#my @TasksBuilders;
+#push @TasksBuilders,
+#	MyPlace::Tasks::Builder->new(level=>20,name=>'level_20');
+#push @TasksBuilders,
+#	MyPlace::Tasks::Builder->new(level=>10,name=>'level_10');
+#push @TasksBuilders,
+#	MyPlace::Tasks::Builder->new(level=>0,name=>'level_0');
+my @DEFAULT_WORKERS = (
 			MyPlace::Tasks::Worker->new(
 					name=>'dump',
 					routine=>sub{
@@ -187,9 +195,7 @@ my @DEFAULT_LISTENERS = (
 						print Data::Dumper->Dump(\@_);
 						return $TASK_STATUS->{DONOTHING};
 					}
-			)
-		),
-		MyPlace::Tasks::Listener->new('echo', 
+			),
 			MyPlace::Tasks::Worker->new(
 					name=>'echo',
 					routine=>sub{
@@ -198,9 +204,7 @@ my @DEFAULT_LISTENERS = (
 						print join(" ",@_),"\n";
 						return $TASK_STATUS->{DONOTHING};
 					}
-			)
-		),
-		MyPlace::Tasks::Listener->new('mdown',
+			),
 			MyPlace::Tasks::Worker->new(
 					name=>'mdown',
 					'no-download'=>$OPTS{'no-download'},
@@ -220,10 +224,17 @@ my @DEFAULT_LISTENERS = (
 							return $TASK_STATUS->{ERROR};
 						}
 					}
-			)
-		),
+			),
 );
 
+sub find_worker {
+	my $namespace = shift;
+	foreach my $listener (@LISTENER) {
+		if($listener->check({'namespace'=>$namespace})) {
+			return $listener->{worker};
+		}
+	}
+}
 
 sub control {
 	my $cmd = shift;
@@ -261,55 +272,97 @@ $SIG{INT} = \&abort;
 app_warning "[" . strtime() . "] Start\n";
 app_warning "Directory: $START_DIR\n";
 
-my @LISTENER = @DEFAULT_LISTENERS;
-sub find_worker {
-	my $namespace = shift;
-	foreach my $listener (@LISTENER) {
-		if($listener->check({'namespace'=>$namespace})) {
-			return $listener->{worker};
+@WORKER = @DEFAULT_WORKERS;
+my $F_WORKER = File::Spec->catfile($CONFIGDIR,'workers');
+$MYSETTING->{_WORKER} = $F_WORKER;
+if(-f $F_WORKER) {
+	my $t = do $F_WORKER;
+	if($@) {
+		app_error "Error loading $F_WORKER:\n";
+		die($@,"\n");
+	}
+	elsif(ref $t) {
+		push @WORKER,@$t;
+	}
+}
+
+if($OPTS{watch}) {
+	foreach(split(/\s*,\s*/,$OPTS{watch})) {
+		my $f = File::Spec->catfile($CONFIGDIR,'watcher',$OPTS{watch});
+		my $t = do $f;
+		if($@) {
+			app_error "Error loading watcher <$f>:$@\n";
+		}
+		elsif(ref $t) {
+			$TASKER->watch(@$t);
 		}
 	}
 }
 
-my $F_LISTENER = File::Spec->catfile($CONFIGDIR,'listener');
-$MYSETTING->{_LISTENER} = $F_LISTENER;
-
-if(-f $F_LISTENER) {
-	do $F_LISTENER;
-	if($@) {
-		app_error "Error loading $F_LISTENER:\n";
-		die($@,"\n");
-	}
-	else {
-		push @LISTENER,listener_init(\%OPTS,$TASKER,\@TasksBuilders);
-	}
-}
-
-my $TBCOUNT = $#TasksBuilders;
-foreach(reverse 0 .. $TBCOUNT) {
-	if(!$TasksBuilders[$_]) {
-		app_warning("TasksBuilder #$_ Removed\n");
-		delete $TasksBuilders[$_];
-	}
-	elsif($TasksBuilders[$_]->{disabled}) {
-		print STDERR "Remove TasksBuilder #$_\n";
-		$TasksBuilders[$_] = undef;
-		delete $TasksBuilders[$_];
-	}
-	else {
-		app_warning("Tasks Builder activated: #$_ " . $TasksBuilders[$_]->{name});
+if($OPTS{worker}) {
+	foreach(split(/\s*,\s*/,$OPTS{worker})) {
+		my $f = File::Spec->catfile($CONFIGDIR,'worker',$_);
+		my $t = do $f;
+		if($@) {
+			app_error "Error loading worker <$f>:$@\n";
+		}
+		elsif(ref $t) {
+			push @WORKER,@$t;
+		}
 	}
 }
 
-my $NO_TASKS_BUILDER = ($TBCOUNT <= 0);
 
+#my $TBCOUNT = $#TasksBuilders;
+#foreach(reverse 0 .. $TBCOUNT) {
+#	if(!$TasksBuilders[$_]) {
+#		app_warning("TasksBuilder #$_ Removed\n");
+#		delete $TasksBuilders[$_];
+#	}
+#	elsif($TasksBuilders[$_]->{disabled}) {
+#		print STDERR "Remove TasksBuilder #$_\n";
+#		$TasksBuilders[$_] = undef;
+#		delete $TasksBuilders[$_];
+#	}
+#	elsif($OPTS{watch} and $TasksBuilders[$_]->{name} !~ m/$OPTS{watch}/) {
+#		app_warning("Tasks Builder disabled: #$_ " . $TasksBuilders[$_]->{name});
+#		$TasksBuilders[$_] = undef;
+#		delete $TasksBuilders[$_];
+#	}
+#	else {
+#		app_warning("Tasks Builder activated: #$_ " . $TasksBuilders[$_]->{name});
+#	}
+#}
+#
+#my $NO_TASKS_BUILDER = ($TBCOUNT <= 0);
+
+foreach(@WATCHER) {
+	next unless($_);
+	next if($_->{disabled});
+	if($OPTS{watch}) {
+		if($_->{name} =~ m/$OPTS{watch}/) {
+			$TASKER->watch($_->{level},$_->{name},%$_);
+		}
+	}
+	else {
+		$TASKER->watch($_->{level},$_->{name},%$_);
+	}
+}
+
+foreach(@WORKER) {
+	next unless($_);
+	next if($_->{disabled});
+	my $w = $_->{namespace} || $_->{name};
+	if($w) {
+		push @LISTENER,MyPlace::Tasks::Listener->new($w,$_);
+	}
+}
 
 app_warning scalar(@LISTENER) . " listener initilized\n";
 foreach(@LISTENER) {
 	app_warning "Listen to namespace [" . $_->{namespace} . "]\n";
 }
 print STDERR "\n";
-
 print $FH_LOG "[" . strtime() . "] PROGRAM START\n"; 
 my $count =0;
 while(!$TASKER->end()) {
@@ -361,15 +414,15 @@ while(!$TASKER->end()) {
 	elsif($OPTS{runonce}) {
 		last;
 	}
-	elsif(@TasksBuilders) {
-		foreach(@TasksBuilders) {
-			if($_ and $_->{more}) {
-				app_message2 "[" . strtime() . "] Queuing scheduled task\n";
-				$TASKER->queue($_->{level},$_->next());
-				last;
-			}
-		}
-	}
+#	elsif(@TasksBuilders) {
+#		foreach(@TasksBuilders) {
+#			if($_ and $_->{more}) {
+#				app_message2 "[" . strtime() . "] Queuing scheduled task\n";
+#				$TASKER->queue($_->{level},$_->next());
+#				last;
+#			}
+#		}
+#	}
 } 
 if(!$OPTS{runonce}) {
 	$TASKER->exit();

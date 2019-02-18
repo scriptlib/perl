@@ -51,4 +51,3 @@ sub strtime {
 
 1;
 
-1;

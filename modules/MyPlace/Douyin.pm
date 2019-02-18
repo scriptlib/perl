@@ -117,7 +117,9 @@ sub get_amemv_api {
 	$p{max_cursor} = shift(@_) || 0;
 	$p{count} = shift(@_) || 21;
 	#my $base = "https://www.amemv.com/aweme/v1/aweme/$type/?";
-	my $base = "https://crawldata.app/api/douyin/v1/aweme/$type?";
+	#my $base = "https://crawldata.app/api/douyin/v1/aweme/$type?";
+	my $base = "https://jokeai.zongcaihao.com/douyin/v292/aweme/$type?";
+	#post?user_id=83774364341&max_cursor=0&count=20
 	my @params;
 	foreach my $k(keys %p) {
 		push @params,"$k=$p{$k}";
@@ -152,7 +154,8 @@ sub safe_decode_json {
 
 sub get_posts_from_url {
 	my $url = shift;
-	$url =~ s/^.*\/([^\/]+)\/\?([^\/]+)$/http:\/\/crawldata.app\/api\/douyin\/v1\/aweme\/$1?$2/;
+	#$url =~ s/^.*\/([^\/]+)\/\?([^\/]+)$/http:\/\/crawldata.app\/api\/douyin\/v1\/aweme\/$1?$2/;
+	$url =~ s/^.*\/([^\/]+)\/\?([^\/]+)$/https:\/\/jokeai.zongcaihao.com\/douyin\/v292\/aweme\/$1?$2/;
 	my $html = get_url($url);
 	my $json = safe_decode_json($html);
 	if(!$json->{data}) {

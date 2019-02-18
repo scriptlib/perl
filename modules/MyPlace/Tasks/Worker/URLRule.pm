@@ -1201,6 +1201,78 @@ sub work {
 			return $TASK_STATUS->{DONOTHING},"Nothing to do";
 		}
 	}
+	elsif($type eq 'search') {
+		my $ERROR_WD = $self->set_workdir($task,$task->{target_dir} || $self->{target_dir});
+		return $ERROR_WD if($ERROR_WD);
+		my $dir = shift;
+		if(!$dir) {
+			return $TASK_STATUS->{DONOTHING},"Nothing to search";
+		}
+		my @prog = ("urlrule_search","--append","--grep","--method","keyword|name");
+		$task->{title} = join(" ",'urlrule',$type,$dir);
+		$dir =~ s/[\/\\]+$//;
+		my $group = "porn";
+		my $groupname;
+		my $name = $dir;
+		if($name =~ m/([^\\\/]+)[\\\/]([^\\\/]+)$/) {
+			$groupname = $1;
+			$name = $2;
+		}
+		$group = lc($groupname) if($groupname);
+		my $dirname = $name;
+		$dirname =~ s/\b(\w)/\U$1/g;
+		$dirname =~ s/(?:\+|%20)+/ /g;
+		my $keyword = lc($name);
+		$keyword =~ s/(?:\+|%20)+/ /g;
+		my $path = $groupname ? "$groupname/$dirname" : $dirname;
+			if(!-d $path) {
+				system("mkdir","-vp",$path);
+			}
+			print STDERR "Enter \"$path\"\n";
+			if(!chdir($path)) {
+				print STDERR "failed: $!\n";
+				return $TASK_STATUS->{ERROR},"$!";
+			}
+		my @search;
+		if(-f "names.txt" and open FI,'<',"names.txt") {
+			foreach(<FI>) {
+				chomp;
+				next unless($_);
+				s/^\s+//;
+				s/\s+$//;
+				next unless($_);
+				next if(m/^\s*#/);
+				if(m/^([^:]+)\s*:\s*(.+)$/) {
+					push @search,{group=>lc($1),keyword=>lc($2)};
+				}
+				else {
+					push @search,{group=>$group,keyword=>lc($_)};
+				}
+			}
+			close FI;
+		}
+		else {
+			push @search,{group=>$group,keyword=>$keyword};
+		}
+		my $si = 1;
+		my $sc = scalar(@search);
+		my $r;
+		system("rm","-v","--","urls.lst") if(-f "urls.lst");
+		foreach(@search) {
+			print STDERR "\t<$si/$sc> group=>$_->{group}, keyword=>$_->{keyword}\n";
+			$r = system(@prog,"--group",$_->{group},"--",$_->{keyword});
+		}
+		print STDERR "Search <$group> of [$name($keyword)] Completed <\$r=$r>\n";
+		system("touch","--",".");
+		print STDERR "\n";
+		if($r == 0) {
+			return $TASK_STATUS->{FINISHED},"OK";
+		}
+		else {
+			return $TASK_STATUS->{ERROR},"Error";
+		}
+
+	}
 	else {
 		my $ERROR_WD = $self->set_workdir($task,$self->{source_dir});
 		return $ERROR_WD if($ERROR_WD);

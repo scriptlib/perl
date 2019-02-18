@@ -501,21 +501,23 @@ sub load {
 	my $self = CORE::shift;
 	return unless($self->{config});
 	my $sec = "Tasks::Center";
-	if($self->{config}->{$sec . "::tasks"}) {
-		$self->{tasks}->[$DEFAULT_TASKS_LEVEL] = [];
-		foreach(@{$self->{config}->{$sec . "::tasks"}}) {
-			next unless($_);
-			my $task = MyPlace::Tasks::Task->new_from_string($_);
-			#	print STDERR $_,"\n";
-			push @{$self->{tasks}->[$DEFAULT_TASKS_LEVEL]},$task;
+	if(!$self->{config}->{'options.no-resume'}) {
+		if($self->{config}->{$sec . "::tasks"}) {
+			$self->{tasks}->[$DEFAULT_TASKS_LEVEL] = [];
+			foreach(@{$self->{config}->{$sec . "::tasks"}}) {
+				next unless($_);
+				my $task = MyPlace::Tasks::Task->new_from_string($_);
+				#	print STDERR $_,"\n";
+				push @{$self->{tasks}->[$DEFAULT_TASKS_LEVEL]},$task;
+			}
 		}
-	}
-	foreach my $level (reverse 0 .. 100) {
-		next unless $self->{config}->{$sec . "::tasks$level"};
-		$self->{tasks}->[$level] = [];
-		foreach(@{$self->{config}->{$sec . "::tasks$level"}}) {
-			next unless($_);
-			push @{$self->{tasks}->[$level]},MyPlace::Tasks::Task->new_from_string($_);
+		foreach my $level (reverse 0 .. 100) {
+			next unless $self->{config}->{$sec . "::tasks$level"};
+			$self->{tasks}->[$level] = [];
+			foreach(@{$self->{config}->{$sec . "::tasks$level"}}) {
+				next unless($_);
+				push @{$self->{tasks}->[$level]},MyPlace::Tasks::Task->new_from_string($_);
+			}
 		}
 	}
 	foreach (keys %{$self->{config}}) {
