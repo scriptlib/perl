@@ -1,3 +1,6 @@
 [submodule "modules"]
 	path = modules
 	url = git@github.com:libmyplace/perl.git
+[submodule "urlrule"]
+	path = urlrule
+	url = git@github.com:urlrule/rules.git
