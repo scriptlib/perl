@@ -114,10 +114,10 @@ my %ENGINES = (
 		groups=>'porn,nsfw',
 	},
 	'tubepornclassic'=>{
-		domain=>'cn.tubepornclassic.com',
-		category=>['https://xhamster.one/categories/###QUERY###',2,'-'],
-		keyword=>['https://cn.tubepornclassic.com/search/###QUERY###',2,'%20'],
-		name=>['https://cn.tubepornclassic.com/models/###QUERY###/',2,'-'],
+		domain=>'tubepornclassic.com',
+		category=>['https://tubepornclassic.com/categories/###QUERY###',2,'-'],
+		keyword=>['https://tubepornclassic.com/search/###QUERY###',2,'%20'],
+		name=>['https://tubepornclassic.com/models/###QUERY###/',2,'-'],
 		groups=>'porn,nsfw',
 	},
 	'megatube'=>{
@@ -133,8 +133,8 @@ my %ENGINES = (
 		groups=>'jav,nsfw',
 	},
 	'yase'=>{
-		domain=>'9.yase520.com',
-		keyword=>['https://9.yase520.com/search/keywords/###QUERY###',2,'%20'],
+		domain=>'yase520.com',
+		keyword=>['https://www.yase9.com/search/keywords/###QUERY###',2,'%20'],
 		groups=>'clips,jav,homemade,cn,leakage,nsfw',
 	},
 );

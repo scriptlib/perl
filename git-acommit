@@ -14,6 +14,7 @@ my @OPTIONS = qw/
 	verbose|v
 	ignore-errors
 	auto
+	test|t
 /;
 my %OPTS;
 if(@ARGV)
@@ -38,7 +39,13 @@ push @gitarg,"--ignore-errors" if($OPTS{'ignore-errors'});
 
 sub run{
 	print STDERR join(" ",@_),"\n";
-	system(@_) == 0;
+	if($OPTS{test}) {
+		print STDERR "    \t[TESTING] [NO RUNNING]\n";
+		return 1;
+	}
+	else {
+		system(@_) == 0;
+	}
 }
 sub gitacommit {
 	my $action = shift;
@@ -74,7 +81,7 @@ sub gitacommit {
 			$message = "$action file: $files[0]";
 		}
 	}
-	run(qw/git commit -m/,$message);
+	run(qw/git commit -m/,'[GIT-ACOMMIT] ' . $message);
 }
 
 my $action = $OPTS{action} || 'Update';
@@ -98,7 +105,7 @@ if($OPTS{auto}) {
 		my $c = $1;
 		my $file = $2;
 		$file =~ s/^"(.+)"$/$1/;
-		if($c eq ' M' || $c eq 'A ') {
+		if($c eq 'M ' || $c eq 'A ') {
 			push @modified,$file;
 		}
 		elsif($c eq ' D' || $c eq 'AD') {
@@ -108,14 +115,13 @@ if($OPTS{auto}) {
 			push @new,$file;
 		}
 		else {
-			print STDERR "Ignored unknown file: $file\n";
+			print STDERR "Ignored: $c $file\n";
 		}
 	}
 }
 else {
 	@default = @ARGV;
 }
-
 &gitacommit('Update','add',@modified) if(@modified);
 &gitacommit('Delete',[
 		['rm','--cached','-f'],

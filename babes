@@ -205,6 +205,7 @@ sub execute {
 		Update=>'Update profile',
 		Download=>'Run downloader in directories',
 		Files=>'Run sub command against files in directories',
+		Save=>'Save babes to another directory',
 	);
 	if(!$CMD) {
 		print STDERR "Commands:\n";
@@ -313,6 +314,9 @@ sub execute {
 	}
 	elsif($CMD eq 'LINK') {
 		exit Babes::Link::process(\%OPTS,@ARGV);
+	}
+	elsif($CMD eq 'SAVE') {
+		exit Babes::Save::process(\%OPTS,@ARGV);
 	}
 	else {
 		die("Command not found: $cmd\n");
@@ -1348,7 +1352,11 @@ sub process {
 		$OPTS->{'images-without-videos'} = 1 unless(defined $OPTS->{'images-without-videos'});
 		$OPTS->{'videos-without-images'} = 1 unless(defined $OPTS->{'videos-without-images'});
 	}
-	foreach(@_) {
+	foreach my $name (@_) {
+		foreach(glob("$name/*")) {
+			next if(m/^\./);
+			next if(m/\/\./);
+			next unless(-d $_);
 		print STDERR "Processing [$_] ...\n";
 		my @result;
 		if($OPTS->{all}) {
@@ -1370,6 +1378,18 @@ sub process {
 					Babes::List::get_duplicated($_,1)
 				);
 			}
+			my $weipaid = undef;
+			foreach my $dn (qw/douyin.com meipai.com
+				miaopai.com	weipai.cn weishi.com vlook.cn/) {
+				if(m/^$dn/i or m/\/$dn/i) {
+					$weipaid = 1;
+					last;
+				}
+			}
+			if(!$weipaid) {
+				print STDERR "Ignored directory $_\n";
+				next;
+			}
 			if($OPTS->{'images-without-videos'}) {
 				process_result($OPTS,$_,
 					'Images files without related videos',
@@ -1382,6 +1402,7 @@ sub process {
 					Babes::List::get_videos_without_images($_)
 				);
 			}
+		}
 		}
 	}
 	return 0;
@@ -1707,6 +1728,88 @@ sub process {
 #			Babes::Move::process(\%llopts,$SRC);
 #		}
 	}
+}
+1;
+#######################################################################
+package Babes::Save;
+use File::Spec;
+sub save {
+	my $OPTS = shift;
+	my $dst = shift;
+	my $name = shift;
+	my $src = readlink($name);
+	$src = $name if(!$src);
+	my $srcd = $src;
+	$srcd =~ s/\/+$//;
+	$srcd =~ s/\/[^\/]+$//;
+	if($src =~ m/\/([^\/]+)\/[^\/]+$/) {
+		$dst = File::Spec->catdir($dst,$1);
+	}
+	my $dstd = File::Spec->catdir($dst,$name);
+	#move to target
+	print "Cleaning $name\n";
+	system("babes","clean","--weipai","--",$name);
+	#print "Copying media files => $dst \n";
+	#system("tar -ch --remove-files --exclude '.mtm' --exclude '*.lst' --exclude '*.txt' -C '$srcd' '$name/' | tar -xv -C '$dst'");
+	if(-d $dstd) {
+		print "Copying all files => $dst ...\n";
+		print "    Files copyied : ";
+		system("cp -avf -t '$dst' -- '$src' | wc -l");
+		print "  [OK]\n";
+		print "Cleaning media files ...\n";
+		print "    Files deleted : ";
+		system("find '$src\/' -mindepth 2 -type f \\( -iname '*.ts' -or -iname '*.mp4' -or -iname '*.flv' -or -iname '*.jpg' -or -iname '*.png' -or -iname '*.gif' -or -iname '*.mov' \\) -exec rm -v -- {} + | wc -l");
+		 
+		print "  [OK]\n";
+	}
+	else {
+		print "Moving all files => $dstd...\n";
+		system("mv -vf -t '$dst' -- '$src'");
+		print "  [OK]\n";
+		print "Coping back some files...\n";
+		system("tar -ch --exclude '*.gif' --exclude '*.png' --exclude '*.mov' --exclude '*.jpg' --exclude '*.ts' --exclude '*.mp4' --exclude '*.flv' -C '$dst' '$name/' | tar -xv -C '$srcd'");
+		print "  [OK]\n";
+	}
+
+}
+sub process {
+	my $OPTS = shift;
+	my %lopts = (%$OPTS);
+	$OPTS = \%lopts;
+
+	if(!@_) {
+		die("Usage: $0 save [options] target_directory source_directories\n");
+	}
+
+	my $DST = shift;
+	if(!@_) {
+		unshift @_,$DST;
+		$DST = Babes::get_pref("save-default") || 'Save';
+	}
+	if($DST !~ /^\.+?\//) { #NOT FULL QULIFIED PATH 
+		my $dpre = $OPTS->{'save-prefix'} || Babes::get_pref("save-prefix") || Babes::get_pref("move-prefix");
+		if($dpre) {
+			$DST = File::Spec->catdir($dpre,$DST);
+		}
+	}
+	foreach my $SRC (@_) {
+		if($OPTS->{'mkdir'}) {
+			if(! -d $SRC) {
+				print STDERR "[$SRC] creating directory";
+				if(mkdir $SRC) {
+					print STDERR "\t[OK]\n";
+				}
+				else {
+					print STDERR "\t[FAILED]\n";
+					next;
+				}
+			}
+
+		}
+		print STDERR "Saving $SRC to $DST\n";
+		save($OPTS,$DST,$SRC);
+	}
+	return 0;
 }
 1;
 #######################################################################
