@@ -67,6 +67,7 @@ else {
 print STDERR Data::Dumper->Dump([$rule],['*rule']) unless(@ARGV);
 #my ($status,$result) = $uh->process($rule);
 my ($status,$result) = $uh->process($url,$level);
+delete $result->{json} unless($OPTS{json});
 
 sub error {
 	my $r = shift;

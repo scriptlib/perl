@@ -142,6 +142,34 @@ my %RULES = (
 		$new =~ s/([-\.　－＿])_+/$1/g;
 		return $new;
 	},
+	SN=>sub {
+		my $old = shift;
+		my $new = $old;
+		$new =~ s/^(.+?[^a-zA-Z]+)([a-zA-Z]+)-(\d+)([\.\-_\s]+)(.+)$/$2-$3_$1$4$5/;
+		if($new eq $old) {
+			$new =~ s/^([a-zA-Z]+)-(\d+)([\.\-_\s]+)(.+)$/$1-$2_$3$4/;
+		}
+		$new =~ s/\s+/_/g;
+		$new =~ s/([\.\-_]){2,}/$1/g;
+		$new =~ s/[\.\-_]+\.([^\.]+)$/.$1/g;
+		return $new;
+	},
+	weibo=>sub {
+		my $old = shift;
+		my $new = $old;
+		$new =~ s/_[0-9a-zA-Z]{32}\.([^\.]+)/.$1/;
+		if($old eq $new) {
+			return $new;
+		}
+		my $ndx = 1;
+		my $bak = $new;
+		while(-e $new) {
+			my $suf = strnum(++$ndx,2);
+			$new = $bak;
+			$new =~ s/\.([^\.]+)$/_$suf\.$1/;
+		}
+		return $new;
+	},
 );
 
 my $exp;

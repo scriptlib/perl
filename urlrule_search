@@ -134,9 +134,17 @@ my %ENGINES = (
 	},
 	'yase'=>{
 		domain=>'yase520.com',
-		keyword=>['https://www.yase9.com/search/keywords/###QUERY###',2,'%20'],
+		keyword=>['https://9.yase520.com/search/keywords/###QUERY###',2,'%20'],
 		groups=>'clips,jav,homemade,cn,leakage,nsfw',
 	},
+	'javwide'=>{
+		domain=>'javwide.com',
+		keyword=>['https://www5.javwide.com/search/movie?q=###QUERY###',3,'+'],
+		tags=>['https://www5.javwide.com/tag/###QUERY###',3,'-'],
+		category=>['https://www5.javwide.com/category/###QUERY###',3,'-'],
+		name=>['https://www5.javwide.com/star/###QUERY###',3,'-'],
+		groups=>'jav,nsfw',
+	}
 );
 
 my %engine;
