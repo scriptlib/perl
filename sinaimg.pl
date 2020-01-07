@@ -1,23 +1,21 @@
-#!/usr/bin/env perl 
+#!/usr/bin/perl 
 # $Id$
 #===============================================================================
-#         NAME: grep-dirs-contain
+#         NAME: sinaimg
 #  DESCRIPTION: 
-#       AUTHOR: xiaoranzzz <xiaoranzzz@MyPlace>
+#       AUTHOR: xiaoranzzz <xiaoranzzz@MYPLACE>
 # ORGANIZATION: MyPlace HEL ORG.
 #      VERSION: 1.0
-#      CREATED: 2018-07-17 03:45
+#      CREATED: 2019-12-22 00:47
 #     REVISION: ---
 #===============================================================================
-package MyPlace::Script::grep_dirs_contain;
+package MyPlace::Script::sinaimg;
 use strict;
 
 our $VERSION = 'v0.1';
 my @OPTIONS = qw/
 	help|h|? 
 	manual|man
-	invert|i
-	count|c=i
 /;
 my %OPTS;
 if(@ARGV)
@@ -36,49 +34,16 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
     exit $v;
 }
 
-sub process {
-	my $dir = shift;
-	my $exp = shift;
-	my @dirs;
-	my $count = 0;
-	opendir my $FI,$dir;
-	foreach(readdir($FI)) {
-		#print STDERR "$dir: $_\n";
-		if(m/$exp/) {
-			$count++;
-		}
-		next if(m/^\.+$/);
-		if(-d "$dir/$_") {
-			push @dirs,"$dir/$_";
-		}
-	}
-	close $FI;
-	foreach(@dirs) {
-		$count += process($_,$exp);
-	}
-	return $count;
-}
-
-my $exp = shift;
 foreach(@ARGV) {
-	if(!-d $_) {
-		print STDERR "\"$_\" no directory [IGNORED]\n";
-		next;
-	}
-	my $r = process($_,$exp);
-	if($OPTS{invert}) {
-		if($r<=$OPTS{count}) {
-			print $_,"\n";
-		}
-		else {
-			print STDERR "\"$_\" no match [IGNORED]\n";
-		}
-	}
-	elsif($r>=$OPTS{count}) {
-		print $_,"\n";
-	}
-	else {
-		print STDERR "\"$_\" no match [IGNORED]\n";
+	if(m/([\da-zA-Z]{32}).*\.([^\.]+)$/) {
+		my $id = $1;
+		my $ext = $2;
+		my $filename = $_;
+		$filename =~ s/.*\///;
+		my $rename = $filename;
+		$rename =~ s/\.([^\.]+)$/.bak.$1/;
+		rename $_,$rename;
+		system("download","http://ww4.sinaimg.cn/large/$id.$ext","-s",$filename);
 	}
 }
 
@@ -89,11 +54,11 @@ __END__
 
 =head1  NAME
 
-grep-dirs-contain - PERL script
+sinaimg - PERL script
 
 =head1  SYNOPSIS
 
-grep-dirs-contain [options] ...
+sinaimg [options] ...
 
 =head1  OPTIONS
 
@@ -123,13 +88,13 @@ ___DESC___
 
 =head1  CHANGELOG
 
-    2018-07-17 03:45  xiaoranzzz  <xiaoranzzz@MyPlace>
+    2019-12-22 00:47  xiaoranzzz  <xiaoranzzz@MYPLACE>
         
         * file created.
 
 =head1  AUTHOR
 
-xiaoranzzz <xiaoranzzz@MyPlace>
+xiaoranzzz <xiaoranzzz@MYPLACE>
 
 =cut
 

@@ -20,6 +20,7 @@ my @OPTIONS = qw/
 	method|by|m=s
 	grep
 	append
+	simple
 /;
 my %OPTS;
 if(@ARGV)
@@ -75,6 +76,9 @@ sub do_action {
 		if($_->{direct}) {
 			$URLRULE->{request}->{"dbfile"} = "urls.good.lst";
 		}
+		elsif($OPTS{simple}) {
+			$URLRULE->{request}->{"dbfile"} = "urls.lst";
+		}
 		else {
 			$URLRULE->{request}->{"dbfile"} = "urls.search.lst";
 		}
@@ -119,6 +123,7 @@ my %ENGINES = (
 		keyword=>['https://tubepornclassic.com/search/###QUERY###',2,'%20'],
 		name=>['https://tubepornclassic.com/models/###QUERY###/',2,'-'],
 		groups=>'porn,nsfw',
+		disabled=>1,
 	},
 	'megatube'=>{
 		domain=>'megatube.xxx',
@@ -126,6 +131,7 @@ my %ENGINES = (
 		name=>['https://www.megatube.xxx/###QUERY###.pornstar',2,'-'],
 		keyword=>['https://www.megatube.xxx/search/###QUERY###/',2,'-'],
 		groups=>'porn,nsfw',
+		disabled=>1,
 	},
 	'javmobile'=>{
 		domain=>'javmobile.mobi',
@@ -136,6 +142,12 @@ my %ENGINES = (
 		domain=>'yase520.com',
 		keyword=>['https://9.yase520.com/search/keywords/###QUERY###',2,'%20'],
 		groups=>'clips,jav,homemade,cn,leakage,nsfw',
+		disabled=>1,
+	},
+	'kedou'=>{
+		domain=>'kedou.xxx',
+		keyword=>['http://www.xiaobi009.com/search/###QUERY###/',2,'-'],
+		groups=>'clips,jav,homemade,cn,leakage,nsfw',
 	},
 	'javwide'=>{
 		domain=>'javwide.com',
@@ -144,7 +156,18 @@ my %ENGINES = (
 		category=>['https://www5.javwide.com/category/###QUERY###',3,'-'],
 		name=>['https://www5.javwide.com/star/###QUERY###',3,'-'],
 		groups=>'jav,nsfw',
-	}
+		disabled=>1,
+	},
+	'ku137'=>{
+		domain=>'ku137.net',
+		keyword=>['https://www.ku137.net/plus/search.php?q=###QUERY###',2,'+'],
+		groups=>'babes,babe',
+	},
+	'555duo'=>{
+		domain=>'555duo.net',
+		keyword=>['https://www.555duo.net/plus/search.php?keyword=###QUERY###',2,'+'],
+		groups=>'babes,babe',
+	},
 );
 
 my %engine;
@@ -178,8 +201,13 @@ foreach(keys %engine) {
 		next if($method eq 'domain');
 		next if($method eq 'group');
 		next unless($method =~ m/$OPTS{method}/);
-		app_message2 "uses engine $_, search by $method\n";
-		push @engine,[$_,@{$e->{$method}}];		
+		if($e->{disabled}) {
+			app_message2 "disabled engine $_\n";
+		}
+		else {
+			app_message2 "uses engine $_, search by $method\n";
+			push @engine,[$_,@{$e->{$method}}];		
+		}
 	}
 }
 
@@ -263,6 +291,9 @@ my $action = $OPTS{action} || 'DATABASE';
 app_message2 "with action:$action\n";
 app_message2 "executing...\n";
 my $exit = do_action(\%OPTS,$action,@request);
+if($OPTS{simple}) {
+	exit ($exit ? 1 : 0);
+}
 if($OPTS{grep} and -f "urls.search.lst") {
 	my $pat = join(" ",@QUERIES);
 	my @prog = ("grep_edit",$pat,"urls.search.lst","--output","urls.lst");

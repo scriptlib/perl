@@ -110,11 +110,12 @@ sub get_basename {
 
 sub ms_path {
 	my $src = shift;
-	#my $dst = `cygpath -w  -- "$src"`;
-	#chomp($dst);
-	my $dst = $src;
-	$dst =~ s/\//\\/g;
+	my $dst = `cygpath -w  -- "$src"`;
+	chomp($dst);
 	return $dst;
+	#my $dst = $src;
+	#$dst =~ s/\//\\/g;
+	#return $dst;
 }
 
 sub print_link {

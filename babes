@@ -1163,6 +1163,9 @@ sub get {
 		$OPTS->{empty} = 1 unless(defined $OPTS->{empty});
 		$OPTS->{'images-without-videos'} = 1 unless(defined $OPTS->{'images-without-videos'});
 	}
+	if($OPTS->{weibo}) {
+		$OPTS->{'videos-without-images'} = 1 unless(defined $OPTS->{'videos-without-images'});
+	}
 	my @result;
 	foreach(@_) {
 		print STDERR "Processing [$_] ...\n";
@@ -1352,6 +1355,10 @@ sub process {
 		$OPTS->{'images-without-videos'} = 1 unless(defined $OPTS->{'images-without-videos'});
 		$OPTS->{'videos-without-images'} = 1 unless(defined $OPTS->{'videos-without-images'});
 	}
+	if($OPTS->{weibo}) {
+		#$OPTS->{empty} = 1 unless(defined $OPTS->{empty});
+		$OPTS->{'videos-without-images'} = 1 unless(defined $OPTS->{'videos-without-images'});
+	}
 	foreach my $name (@_) {
 		foreach(glob("$name/*")) {
 			next if(m/^\./);
@@ -1380,8 +1387,8 @@ sub process {
 			}
 			my $weipaid = undef;
 			foreach my $dn (qw/douyin.com meipai.com
-				miaopai.com	weipai.cn weishi.com vlook.cn/) {
-				if(m/^$dn/i or m/\/$dn/i) {
+				miaopai.com	weipai.cn weishi.com vlook.cn weibo.com/) {
+				if(m/$dn/) {
 					$weipaid = 1;
 					last;
 				}

@@ -1,23 +1,24 @@
-#!/usr/bin/env perl 
+#!/usr/bin/perl 
 # $Id$
 #===============================================================================
-#         NAME: grep-dirs-contain
+#         NAME: r-rm
 #  DESCRIPTION: 
-#       AUTHOR: xiaoranzzz <xiaoranzzz@MyPlace>
+#       AUTHOR: xiaoranzzz <xiaoranzzz@MYPLACE>
 # ORGANIZATION: MyPlace HEL ORG.
 #      VERSION: 1.0
-#      CREATED: 2018-07-17 03:45
+#      CREATED: 2019-11-29 23:48
 #     REVISION: ---
 #===============================================================================
-package MyPlace::Script::grep_dirs_contain;
+package MyPlace::Script::r_rm;
 use strict;
 
 our $VERSION = 'v0.1';
 my @OPTIONS = qw/
 	help|h|? 
 	manual|man
-	invert|i
-	count|c=i
+	force|f
+	verbose|v
+	recursive|r
 /;
 my %OPTS;
 if(@ARGV)
@@ -36,52 +37,32 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
     exit $v;
 }
 
-sub process {
-	my $dir = shift;
-	my $exp = shift;
-	my @dirs;
-	my $count = 0;
-	opendir my $FI,$dir;
-	foreach(readdir($FI)) {
-		#print STDERR "$dir: $_\n";
-		if(m/$exp/) {
-			$count++;
-		}
-		next if(m/^\.+$/);
-		if(-d "$dir/$_") {
-			push @dirs,"$dir/$_";
-		}
-	}
-	close $FI;
-	foreach(@dirs) {
-		$count += process($_,$exp);
-	}
-	return $count;
+my @files = @ARGV;
+if(!@files) {
+	die("Usage: $0 [options] files...\n");
 }
-
-my $exp = shift;
-foreach(@ARGV) {
-	if(!-d $_) {
-		print STDERR "\"$_\" no directory [IGNORED]\n";
-		next;
-	}
-	my $r = process($_,$exp);
-	if($OPTS{invert}) {
-		if($r<=$OPTS{count}) {
-			print $_,"\n";
+my %dups;
+my @args;
+while(@files) {
+	local $_ = shift(@files);
+	next if($dups{$_});
+	push @args,$_;
+	print STDERR "X $_\n"; 
+	$dups{$_} = 1;
+	if(m/\.[^\/]+$/) {
+		s/\.[^\/]+$//;
+		foreach my $slim (glob($_ . ".*")) {
+			next if($dups{$slim});
+			push @files,$slim;
 		}
-		else {
-			print STDERR "\"$_\" no match [IGNORED]\n";
-		}
-	}
-	elsif($r>=$OPTS{count}) {
-		print $_,"\n";
-	}
-	else {
-		print STDERR "\"$_\" no match [IGNORED]\n";
 	}
 }
-
+my @progs = ("/bin/rm");
+push @progs,"-r" if($OPTS{recursive});
+push @progs,"-v" if($OPTS{verbose});
+push @progs,"-f" if($OPTS{force});
+push @progs,"--",@args;
+exec(@progs);
 
 __END__
 
@@ -89,11 +70,11 @@ __END__
 
 =head1  NAME
 
-grep-dirs-contain - PERL script
+r-rm - PERL script
 
 =head1  SYNOPSIS
 
-grep-dirs-contain [options] ...
+r-rm [options] ...
 
 =head1  OPTIONS
 
@@ -123,13 +104,13 @@ ___DESC___
 
 =head1  CHANGELOG
 
-    2018-07-17 03:45  xiaoranzzz  <xiaoranzzz@MyPlace>
+    2019-11-29 23:48  xiaoranzzz  <xiaoranzzz@MYPLACE>
         
         * file created.
 
 =head1  AUTHOR
 
-xiaoranzzz <xiaoranzzz@MyPlace>
+xiaoranzzz <xiaoranzzz@MYPLACE>
 
 =cut
 

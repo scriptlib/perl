@@ -1,23 +1,21 @@
-#!/usr/bin/env perl 
+#!/usr/bin/perl 
 # $Id$
 #===============================================================================
-#         NAME: grep-dirs-contain
+#         NAME: list-dir
 #  DESCRIPTION: 
-#       AUTHOR: xiaoranzzz <xiaoranzzz@MyPlace>
+#       AUTHOR: xiaoranzzz <xiaoranzzz@MYPLACE>
 # ORGANIZATION: MyPlace HEL ORG.
 #      VERSION: 1.0
-#      CREATED: 2018-07-17 03:45
+#      CREATED: 2019-12-01 03:21
 #     REVISION: ---
 #===============================================================================
-package MyPlace::Script::grep_dirs_contain;
+package MyPlace::Script::list_dir;
 use strict;
 
 our $VERSION = 'v0.1';
 my @OPTIONS = qw/
 	help|h|? 
 	manual|man
-	invert|i
-	count|c=i
 /;
 my %OPTS;
 if(@ARGV)
@@ -36,49 +34,23 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
     exit $v;
 }
 
-sub process {
-	my $dir = shift;
-	my $exp = shift;
-	my @dirs;
-	my $count = 0;
-	opendir my $FI,$dir;
-	foreach(readdir($FI)) {
-		#print STDERR "$dir: $_\n";
-		if(m/$exp/) {
-			$count++;
-		}
-		next if(m/^\.+$/);
-		if(-d "$dir/$_") {
-			push @dirs,"$dir/$_";
-		}
-	}
-	close $FI;
-	foreach(@dirs) {
-		$count += process($_,$exp);
-	}
-	return $count;
-}
+my $output = shift;
+die("Usage: $0 <output> dirs...\n") unless(@ARGV);
 
-my $exp = shift;
 foreach(@ARGV) {
-	if(!-d $_) {
-		print STDERR "\"$_\" no directory [IGNORED]\n";
-		next;
-	}
-	my $r = process($_,$exp);
-	if($OPTS{invert}) {
-		if($r<=$OPTS{count}) {
-			print $_,"\n";
+	print STDERR "Listing $_ \n";
+	if(open FO,">>","$_/$output") {
+		foreach my $f (glob("$_/*")) {
+			next if($f =~ m/\/\./);
+			next if($f eq "$_/$output");
+			print STDERR " -- $f\n";
+			print FO $f,"\n";
 		}
-		else {
-			print STDERR "\"$_\" no match [IGNORED]\n";
-		}
-	}
-	elsif($r>=$OPTS{count}) {
-		print $_,"\n";
+		close FO;
+		print STDERR ">>$_/$output";
 	}
 	else {
-		print STDERR "\"$_\" no match [IGNORED]\n";
+		print STDERR "  Error opening $_/$output \n";
 	}
 }
 
@@ -89,11 +61,11 @@ __END__
 
 =head1  NAME
 
-grep-dirs-contain - PERL script
+list-dir - PERL script
 
 =head1  SYNOPSIS
 
-grep-dirs-contain [options] ...
+list-dir [options] ...
 
 =head1  OPTIONS
 
@@ -123,13 +95,13 @@ ___DESC___
 
 =head1  CHANGELOG
 
-    2018-07-17 03:45  xiaoranzzz  <xiaoranzzz@MyPlace>
+    2019-12-01 03:21  xiaoranzzz  <xiaoranzzz@MYPLACE>
         
         * file created.
 
 =head1  AUTHOR
 
-xiaoranzzz <xiaoranzzz@MyPlace>
+xiaoranzzz <xiaoranzzz@MYPLACE>
 
 =cut
 

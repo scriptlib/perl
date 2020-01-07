@@ -16,6 +16,7 @@ our $VERSION = 'v0.1';
 my @OPTIONS = qw/
 	help|h|? 
 	manual|man
+	filename|n
 /;
 my %OPTS;
 if(@ARGV)
@@ -39,16 +40,32 @@ my %dup;
 foreach(<>) {
 	chomp;
 	next unless(-f $_);
-	next unless(-r $_);
-	my $fh;
-	if(!(open $fh,'<',$_)) {
-		print STDERR "Error opening $_: $!\n";
-		next;
+	next unless($OPTS{filename} or -r $_);
+	my $md5 = $_;
+	if($OPTS{filename}) {
+		if(m/^(.+?)(\[[^\]]*\])?\.(flv|mov|mp4|mpeg|ts|f4v|mov)$/i) {
+			$md5 = "$1|video";
+		}
+		elsif(m/^(.+?)(\[[^\]]*\])?\.(3in1\.jpg|jpg|jpeg|png)$/i) {
+			$md5 = "$1|picture";
+		}
+		elsif(m/^(.+?)(\[[^\]]*\])?\.m3u8$/i) {
+			if($dup{"$1|video"}) {
+				$md5 = "$1|video";
+			}
+		}
 	}
-	$dg->reset();
-	$dg->addfile($fh);
-	my $md5 = $dg->hexdigest();
-	close $fh;
+	else {
+		my $fh;
+		if(!(open $fh,'<',$_)) {
+			print STDERR "Error opening $_: $!\n";
+			next;
+		}
+		$dg->reset();
+		$dg->addfile($fh);
+		$md5 = $dg->hexdigest();
+		close $fh;
+	}
 	if($dup{$md5}) {
 		print $_,"\n";
 	}

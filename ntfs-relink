@@ -24,7 +24,7 @@ foreach(@files) {
 		next;
 	}
         printf STDERR "%-10s%s...\n","Relinking",$_;
-	if(system('ntfs-link',$newlink,$_) == 0) {
+	if(system('ntfs-link',"--",$newlink,$_) == 0) {
             printf STDERR "%-10s%s\n%-10s%s\n",
             "From:","\"$oldlink\"",
             "To:","\"$newlink\"";

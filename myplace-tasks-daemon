@@ -118,7 +118,12 @@ foreach(@CONFIG_KEYS,@CMDLINE_OPTS) {
 	}
 }
 $TASKER->{DEBUG} = 1 if($OPTS{debug});
-$TASKER->runonce(@ARGV) if($OPTS{runonce});
+if(@ARGV) {
+	$OPTS{runonce} = 1;
+}
+if($OPTS{runonce}) {
+	$TASKER->runonce(@ARGV)
+}
 
 my $F_LOG = File::Spec->catfile($CONFIGDIR,"mtd.log");
 my $FH_LOG;
@@ -336,6 +341,7 @@ if($OPTS{worker}) {
 #
 #my $NO_TASKS_BUILDER = ($TBCOUNT <= 0);
 
+@WATCHER = () if($OPTS{runonce});
 foreach(@WATCHER) {
 	next unless($_);
 	next if($_->{disabled});
@@ -409,6 +415,7 @@ while(!$TASKER->end()) {
 			app_warning "Write configuration to $CONFIGURATION\n";
 			sc_to_file($CONFIGURATION,$MYSETTING);
 		}
+		last if($OPTS{runonce});
 		sleep 1;
 	}
 	elsif($OPTS{runonce}) {
