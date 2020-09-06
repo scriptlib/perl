@@ -1,6 +1,7 @@
 #!/usr/bin/perl
-
+use Encode qw/find_encoding from_to/;
 use URI::Escape qw/uri_escape uri_escape_utf8/;
 my $text = join('',<>);
+from_to($text,"utf8","gb2312");
 print uri_escape($text);
 

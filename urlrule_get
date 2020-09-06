@@ -1,33 +1,3 @@
-#!/usr/bin/perl -w
-# $Id$
-###APPNAME:     urlrule_get
-###APPAUTHOR:   duel
-###APPDATE:	Mon Mar 24 06:25:31 2008
-###APPVER:	0.1
-###APPDESC:     apply rule for URL,and perform action	
-###APPUSAGE:	urlrule_get URL [0-5] [action args...]
-###APPEXAMPLE:	urlrule_get http://www.sina.com.cn 0 cat
-use strict;
-use lib $ENV{XR_PERL_MODULE_DIR};
-use MyPlace::Script::Usage qw/help_even_empty/;
-exit 0 if(help_even_empty($0,@ARGV));
-use MyPlace::Script::Message;
-use MyPlace::URLRule qw/parse_rule/;
-use Encode qw/find_encoding/;
+#!/bin/sh
+exec urlrule --action download "$@"
 
-my $utf8 = find_encoding("utf8");
-foreach(@ARGV) {
-	$_=$utf8->decode($_);
-}
-my $rule = parse_rule(@ARGV);
-push @ARGV,"batchget -c -M 600 -f -n '$rule->{domain}\[$rule->{level}\]' -r '#URLRULE_BASE#'";
-my $urlrule_action = `which urlrule_action`;
-chomp($urlrule_action);
-eval `cat "$urlrule_action"`;
-if($@) {
-	print STDERR "$@\n";
-	exit 1;
-}
-else {
-	exit 0;
-}

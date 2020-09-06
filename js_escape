@@ -1,5 +1,5 @@
 #!/usr/bin/perl -W
-use encoding utf8;
+use utf8;
 use Encode;
 $ARGV[0]="--help" unless(@ARGV);
 exit 0 unless(system("plhelp",$0,(@ARGV)));
@@ -16,6 +16,6 @@ if (@ARGV < 1) {
 }
 else {
     foreach(@ARGV) {
-        print(&escape((decode("utf8",$_))));        
+        print(&escape((decode("gb2312",$_))));        
     }
 }

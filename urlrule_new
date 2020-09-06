@@ -159,7 +159,7 @@ TMPLINLINE
 	if($rule{source}) {
 		$DEF{ID} = $rule{source};
 		$DEF{ID} =~ s/^.*\/([^\/]+)\/([^\/]+)$/$1_$2/; 
-		$DEF{ID} =~ s/\./_/g;
+		$DEF{ID} =~ s/[-\.]/_/g;
 	}
 foreach(@TEXT) {
 	foreach my $D(keys %DEF) {

@@ -21,6 +21,7 @@ my @OPTIONS = qw/
 	grep
 	append
 	simple
+	force
 /;
 my %OPTS;
 if(@ARGV)
@@ -63,8 +64,10 @@ sub do_action {
 			'thread'=>$OPTS->{thread},
 			'createdir'=>1,
 			'buildurl'=>1,
+			'force'=>$OPTS->{force},
 			'options'=>{
 				fullname=>$OPTS->{fullname},
+				force=>$OPTS->{force},
 			},
 			'include'=>$OPTS->{include},
 			'exclude'=>$OPTS->{exclude},
@@ -140,13 +143,13 @@ my %ENGINES = (
 	},
 	'yase'=>{
 		domain=>'yase520.com',
-		keyword=>['https://9.yase520.com/search/keywords/###QUERY###',2,'%20'],
+		keyword=>['https://w.9huase.com/search/keywords/###QUERY###',2,'%20'],
 		groups=>'clips,jav,homemade,cn,leakage,nsfw',
 		disabled=>1,
 	},
 	'kedou'=>{
 		domain=>'kedou.xxx',
-		keyword=>['http://www.xiaobi009.com/search/###QUERY###/',2,'-'],
+		keyword=>['http://www.xiaobi014.com/search/###QUERY###/',2,'-'],
 		groups=>'clips,jav,homemade,cn,leakage,nsfw',
 	},
 	'javwide'=>{
@@ -162,11 +165,58 @@ my %ENGINES = (
 		domain=>'ku137.net',
 		keyword=>['https://www.ku137.net/plus/search.php?q=###QUERY###',2,'+'],
 		groups=>'babes,babe',
+		encode=>'gb2312',
 	},
 	'555duo'=>{
 		domain=>'555duo.net',
 		keyword=>['https://www.555duo.net/plus/search.php?keyword=###QUERY###',2,'+'],
 		groups=>'babes,babe',
+		encode=>'gb2312',
+	},
+	'd8swe.xyz'=>{
+		domain=>'d8swe.syz',
+		keyword=>['http://avid8eo.ainjijj.space/v/search?title=###QUERY###',2,'+'],
+		tags=>['http://avid8eo.ainjijj.space/v/search?tag_name=###QUERY###',2,'+'],
+		groups=>'jav,porn,clips,cn,homemade,leakage,nsfw',
+	},
+	'tom203.com'=>{
+		domain=>'tom203.com',
+		keyword=>['https://tomi987.com/e/search/index.php?keyboard=###QUERY###&show=title&tbname=movie&tempid=1',3,'+'],
+		groups=>'jav,porn,clips,cn,homemade,leakage,nsfw',
+		sites=>['https://tom889.com/',4],
+	},
+	'ddxzp.com'=>{
+		domain=>'ddxzp.com',
+		sites=>['http://ddxzp.com/video/category/free?pageNo=1&pageSize=60',1,''],
+		groups=>'sites',
+	},
+	'hg-22.xyz'=>{
+		domain=>'hg-22.xyz',
+		sites=>['https://hg-22.xyz/',3,''],
+		keyword=>['https://hg-22.xyz/index.php/vod/search.html?wd=###QUERY###',2,'+'],
+		tags=>['https://hg-22.xyz/index.php/vod/search/tag/###QUERY###.html',2,'+'],
+		groups=>'jav,homemade,leakage,nsfw,clips,cn',
+	},
+	'fi11.com'=>{
+		domain=>'fi11.com',
+		sites=>['https://www.hxcpp10.com/',2],
+		groups=>'sites',
+	},
+	'ps5566.com'=>{
+		domain=>'ps5566.com',
+		sites=>['https://ps5566.com/',3],
+		groups=>'sites',
+	},
+	'arzon.jp'=>{
+		domain=>'arzon.jp',
+		keyword=>['https://www.arzon.jp/itemlist.html?t=&m=all&s=&q=###QUERY###',2,'+'],
+		tags=>['https://www.arzon.jp/itemlist.html?t=&m=all&s=&q=###QUERY###',2,'+'],
+		groups=>'jav,nsfw,covers',
+	},
+	'bbs.my9600.com'=>{
+		domain=>'bbs.my9600.com',
+		sites=>['https://bbs.my9600.com/',3],
+		groups=>'sites',
 	},
 );
 
@@ -187,6 +237,7 @@ else{
 	$OPTS{group} = 'default' unless($OPTS{group});
 	foreach(keys %ENGINES) {
 		my $groups = $ENGINES{$_}->{groups};
+		next unless($groups);
 		if($groups =~ m/$OPTS{group}/) {
 			$engine{$_} = 1;
 		}
@@ -217,12 +268,15 @@ if(!@engine) {
 }
 
 if(!@ARGV) {
-	foreach my $fk(qw/keywords.lst keywords.txt/) {
+	foreach my $fk(qw/keywords.lst keywords.txt names.txt/) {
 		next unless(-f $fk);
 		app_message2 "Read queires from <$fk>\n";
 		open FI,'<',$fk or next;
 		foreach(<FI>) {
 			s/[\r\n]+$//;
+			s/^\s*//;
+			s/\s*$//;
+			s/^[^:]*://;
 			next unless($_);
 			push @ARGV,$_;
 			app_message2 "  : $_\n" 
@@ -264,6 +318,7 @@ foreach(@ARGV) {
 	s/^\.+//;
 	push @QUERIES,$_;
 }
+$OPTS{simple} = 1 if($OPTS{method} eq 'sites');
 
 my @request;
 foreach my $QUERY(@QUERIES) {
@@ -274,6 +329,18 @@ foreach my $QUERY(@QUERIES) {
 		my $level = $e->[2];
 		my $space = $e->[3];
 		my $direct = $e->[4];
+		
+		if($OPTS{method} eq 'sites') {
+			if($ENGINES{$name}->{domain} !~ $QUERY) {
+				next;
+			}
+		}
+		if($ENGINES{$name}->{encode}) {
+			use Encode qw/from_to/;
+			use URI::Escape qw/uri_escape/;
+			from_to($key,"utf8",$ENGINES{$name}->{encode});
+			$key = uri_escape($key);
+		}
 		#app_message2 "Search \<$QUERY\> using engine \[$name\]\n";
 		$key =~ s/\s+/$space/g;
 		$url =~ s/###QUERY###/$key/g;
