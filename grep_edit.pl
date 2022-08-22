@@ -18,6 +18,7 @@ my @OPTIONS = qw/
 	manual|man
 	output|o=s
 	append|a
+	filename|n
 /;
 my %OPTS;
 if(@ARGV)
@@ -74,6 +75,11 @@ foreach my $filename (@files) {
 	foreach(<$FI>) {
 		$total++;
 		my $line = lc($_);
+		if($OPTS{filename}) {
+			if($line =~ m/.*\/([^\/]+?)\/?$/) {
+				$line = $1;
+			}
+		}
 		my $save = 1;
 		foreach my $w(@words) {
 			if(index($line,$w)<0) {

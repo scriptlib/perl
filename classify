@@ -3,7 +3,7 @@
 package MyPlace::Script::classify;
 use strict;
 use MyPlace::Classify qw/read_rules/;
-our $VERSION = 'v0.1';
+our $VERSION = 'v1.1';
 
 
 my @OPTIONS = qw/
@@ -67,7 +67,8 @@ my %Actions;
 		'name'=>'keyword',
 		'do'=>sub {
 			my ($files,$rule) = @_;
-			my $target = $rule->{dest} . '/' . $rule->{name} . '/'; 
+			my $result = $rule->{name};
+			my $target = $rule->{dest} . '/' . $result . '/'; 
 		    system_run('mkdir','-pv','--',$target) unless(-d $target || $TESTMODE);
 			my @prog = ();
 			push @prog,split(/\s+/,$OPTS{prefix}) if($OPTS{prefix});
@@ -75,9 +76,9 @@ my %Actions;
 			my @suf = ();
 			push @suf,split(/\s+/,$OPTS{suffix}) if($OPTS{suffix});
 			print STDERR "  <@prog>, " if(@prog);
-			print STDERR $rule->{name},"\n";
+			print STDERR $result,"\n";
 			my @keywords;
-			push @keywords,$rule->{name} unless($rule->{exclude_name});
+			push @keywords,$result unless($rule->{exclude_name});
 			push @keywords, @{$rule->{keyword}} if($rule->{keyword});
 			my $CWD = getcwd;
 			chdir $target;
@@ -200,6 +201,18 @@ my %Actions;
 my %TestMethod;
 
 %TestMethod = (
+	'rule'=>{
+		'name'=>'rule',
+		'test'=>sub {
+			my $query = shift;
+			my $exp = shift;
+			my $rule = shift;
+			foreach($exp,$rule->{name},@{$rule->{keywords}}) {
+				return 1 if(m/$query/);
+			}
+			return 0;
+		},
+	},
 	'name'=>{
 		'name'=>'name',
 		'test'=>sub {
@@ -217,10 +230,7 @@ my %TestMethod;
 			my $right = shift;
 			my $rule = shift;
 			my $regexp = undef;
-			if(($right =~ m/^\//) and ($right =~ m/\/$/)) {
-				$regexp = 1;
-			}
-			elsif($right =~ m/\*|\?/) {
+			if($rule->{name} =~ m/\$1/) {
 				$regexp = 1;
 			}
 			my $icase = $TestMethod{text}->{case};
@@ -233,11 +243,16 @@ my %TestMethod;
 			foreach(@icase) {
 				return 1 if($ileft eq $_);
 			}
+			$rule->{result} = undef;
 			if($icase) {
-				return $left =~ $right;
+				if($left =~ m/$right/) {
+					$rule->{result} = eval("\"$rule->{name}\"") if($regexp);
+					return 1;
+				}
 			}
-			else {
-				return $left =~ /$right/i;
+			elsif($left =~ /$right/i) {
+				$rule->{result} = eval("\"$rule->{name}\"") if($regexp);
+				return 1;
 			}
 			return undef;
 		},
@@ -332,7 +347,24 @@ sub system_run {
     return system(@_)==0;
 }
 sub do_action {
-    return $ACTION->{do}->(@_);
+	my $files = shift;
+	my $rule = shift;
+	my $exit;
+	if($rule->{names}) {
+		my %r = %$rule;
+		foreach my $name(keys %{$rule->{names}}) {
+			my $ff = $rule->{names}->{$name};
+			next unless(ref $ff);
+			next unless(@$ff);
+			print STDERR "  [$rule->{name}] => $name matches " . scalar(@$ff) . " files:\n";
+			$r{name} = $name;
+			$exit = $ACTION->{do}->($ff,\%r,@_);
+		}
+	}
+	else {
+		$exit = $ACTION->{do}->($files,$rule,@_);
+	}
+	return $exit;
 }
 
 sub test {
@@ -350,8 +382,18 @@ sub classify {
     if($status) {
         $CLASSIFIED{$file} = 1;
         $rule->{files}=[] if(!$rule->{files});
-        push @{$rule->{files}},$file;
         print STDERR "Classify [",$rule->{name},($msg ? ": $msg" : ""),"] $file\n" if($OPTS{verbose});
+		if($rule->{result}) {
+			#print STDERR "  $rule->{name} => $rule->{result} matched $file\n";
+			$rule->{names} = {} unless($rule->{names});
+			$rule->{names}->{$rule->{result}} = [] unless($rule->{names}->{$rule->{result}});
+			push @{$rule->{names}->{$rule->{result}}},$file;
+			push @{$rule->{files}},$file;#[$file,$rule->{result}];
+			$rule->{result} = undef;
+		}
+		else {
+	        push @{$rule->{files}},$file;
+		}
         return $file,$rule;
     }
 	else {
@@ -366,8 +408,10 @@ sub process_nofiles {
 	my $files = shift;
 	my $rules = shift;
 	my $idx = 0;
+	my $total = 0;
 	my @match = ();
 	if($files and @$files) {
+		$total = @$files;
 		foreach my $rule(@$rules) {
 			foreach my $file(@files) {
 				if(test($file,$rule)) {
@@ -410,6 +454,7 @@ sub process_rule {
 sub process {
     my $files = shift;
     my $rules = shift;
+	my $total = scalar(@$files);
     foreach my $rule (@$rules) {
         process_rule($files,$rule);
     }
@@ -425,12 +470,15 @@ sub process {
             print STDERR "Class [$rule->{name}] matches nothing!\n" if($OPTS{debug} || $OPTS{verbose});
         }
     }
+	print STDERR "-"x40 . "\nFiles Processed   :   $total\n";
 	if($count) {
-		print STDERR "Total $count files classified\n\n";
+		print STDERR "Files Classified  :   $count\n";
+		print STDERR "Files Untouched   :   " . (0 + $total - $count) . "\n";
 	}
 	else {
-		print STDERR "Rules match no file\n\n";
+		print STDERR "But rules match no file\n\n";
 	}
+	print STDERR "-"x40 . "\n";
     #foreach(@$files) {
     #    process_file($_,$rules);
     #}
@@ -438,11 +486,19 @@ sub process {
 
 
 $DEST = $OPTS{'dest'} || '.';
-$METHOD = $OPTS{'by'} || 'text';
+$METHOD = $OPTS{'by'};
 $RULE_FILE = $OPTS{'rule'} || 'classify.rule';
 $TESTMODE = $OPTS{'test'} || '';
 my $ACTION_NAME=$OPTS{'action'} || 'query';
 $ACTION=$Actions{$ACTION_NAME};
+if(!$METHOD) {
+	if($ACTION_NAME eq 'query') {
+		$METHOD = 'rule';
+	}
+	else {
+		$METHOD = 'text';
+	}
+}
 
 if($OPTS{dump}) {
 	$RULES=read_rules($RULE_FILE,$DEST);
@@ -504,6 +560,7 @@ if(!@files) {
 if(!@files) {
 	die("Error: Nothing to do.\n");
 }
+
 
 exit process(\@files,$RULES);
 

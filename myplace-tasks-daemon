@@ -26,6 +26,8 @@ my @OPTIONS = qw/
 	watch=s
 	worker=s
 	no-resume|new
+	follow=s
+	new-tasks
 /;
 my %OPTS;
 my $USE_LAST_CONFIG = 1;
@@ -69,12 +71,25 @@ if(! -d $CONFIGDIR) {
 our $CONFIGURATION = File::Spec->catdir($CONFIGDIR,"config");
 our $MYSETTING = $OPTS{runonce} ? {} :  sc_from_file($CONFIGURATION);
 
-my @CONFIG_KEYS = qw/sleep/;
+my @CONFIG_KEYS = qw/sleep follow/;
 my @CMDLINE_OPTS = qw/no-resume no-pull no-push disable-download disable-all-download no-download no-git include exclude no-saveurl/;
 my @OPTS_KEYS = ($USE_LAST_CONFIG ? (@CONFIG_KEYS,@CMDLINE_OPTS) : @CONFIG_KEYS);
+
+
+$OPTS{follow} = 'follows' unless(defined $OPTS{follow});
+if(!defined $MYSETTING->{"options.follow"}) {
+	if($OPTS{follow} ne 'follows') {
+		$OPTS{'no-resume'} = 1;
+	}
+}
+elsif($MYSETTING->{"options.follow"} ne $OPTS{follow}) {
+	$OPTS{'no-resume'} = 1;
+}
+
 foreach (@OPTS_KEYS) {
 	$OPTS{$_} = $MYSETTING->{"options.$_"} if(!defined $OPTS{$_});
 }
+
 foreach(@CONFIG_KEYS,@CMDLINE_OPTS) {
 	if(defined $OPTS{$_}) {
 		$MYSETTING->{"options.$_"} = $OPTS{$_};
@@ -84,7 +99,6 @@ foreach(@CONFIG_KEYS,@CMDLINE_OPTS) {
 	}
 }
 
-
 $MYSETTING->{_DIR} = $CONFIGDIR;
 print STDERR "CONFIG : $CONFIGDIR\n" if($OPTS{debug});
 
@@ -92,6 +106,9 @@ our $TASKER;
 our @WATCHER;
 our @LISTENER;
 our @WORKER;
+
+
+
 
 ######DISABLE GIT
 if(!$OPTS{"no-git"}) {

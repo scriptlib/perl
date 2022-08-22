@@ -64,6 +64,7 @@ my @OPTIONS = qw/
 	same-directory
 	mkdir|md
 	fullname|full
+	keep-filename
 /;
 our %CONF;
 our @DATABASE_DIR = qw{
@@ -647,11 +648,18 @@ sub move_to {
 			foreach my $file (glob("$srcd/*/*/*.*")) {
 #				print STDERR $file,"\n";
 				if($file =~ m/^(.*?([^\/]+)\/[^\/]+\/([^\/]+))\/([^\/]+?)\.(mov\.3in1\.jpg|mov|flv|mp4|f4v|mpeg|png|gif|jpg|ts)$/) {
-					if($OPTS->{'same-directory'}) {
-						$clips{$file} = "$1/$2_$4_$3.$5";
+					my $long_name;
+					if($OPTS->{'keep-filename'}) {
+						$long_name = "$4.$5"
 					}
 					else {
-						$clips{$file} = "$2_$4_$3.$5";
+						$long_name = "$2_$4_$3.$5";
+					}
+					if($OPTS->{'same-directory'}) {
+						$clips{$file} = "$1/$long_name";
+					}
+					else {
+						$clips{$file} = $long_name;
 					}
 				}
 			}
@@ -668,6 +676,7 @@ sub move_to {
 	if($OPTS->{clips} or $OPTS->{into}) {
 		print STDERR "  Move files into <$dstd>:\n";
 		print STDERR "\tNothing to do,  files not found\n" unless(%clips);
+		mkdir $dstd unless(-d $dstd);
 		foreach my $src (keys %clips) {
 			my $dst = $OPTS->{'same-directory'} ? $clips{$src} : catfile($dstd,$clips{$src});
 			print STDERR "    <= " . $clips{$src} . "\n";
@@ -705,6 +714,7 @@ sub move_to {
 				push @ods,$_;
 			}
 		}
+		mkdir $dstd unless(-d $dstd);
 		print STDERR "  Move directories into <$dstd>:\n";
 		foreach(@ods) {
 			print STDERR "    <= $_\n";

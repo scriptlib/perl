@@ -54,6 +54,36 @@ sub _safe_path {
 	}
 }
 
+sub append_file {
+	my $dst = shift;
+	my $src = shift;
+	my %holder;
+	if(open FI,"<",$dst) {
+		foreach(<FI>) {
+			$holder{$_} = 1;
+		}
+		close FI;
+	}
+	if(!open FO,">>",$dst) {
+		print STDERR "Error writting $dst ...\n";
+		return 2;
+	}
+	if(!open FI,"<",$src) {
+		print STDERR "Error reading $src ...\n";
+		return 3;
+	}
+	my $count = 0;
+	foreach(<FI>) {
+		next if($holder{$_});
+		print FO $_;
+		$count ++;
+	}
+	close FI;
+	close FO;
+	print STDERR "Append $src ($count lines) to $dst\n";
+	return 0;
+}
+
 sub do_action {
 	my $OPTS = shift;
 	my $action = shift;
@@ -98,12 +128,37 @@ sub do_action {
 
 
 my %ENGINES = (
+	'xhdporno.club'=>{
+		domain=>'xhdporno.club',
+		keyword=>['https://xhdporno.club/search?text=###QUERY###',2,'%20'],
+		category=>['https://xhdporno.club/category/###QUERY###/',2,'-'],
+		name=>['https://xhdporno.club/models/###QUERY###/',2,'-'],
+		groups=>'porn,nsfw',
+		direct=>1,
+		no_grep=>1,
+	},
+	'hifiporn'=>{
+		domain=>'hifiporn.cc',
+		keyword=>['https://hifiporn.cc/xxx/###QUERY###/',2,'-'],
+		groups=>'porn,nsfw',
+	},
+	'mypornvid.cc'=>{
+		domain=>'mypornvid.cc',
+		keyword=>['https://mypornvid.cc/videos/###QUERY###/',2,'-'],
+		groups=>'porn,nsfw',
+	},
+	'pornmaster.cc'=>{
+		domain=>'pornmaster.cc',
+		keyword=>['https://pornmaster.cc/hd/###QUERY###/',2,'-'],
+		groups=>'porn,nsfw',
+	},
 	'txxx'=>{
 		domain=>'txxx.com',
 		keyword=>['https://www.txxx.com/search/?s=###QUERY###',2,'+'],
 		category=>['https://www.txxx.com/categories/###QUERY###/',2,'-'],
 		name=>['https://www.txxx.com/models/###QUERY###/',2,'-'],
 		groups=>'porn,nsfw',
+		disabled=>1,
 	},
 	'spankbang'=>{
 		domain=>'spankbang.com',
@@ -111,13 +166,14 @@ my %ENGINES = (
 		category=>['https://spankbang.com/category/###QUERY###/',2,'+'],
 		tags=>['https://spankbang.com/tag/###QUERY###/',2,'+'],
 		groups=>'default,porn,nsfw',
+		disabled=>1,
 	},
 	'xhamster'=>{
-		domain=>'xhamster.one',
-		keyword=>['https://xhamster.one/search?q=###QUERY###',2,'+'],
-		name=>['https://xhamster.one/pornstars/###QUERY###',2,'-'],
-		category=>['https://xhamster.one/categories/###QUERY###',2,'-'],
-		tags=>['https://xhamster.one/tags/###QUERY###',2,'-'],
+		domain=>'xhamster15.com',
+		keyword=>['https://xhamster15.com/search?q=###QUERY###',2,'+'],
+		name=>['https://xhamster15.com/pornstars/###QUERY###',2,'-'],
+		category=>['https://xhamster15.com/categories/###QUERY###',2,'-'],
+		tags=>['https://xhamster15.com/tags/###QUERY###',2,'-'],
 		groups=>'porn,nsfw',
 	},
 	'tubepornclassic'=>{
@@ -136,9 +192,19 @@ my %ENGINES = (
 		groups=>'porn,nsfw',
 		disabled=>1,
 	},
+	'noodlemagazine.com'=>{
+		domain=>"pornomilf.club",
+		keyword=>["https://noodlemagazine.com/video/###QUERY###",2,' '],
+		groups=>"porn,nsfw",
+	},
+	'pornomilf.club'=>{
+		domain=>"pornomilf.club",
+		keyword=>["https://pornomilf.club/###QUERY###/",3,' '],
+		groups=>"porn,nsfw",
+	},
 	'javmobile'=>{
 		domain=>'javmobile.mobi',
-		keyword=>['https://javmobile.mobi/videos/###QUERY###/',2,'-'],
+		keyword=>['https://javmobile.mobi/videos/###QUERY###/',3,'-'],
 		groups=>'jav,nsfw',
 	},
 	'yase'=>{
@@ -181,9 +247,9 @@ my %ENGINES = (
 	},
 	'tom203.com'=>{
 		domain=>'tom203.com',
-		keyword=>['https://tomi987.com/e/search/index.php?keyboard=###QUERY###&show=title&tbname=movie&tempid=1',3,'+'],
+		keyword=>['https://tom386.com/e/search/index.php?keyboard=###QUERY###&show=title&tbname=movie&tempid=1',3,'+'],
 		groups=>'jav,porn,clips,cn,homemade,leakage,nsfw',
-		sites=>['https://tom889.com/',4],
+		sites=>['https://tom386.com/',4],
 	},
 	'ddxzp.com'=>{
 		domain=>'ddxzp.com',
@@ -329,6 +395,7 @@ foreach my $QUERY(@QUERIES) {
 		my $level = $e->[2];
 		my $space = $e->[3];
 		my $direct = $e->[4];
+		$direct = 1 if($ENGINES{$name}->{direct});
 		
 		if($OPTS{method} eq 'sites') {
 			if($ENGINES{$name}->{domain} !~ $QUERY) {
@@ -351,36 +418,30 @@ foreach my $QUERY(@QUERIES) {
 			level=>$level,
 			prompt=>"$name:$QUERY",
 			direct=>$direct,
+			engine=>$e,
 		};
 	}
 }
+#if(-f "urls.lst") {
+#	app_message2 "backing up \"urls.lst\" ...";
+#	rename "urls.lst","urls.lst." . scalar(time);
+#}
 my $action = $OPTS{action} || 'DATABASE';
 app_message2 "with action:$action\n";
 app_message2 "executing...\n";
 my $exit = do_action(\%OPTS,$action,@request);
 if($OPTS{simple}) {
-	exit ($exit ? 1 : 0);
 }
-if($OPTS{grep} and -f "urls.search.lst") {
+elsif($OPTS{grep} and -f "urls.search.lst") {
 	my $pat = join(" ",@QUERIES);
-	my @prog = ("grep_edit",$pat,"urls.search.lst","--output","urls.lst");
+	my @prog = ("grep_edit","--filename","--output","urls.lst");
 	push @prog,"--append" if($OPTS{append});
+	push @prog,"--",$pat,"urls.search.lst";
 	system(@prog);
 }
 foreach(qw/urls.good.lst urls.static.lst/) {
 	next unless(-f $_);
-	if(!open FO,">>","urls.lst") {
-		print STDERR "Error writting urls.lst ...\n";
-		exit 2;
-	}
-	if(!open FI,"<",$_) {
-		print STDERR "Error reading $_ ...\n";
-		next;
-	}
-	print FO <FI>;
-	close FI;
-	close FO;
-	print STDERR "Append $_ to urls.lst\n";
+	$exit = append_file("urls.lst",$_);
 }
 
 exit 1 unless(defined $exit);

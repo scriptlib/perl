@@ -47,13 +47,16 @@ if(!$action) {
 	elsif($OPTS{additem}) {
 		$action = 'ADDITEM';
 	}
+	elsif($OPTS{delete}) {
+		$action = 'DELETE';
+	}
 }
 else {
 	$action = uc($action);
 }
 $action = uc(shift(@ARGV)) unless($action);
 
-if($action !~ /^(?:ADD|QUERY|DUMP|ADDITEM)$/) {
+if($action !~ /^(?:ADD|QUERY|DUMP|ADDITEM|DELETE)$/) {
 	print STDERR "Error action <$action> not supported\n";
 	exit 1;
 }
@@ -75,6 +78,20 @@ if($action eq 'ADD') {
 	($status,@targets) = $sq->add(@query);
 	if($status) {
 		print STDERR "$status item(s) add to database\n";
+		if($data) {
+			$sq->saveTo($data);
+		}
+	}
+	else {
+		print STDERR "Error: ",join(" ",@targets),"\n";
+		exit 2;
+	}
+	
+}
+elsif($action eq 'DELETE') {
+	($status,@targets) = $sq->delete(@query);
+	if($status) {
+		print STDERR @targets,"\n";
 		if($data) {
 			$sq->saveTo($data);
 		}

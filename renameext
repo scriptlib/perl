@@ -32,6 +32,7 @@ my @OPTIONS= qw/
 	delete
 	lastname|l
 	mkdir|makedir|make-dir|md
+	copy|c
 /;
 GetOptions(\%OPTS,@OPTIONS);
 exit_usage(0,$0) if($OPTS{'help'});
@@ -297,10 +298,15 @@ sub my_rename {
 			system("mkdir","-pv",$pdir) unless(-d $pdir);
 		}
 	}
-    rename $old,"$tempname" or return undef;
-	if(!rename $tempname,$new) {
-		rename $tempname,$old;
-		return undef;
+	if($OPTS{copy}) {
+		return (system("cp","-a","--",$old,$new) == 0);
+	}
+	else {
+	    rename $old,"$tempname" or return undef;
+		if(!rename $tempname,$new) {
+			rename $tempname,$old;
+			return undef;
+		}
 	}
     return 1;
 }

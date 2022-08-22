@@ -15,6 +15,27 @@ use strict;
 use lib $ENV{XR_PERL_MODULE_DIR};
 use MyPlace::Config;
 use Term::ANSIColor;
+my @OPTIONS = qw/file|f:s help|h manual|man|m/;
+my %OPTS;
+if(@ARGV)
+{
+    require Getopt::Long;
+    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
+}
+else {
+	$OPTS{'help'} = 1;
+}
+
+if($OPTS{manual}) {
+    require Pod::Usage;
+    Pod::Usage::pod2usage(-exitval=>0,-verbose => 2);
+    exit 0;
+}
+elsif($OPTS{help}) {
+    require Pod::Usage;
+    Pod::Usage::pod2usage(-exitval=>0,-verbose => 1);
+    exit 0;
+}
 
 
 sub print1 {
@@ -24,7 +45,9 @@ sub print2 {
     print STDERR color('yellow'),@_,color('reset');
 }
 sub print3 {
-    print STDERR color('red'),@_,color('reset');
+	if($OPTS{verbose}) {
+	    print STDERR color('red'),@_,color('reset');
+	}
 }
 
 sub print_path {
@@ -64,27 +87,6 @@ sub print_target {
     }
 }
 
-my @OPTIONS = qw/file|f:s help|h manual|man|m/;
-my %OPTS;
-if(@ARGV)
-{
-    require Getopt::Long;
-    Getopt::Long::GetOptions(\%OPTS,@OPTIONS);
-}
-else {
-	$OPTS{'help'} = 1;
-}
-
-if($OPTS{manual}) {
-    require Pod::Usage;
-    Pod::Usage::pod2usage(-exitval=>0,-verbose => 2);
-    exit 0;
-}
-elsif($OPTS{help}) {
-    require Pod::Usage;
-    Pod::Usage::pod2usage(-exitval=>0,-verbose => 1);
-    exit 0;
-}
 
 my $CONFIG;
 my $database = $OPTS{file};

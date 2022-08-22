@@ -1,7 +1,7 @@
 #!/usr/bin/perl 
 # $Id$
 #===============================================================================
-#         NAME: new_name
+#         NAME: find_rule
 #  DESCRIPTION: create a directory based on names
 #       AUTHOR: xiaoranzzz <xiaoranzzz@MYPLACE>
 # ORGANIZATION: MyPlace HEL ORG.
@@ -10,7 +10,7 @@
 #     REVISION: ---
 #===============================================================================
 
-package MyPlace::Script::new_name;
+package MyPlace::Script::find_rule;
 use strict;
 use warnings;
 use utf8;
@@ -19,7 +19,6 @@ our $VERSION = 'v0.1';
 my @OPTIONS = qw/
 	help|h|? 
 	manual|man
-	rule|r=s
 /;
 my %OPTS;
 if(@ARGV)
@@ -39,57 +38,7 @@ if($OPTS{'help'} or $OPTS{'manual'}) {
 }
 
 my $cat = shift;
-my $data = shift;
-if(!$data) {
-	$data = $cat;
-	$cat = undef;
-}
 
-if((!$cat) and ($OPTS{rule})) {
-	$cat = $OPTS{rule} if(-d $OPTS{rule});
-}
-
-my @data = split(/\s*,\s*/,$data);
-my $name = shift(@data);
-my $pdir = $cat ? "$cat/$name" : "$name";
-my %dups;
-
-system("mkdir","-p","-v","--",$pdir) unless(-d $pdir);
-
-if(open FI,"<","$pdir/names.txt") {
-	$dups{$_} = 1 foreach(<FI>);
-	close FI;
-}
-
-print STDERR "Writting <$pdir/names.txt> ...";
-open FO,">>","$pdir/names.txt" or die("\n$!\n");
-
-my $prefix = $OPTS{rule} ? $OPTS{rule} . ":" : "";
-
-my $count = 0;
-foreach($name,@data) {
-	if($OPTS{rule} and ($OPTS{rule} eq 'avstar') or ($OPTS{rule} eq 'pornstar')) {
-		if(m/^[\w\s_-]+$/) {
-			$prefix = "porn:";
-		}
-		else {
-			$prefix = "jav|cn:";
-		}
-	}
-	my $line = $prefix . $_ . "\n";
-	next if($dups{$line});
-	$count++;
-	print FO $line;
-	print STDERR "\n    ",$line;
-}
-close FO;
-if($count>0) {
-	print STDERR "  [OK]\n";
-}
-else {
-	print STDERR "  [Nothing changed]\n";
-}
-print STDERR "\n";
 use File::Spec::Functions qw/catfile/;
 #RULE
 
@@ -111,14 +60,14 @@ use File::Spec::Functions qw/catfile/;
 #3. "classify"
 #4. ".rules"
 #5. ".classify"
-if($OPTS{rule}) {
+if($cat) {
 	my $rule_dir;
 	my $rule_file;
 	foreach my $pdir(".",$ENV{HOME}) {
 		foreach my $pre("","rules","classify",".rules",".classify") {
-			foreach my $pre2(".","/","/.","/$OPTS{rule}.") {
+			foreach my $pre2(".","/","/.","/${cat}.") {
 				foreach my $suf("rule","rules") {
-					my $t = catfile($pdir,$pre,$OPTS{rule} . $pre2 . $suf);
+					my $t = catfile($pdir,$pre,${cat} . $pre2 . $suf);
 					if(-f $t) {
 						$rule_file = $t;
 						last;
@@ -138,16 +87,9 @@ if($OPTS{rule}) {
 			last if($rule_dir);
 		}
 		$rule_dir = catfile($ENV{HOME},".classify") unless($rule_dir);
-		if(!-d $rule_dir) {
-			system(qw/mkdir -p -v --/,$rule_dir);
-		}
-		if(!-d $rule_dir) {
-			print STDERR "Error creating directory $rule_dir\n!";
-			exit 1;
-		}
-		$rule_file = catfile($rule_dir,$OPTS{rule} . ".rule");
+		$rule_file = catfile($rule_dir,${cat} . ".rule");
 	}
-	system("confa","-f",$rule_file,"--","add",$name,@data);
+	print $rule_file,"\n";
 }
 
 
@@ -157,11 +99,11 @@ __END__
 
 =head1  NAME
 
-new_name - PERL script
+find_rule - PERL script
 
 =head1  SYNOPSIS
 
-new_name [options] ...
+find_rule [options] ...
 
 =head1  OPTIONS
 
